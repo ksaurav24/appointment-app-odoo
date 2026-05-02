@@ -24,6 +24,7 @@ export function ForgotPasswordForm() {
     try {
       const result = await forgotPasswordMutation.mutateAsync(values);
       toast.success(result.message);
+      // Keeping email in query avoids re-entering it on OTP verification.
       const emailQuery = encodeURIComponent(values.email);
       router.push(`${ROUTES.otpVerification}?email=${emailQuery}&flow=reset`);
     } catch (error) {

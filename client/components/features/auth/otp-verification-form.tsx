@@ -16,6 +16,7 @@ export function OtpVerificationForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const emailFromQuery = searchParams.get("email") ?? "";
+  // One OTP page serves multiple flows; query param decides post-verify route.
   const flow = searchParams.get("flow");
   const { otpVerificationMutation } = useAuth();
   const { register, handleSubmit, formState } = useForm<OtpVerificationFormValues>({

@@ -25,6 +25,7 @@ export function SignupForm() {
       const result = await signupMutation.mutateAsync(values);
       toast.success(result.message);
       reset();
+      // Carry email forward so OTP page can prefill and reduce typing mistakes.
       const emailQuery = encodeURIComponent(values.email);
       router.push(`${ROUTES.otpVerification}?email=${emailQuery}&flow=signup`);
     } catch (error) {

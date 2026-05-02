@@ -1,4 +1,4 @@
-export const APP_NAME = "Appointment App";
+export const APP_NAME = "BookEase";
 export const DEMO_OTP = "123456";
 
 // Central route constants prevent hardcoded path typos in components.
