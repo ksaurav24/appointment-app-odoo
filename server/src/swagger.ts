@@ -8,7 +8,7 @@ export function setupSwagger(app: INestApplication): void {
   const config = new DocumentBuilder()
     .setTitle('Appointment App API')
     .setDescription(
-      'Multi-tenant appointment booking platform — auth, organizations, and (forthcoming) appointment endpoints.',
+      'Multi-tenant appointment booking platform — auth, organizations, bookable inventory, and appointment-type configuration.',
     )
     .setVersion('0.1.0')
     .addCookieAuth(
@@ -20,6 +20,22 @@ export function setupSwagger(app: INestApplication): void {
     .addTag('auth', 'Authentication, registration, and account management')
     .addTag('organizations', 'Organization (organizer-tenant) endpoints')
     .addTag('admin', 'Administrator-only endpoints')
+    .addTag(
+      'bookable-persons',
+      'Organizer-managed human service providers (no login, receive email notifications)',
+    )
+    .addTag(
+      'bookable-resources',
+      'Organizer-managed physical assets (no login, no notifications)',
+    )
+    .addTag(
+      'appointment-types',
+      'Organizer configuration: entities, schedule, booking rules, cancellation/reschedule policy, publish state',
+    )
+    .addTag(
+      'public-appointment-types',
+      'Customer-facing discovery of published appointment types',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

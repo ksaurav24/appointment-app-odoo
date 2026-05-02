@@ -5,9 +5,12 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AdminModule } from './admin/admin.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AppointmentTypesModule } from './appointment-types/appointment-types.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { BookablePersonsModule } from './bookable-persons/bookable-persons.module';
+import { BookableResourcesModule } from './bookable-resources/bookable-resources.module';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -38,6 +41,9 @@ import { UsersModule } from './users/users.module';
     OrganizationsModule,
     AuthModule,
     AdminModule,
+    BookablePersonsModule,
+    BookableResourcesModule,
+    AppointmentTypesModule,
   ],
   controllers: [AppController],
   providers: [
