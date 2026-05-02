@@ -85,7 +85,6 @@ export class AuthController {
       : { userId: result.userId, message };
   }
 
-
   @Public()
   @Throttle({ otpSubmit: { limit: 10, ttl: 600_000 } })
   @HttpCode(HttpStatus.OK)

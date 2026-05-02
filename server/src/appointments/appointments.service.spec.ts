@@ -84,6 +84,7 @@ interface PrismaMockHandles {
   appointmentAnswerCreateMany: jest.Mock;
   slotLockDelete: jest.Mock;
   appointmentFindUnique: jest.Mock;
+  txExecuteRaw: jest.Mock;
 }
 
 function makePrisma(handles: PrismaMockHandles): PrismaService {
@@ -98,6 +99,7 @@ function makePrisma(handles: PrismaMockHandles): PrismaService {
       count: handles.slotLockCount,
       delete: handles.slotLockDelete,
     },
+    $executeRaw: handles.txExecuteRaw,
   };
   return {
     slotLock: { findUnique: handles.slotLockFindUnique },
@@ -148,6 +150,7 @@ describe('AppointmentsService.create', () => {
         status: AppointmentStatus.CONFIRMED,
         confirmationCode: 'CC-XYZ',
       }),
+      txExecuteRaw: jest.fn().mockResolvedValue(1),
     };
     notifications = makeNotifications();
     const cacheStub = {
@@ -228,6 +231,29 @@ describe('AppointmentsService.create', () => {
     ).rejects.toThrow(ConflictException);
   });
 
+  it('takes a per-slot advisory lock inside the transaction before checking capacity', async () => {
+    await service.create(customerId, {
+      slotLockId: lockIdString,
+      answers: [{ questionId: questionIdString, answerText: '10' }],
+    });
+
+    expect(handles.txExecuteRaw).toHaveBeenCalledTimes(1);
+    const [strings, key] = handles.txExecuteRaw.mock.calls[0] as [
+      TemplateStringsArray,
+      string,
+    ];
+    expect(strings.join('')).toMatch(/pg_advisory_xact_lock/);
+    expect(key).toContain(appointmentTypeId);
+    expect(key).toContain('res-1');
+    expect(key).toContain('2026-05-05T09:00:00');
+
+    // Advisory lock must precede the capacity recheck — otherwise the lock
+    // doesn't actually serialise the race window.
+    expect(handles.txExecuteRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      handles.appointmentAggregate.mock.invocationCallOrder[0],
+    );
+  });
+
   it('rejects when capacity check fails inside the transaction (race)', async () => {
     handles.appointmentAggregate.mockResolvedValue({
       _sum: { capacityBooked: 1 },
@@ -270,5 +296,108 @@ describe('AppointmentsService.create', () => {
       expect.anything(),
       expect.objectContaining({ type: 'APPOINTMENT_CREATED' }),
     );
+  });
+});
+
+describe('AppointmentsService.rescheduleByCustomer', () => {
+  const existingAppointmentId = 200n;
+  const existingPublicId = 'apt-public-1';
+
+  function makeExistingAppointment() {
+    return {
+      id: existingAppointmentId,
+      publicId: existingPublicId,
+      organizationId: 'org-1',
+      appointmentTypeId,
+      bookablePersonId: null,
+      bookableResourceId: 'res-1',
+      customerId,
+      startTime: new Date('2026-05-04T09:00:00.000Z'),
+      endTime: new Date('2026-05-04T10:00:00.000Z'),
+      status: AppointmentStatus.CONFIRMED,
+      capacityBooked: 1,
+      rescheduleCount: 0,
+      appointmentType: makeAppointmentType(),
+    };
+  }
+
+  it('takes a per-slot advisory lock for the new slot before checking capacity', async () => {
+    const txExecuteRaw = jest.fn().mockResolvedValue(1);
+    const appointmentAggregate = jest
+      .fn()
+      .mockResolvedValue({ _sum: { capacityBooked: 0 } });
+    const slotLockCount = jest.fn().mockResolvedValue(0);
+    const appointmentRescheduleCreate = jest.fn().mockResolvedValue({});
+    const appointmentUpdate = jest.fn().mockResolvedValue({});
+    const slotLockDelete = jest.fn().mockResolvedValue({});
+    const auditLogCreate = jest.fn().mockResolvedValue({});
+    const appointmentFindUnique = jest.fn().mockResolvedValue({
+      publicId: existingPublicId,
+      status: AppointmentStatus.CONFIRMED,
+    });
+
+    const tx = {
+      appointment: {
+        aggregate: appointmentAggregate,
+        update: appointmentUpdate,
+        findUnique: appointmentFindUnique,
+      },
+      appointmentReschedule: { create: appointmentRescheduleCreate },
+      slotLock: { count: slotLockCount, delete: slotLockDelete },
+      auditLog: { create: auditLogCreate },
+      $executeRaw: txExecuteRaw,
+    };
+    const prisma = {
+      appointment: {
+        findFirst: jest.fn().mockResolvedValue(makeExistingAppointment()),
+      },
+      slotLock: {
+        findUnique: jest.fn().mockResolvedValue(
+          makeLock({
+            slotStart: new Date('2026-05-06T09:00:00.000Z'),
+            slotEnd: new Date('2026-05-06T10:00:00.000Z'),
+          }),
+        ),
+      },
+      $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
+    } as unknown as PrismaService;
+
+    const notifications = makeNotifications();
+    const cacheStub = {
+      invalidateOrgScope: jest.fn().mockResolvedValue(undefined),
+      invalidateAdminScope: jest.fn().mockResolvedValue(undefined),
+      invalidatePrefix: jest.fn().mockResolvedValue(undefined),
+      getOrSet: jest.fn(),
+    } as unknown as ConstructorParameters<typeof AppointmentsService>[3];
+    const service = new AppointmentsService(
+      prisma,
+      {} as OrganizationsService,
+      notifications.service,
+      cacheStub,
+    );
+
+    await service.rescheduleByCustomer(customerId, existingPublicId, {
+      slotLockId: lockIdString,
+    });
+
+    expect(txExecuteRaw).toHaveBeenCalledTimes(1);
+    const [strings, key] = txExecuteRaw.mock.calls[0] as [
+      TemplateStringsArray,
+      string,
+    ];
+    expect(strings.join('')).toMatch(/pg_advisory_xact_lock/);
+    expect(key).toContain(appointmentTypeId);
+    expect(key).toContain('res-1');
+    // Key must reference the NEW slot, not the existing appointment time.
+    expect(key).toContain('2026-05-06T09:00:00');
+    expect(key).not.toContain('2026-05-04T09:00:00');
+
+    expect(txExecuteRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      appointmentAggregate.mock.invocationCallOrder[0],
+    );
+
+    // Sanity: the reschedule actually went through.
+    expect(appointmentUpdate).toHaveBeenCalled();
+    expect(slotLockDelete).toHaveBeenCalled();
   });
 });
