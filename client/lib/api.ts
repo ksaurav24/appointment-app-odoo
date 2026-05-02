@@ -10,12 +10,12 @@ import type {
   LoginResult,
   OrgDetail,
   OrgListing,
+  OrgRegistrationPayload,
   Organization,
   OtpVerificationFormValues,
   RegisterResult,
   ResetPasswordFormValues,
   ResetPasswordResult,
-  SignupFormValues,
   VerifyEmailResult,
 } from "@/types";
 
@@ -174,22 +174,21 @@ function buildMockUser(record: MockUserRecord): AuthUser {
 // ─── Auth API ─────────────────────────────────────────────────────────────────
 
 /**
- * POST /auth/register
- * Registers a new customer account.
- * Returns { userId, message } — NOT tokens.
- * User must verify email before they can log in.
- *
- * Field mapping: form.fullName → RegisterDto.fullName
+ * POST /auth/register  (Customer path)
+ * Registers a new customer. No organization object → backend sets role=CUSTOMER.
+ * Returns { userId, message }. No cookies issued — user must verify email then login.
  */
-export async function registerUser(
-  payload: SignupFormValues,
-): Promise<RegisterResult> {
+export async function registerCustomer(creds: {
+  fullName: string;
+  email: string;
+  password: string;
+}): Promise<RegisterResult> {
   if (api.defaults.baseURL) {
     try {
       const { data } = await api.post<RegisterResult>("/auth/register", {
-        fullName: payload.fullName,
-        email: payload.email,
-        password: payload.password,
+        fullName: creds.fullName,
+        email: creds.email,
+        password: creds.password,
       });
       return data;
     } catch (err) {
@@ -199,19 +198,74 @@ export async function registerUser(
 
   // MOCK
   await wait();
-  const key = payload.email.toLowerCase();
+  const key = creds.email.toLowerCase();
   if (mockUsers.has(key)) throw new Error("Email is already registered.");
   const user: MockUserRecord = {
     id: crypto.randomUUID(),
-    fullName: payload.fullName.trim(),
+    fullName: creds.fullName.trim(),
     email: key,
-    password: payload.password,
+    password: creds.password,
     emailVerified: false,
   };
   mockUsers.set(key, user);
   return {
     userId: user.id,
     message: "Account created — check your email for a verification code.",
+  };
+}
+
+/**
+ * POST /auth/register  (Organizer path)
+ * Registers a new organizer with their organization data in one atomic transaction.
+ * Backend sets role=ORGANIZER and creates the org record together.
+ * Returns { userId, organizationId, message }.
+ * No cookies issued — user must verify email then login.
+ *
+ * Backend RegisterOrganizationDto fields:
+ *   name, slug, contactEmail (required)
+ *   description, contactPhone, address, timezone (optional)
+ */
+export async function registerOrgUser(
+  payload: OrgRegistrationPayload,
+): Promise<RegisterResult> {
+  if (api.defaults.baseURL) {
+    try {
+      const { data } = await api.post<RegisterResult>("/auth/register", {
+        fullName: payload.user.fullName,
+        email: payload.user.email,
+        password: payload.user.password,
+        organization: {
+          name: payload.org.name,
+          slug: payload.org.slug,
+          contactEmail: payload.user.email, // org contact = user email
+          description: payload.org.description,
+          contactPhone: payload.org.contactPhone,
+          address: payload.org.address,
+          timezone: payload.org.timezone,
+        },
+      });
+      return data;
+    } catch (err) {
+      extractApiError(err);
+    }
+  }
+
+  // MOCK
+  await wait();
+  const key = payload.user.email.toLowerCase();
+  if (mockUsers.has(key)) throw new Error("Email is already registered.");
+  const user: MockUserRecord = {
+    id: crypto.randomUUID(),
+    fullName: payload.user.fullName.trim(),
+    email: key,
+    password: payload.user.password,
+    emailVerified: false,
+  };
+  mockUsers.set(key, user);
+  return {
+    userId: user.id,
+    organizationId: crypto.randomUUID(),
+    message: "Organisation registered — check your email to verify your account.",
   };
 }
 

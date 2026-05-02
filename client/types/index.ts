@@ -38,6 +38,24 @@ export interface RegisterResult {
   message: string;
 }
 
+// Payload for the organizer signup path — combines user credentials with org details.
+// Passed to registerOrgUser() which calls POST /auth/register with the organization field.
+export interface OrgRegistrationPayload {
+  user: {
+    fullName: string;
+    email: string;
+    password: string;
+  };
+  org: {
+    name: string;
+    slug: string;
+    description?: string;
+    contactPhone?: string;
+    address?: string;
+    timezone?: string;
+  };
+}
+
 // POST /auth/login response.
 // Either 2FA is required (no user/cookies yet) or user is returned with cookies set.
 export interface LoginResult {

@@ -68,4 +68,4 @@ import { UsersModule } from './users/users.module';
     { provide: APP_GUARD, useClass: OrganizationApprovedGuard },
   ],
 })
-export class AppModule {}
+export class AppModule { }
