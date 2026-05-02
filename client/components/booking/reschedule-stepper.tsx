@@ -4,10 +4,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useReducer, useState } from "react";
 import { toast } from "sonner";
 
+import { ArcTimePicker } from "@/components/booking/arc-time-picker";
 import { AvailabilityCalendar } from "@/components/booking/availability-calendar";
-import { DurationPicker } from "@/components/booking/duration-picker";
-import { OpenRangePicker } from "@/components/booking/open-range-picker";
-import { SlotList } from "@/components/booking/slot-list";
 import { SlotLockCountdown } from "@/components/booking/slot-lock-countdown";
 import { CheckoutShell } from "@/components/layout/checkout-shell";
 import { Button } from "@/components/ui/button";
@@ -21,10 +19,7 @@ import {
   useReleaseSlotLock,
   useRescheduleAppointment,
 } from "@/hooks/useBooking";
-import {
-  useAvailability,
-  useDurationOptions,
-} from "@/hooks/usePublicAppointments";
+import { useAvailability } from "@/hooks/usePublicAppointments";
 import { releaseSlotLockBeacon } from "@/lib/api";
 import {
   formatDateInZone,
@@ -32,14 +27,13 @@ import {
 } from "@/lib/format";
 import type { AppointmentWithRelations } from "@/types";
 
-type Step = "date" | "time" | "duration" | "review";
+type Step = "date" | "time" | "review";
 
 type State = {
   step: Step;
   date?: string;
   startTime?: string;
   endTime?: string;
-  durationMinutes?: number;
   reason: string;
   slotLockId?: string;
   slotLockExpiresAt?: string;
@@ -48,8 +42,7 @@ type State = {
 type Action =
   | { type: "SET_STEP"; step: Step }
   | { type: "SET_DATE"; date: string }
-  | { type: "SET_TIME"; startTime: string; endTime?: string }
-  | { type: "SET_DURATION"; durationMinutes: number; endTime: string }
+  | { type: "SET_TIME"; startTime: string; endTime: string }
   | { type: "SET_REASON"; reason: string }
   | { type: "SET_LOCK"; slotLockId: string; slotLockExpiresAt: string }
   | { type: "CLEAR_LOCK" };
@@ -64,19 +57,11 @@ function reducer(state: State, action: Action): State {
         date: action.date,
         startTime: undefined,
         endTime: undefined,
-        durationMinutes: undefined,
       };
     case "SET_TIME":
       return {
         ...state,
         startTime: action.startTime,
-        endTime: action.endTime ?? state.endTime,
-        durationMinutes: undefined,
-      };
-    case "SET_DURATION":
-      return {
-        ...state,
-        durationMinutes: action.durationMinutes,
         endTime: action.endTime,
       };
     case "SET_REASON":
@@ -99,7 +84,6 @@ type Props = { appointment: AppointmentWithRelations };
 export function RescheduleStepper({ appointment }: Props) {
   const router = useRouter();
   const type = appointment.appointmentType;
-  const isVariable = type.durationMode === "VARIABLE";
 
   const [state, dispatch] = useReducer(reducer, {
     step: "date",
@@ -125,19 +109,6 @@ export function RescheduleStepper({ appointment }: Props) {
       undefined,
     timezone: tz,
   });
-
-  const durationsQuery = useDurationOptions(
-    state.step === "duration" && state.startTime ? type.id : undefined,
-    {
-      date: state.date,
-      startTime: state.startTime,
-      entityId:
-        appointment.bookablePersonId ??
-        appointment.bookableResourceId ??
-        undefined,
-      timezone: tz,
-    },
-  );
 
   const acquire = useAcquireSlotLock();
   const extend = useExtendSlotLock();
@@ -232,16 +203,13 @@ export function RescheduleStepper({ appointment }: Props) {
       return;
     }
     if (state.step === "time") dispatch({ type: "SET_STEP", step: "date" });
-    else if (state.step === "duration") dispatch({ type: "SET_STEP", step: "time" });
     else if (state.step === "review")
-      dispatch({ type: "SET_STEP", step: isVariable ? "duration" : "time" });
+      dispatch({ type: "SET_STEP", step: "time" });
   };
 
   const goNext = () => {
     if (state.step === "date") dispatch({ type: "SET_STEP", step: "time" });
     else if (state.step === "time")
-      dispatch({ type: "SET_STEP", step: isVariable ? "duration" : "review" });
-    else if (state.step === "duration")
       dispatch({ type: "SET_STEP", step: "review" });
   };
 
@@ -285,9 +253,7 @@ export function RescheduleStepper({ appointment }: Props) {
       case "date":
         return !state.date;
       case "time":
-        return !state.startTime;
-      case "duration":
-        return !state.durationMinutes;
+        return !state.startTime || !state.endTime;
       default:
         return false;
     }
@@ -331,41 +297,16 @@ export function RescheduleStepper({ appointment }: Props) {
                 <p className="text-sm text-destructive">
                   Couldn&apos;t load times. Try a different date.
                 </p>
-              ) : availabilityQuery.data.durationMode === "FIXED" ? (
-                <SlotList
+              ) : (
+                <ArcTimePicker
                   availability={availabilityQuery.data}
                   selectedStart={state.startTime}
-                  onSelect={(s, e) =>
+                  selectedEnd={state.endTime}
+                  onChange={(s, e) =>
                     dispatch({ type: "SET_TIME", startTime: s, endTime: e })
                   }
                 />
-              ) : (
-                <OpenRangePicker
-                  availability={availabilityQuery.data}
-                  selectedStart={state.startTime}
-                  onSelect={(s) =>
-                    dispatch({ type: "SET_TIME", startTime: s })
-                  }
-                />
               )}
-            </section>
-          ) : null}
-
-          {state.step === "duration" ? (
-            <section className="space-y-4">
-              <h2 className="font-heading text-base font-semibold">Pick a duration</h2>
-              <DurationPicker
-                durations={durationsQuery.data?.durations ?? []}
-                selected={state.durationMinutes}
-                isLoading={durationsQuery.isPending}
-                onSelect={(mins) => {
-                  if (!state.startTime) return;
-                  const endIso = new Date(
-                    new Date(state.startTime).getTime() + mins * 60_000,
-                  ).toISOString();
-                  dispatch({ type: "SET_DURATION", durationMinutes: mins, endTime: endIso });
-                }}
-              />
             </section>
           ) : null}
 

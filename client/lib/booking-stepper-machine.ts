@@ -7,7 +7,6 @@ import type { AppointmentTypeWithRelations } from "@/types";
 export type BookingStep =
   | "entity"
   | "time"
-  | "duration"
   | "questions"
   | "review"
   | "payment";
@@ -29,8 +28,7 @@ export type BookingState = {
 export type BookingAction =
   | { type: "SET_ENTITY"; entityId: string }
   | { type: "SET_DATE"; date: string }
-  | { type: "SET_TIME"; startTime: string; endTime?: string }
-  | { type: "SET_DURATION"; durationMinutes: number; endTime: string }
+  | { type: "SET_TIME"; startTime: string; endTime: string }
   | { type: "SET_ANSWERS"; answers: Record<string, string> }
   | { type: "SET_CAPACITY"; capacityBooked: number }
   | {
@@ -64,19 +62,19 @@ export function bookingReducer(
         endTime: undefined,
         durationMinutes: undefined,
       };
-    case "SET_TIME":
+    case "SET_TIME": {
+      const durationMinutes = Math.round(
+        (new Date(action.endTime).getTime() -
+          new Date(action.startTime).getTime()) /
+          60_000,
+      );
       return {
         ...state,
         startTime: action.startTime,
-        endTime: action.endTime ?? state.endTime,
-        durationMinutes: undefined,
-      };
-    case "SET_DURATION":
-      return {
-        ...state,
-        durationMinutes: action.durationMinutes,
         endTime: action.endTime,
+        durationMinutes,
       };
+    }
     case "SET_ANSWERS":
       return { ...state, answers: action.answers };
     case "SET_CAPACITY":
@@ -108,7 +106,6 @@ export function activeSteps(type: AppointmentTypeWithRelations): BookingStep[] {
   const steps: BookingStep[] = [];
   if (type.assignmentMode === "MANUAL") steps.push("entity");
   steps.push("time");
-  if (type.durationMode === "VARIABLE") steps.push("duration");
   if (type.bookingQuestions.length > 0) steps.push("questions");
   steps.push("review");
   if (type.advancePaymentEnabled) steps.push("payment");

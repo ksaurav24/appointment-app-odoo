@@ -11,13 +11,11 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { ArcTimePicker } from "@/components/booking/arc-time-picker";
 import { AvailabilityCalendar } from "@/components/booking/availability-calendar";
-import { DurationPicker } from "@/components/booking/duration-picker";
 import { EntityPicker } from "@/components/booking/entity-picker";
-import { OpenRangePicker } from "@/components/booking/open-range-picker";
 import { QuestionForm, validateAnswers } from "@/components/booking/question-form";
 import { RazorpayCheckout } from "@/components/booking/razorpay-checkout";
-import { SlotList } from "@/components/booking/slot-list";
 import { SlotLockCountdown } from "@/components/booking/slot-lock-countdown";
 import { StepIndicator } from "@/components/booking/step-indicator";
 import { CheckoutShell } from "@/components/layout/checkout-shell";
@@ -36,10 +34,7 @@ import {
   useReleaseSlotLock,
   useVerifyPayment,
 } from "@/hooks/useBooking";
-import {
-  useAvailability,
-  useDurationOptions,
-} from "@/hooks/usePublicAppointments";
+import { useAvailability } from "@/hooks/usePublicAppointments";
 import {
   bookingReducer,
   INITIAL_STATE,
@@ -139,15 +134,6 @@ export function BookingStepper({ type }: BookingStepperProps) {
     state.date ? type.id : undefined,
     {
       date: state.date,
-      entityId: state.entityId,
-      timezone: type.schedules[0]?.timezone,
-    },
-  );
-  const durationsQuery = useDurationOptions(
-    state.step === "duration" && state.startTime ? type.id : undefined,
-    {
-      date: state.date,
-      startTime: state.startTime,
       entityId: state.entityId,
       timezone: type.schedules[0]?.timezone,
     },
@@ -410,9 +396,7 @@ export function BookingStepper({ type }: BookingStepperProps) {
       case "entity":
         return !state.entityId;
       case "time":
-        return !state.date || !state.startTime;
-      case "duration":
-        return !state.durationMinutes;
+        return !state.date || !state.startTime || !state.endTime;
       case "questions": {
         const v = validateAnswers(type.bookingQuestions, state.answers);
         return !v.isValid;
@@ -481,47 +465,18 @@ export function BookingStepper({ type }: BookingStepperProps) {
                     <p className="text-sm text-destructive">
                       Couldn&apos;t load times. Try a different date.
                     </p>
-                  ) : availabilityQuery.data.durationMode === "FIXED" ? (
-                    <SlotList
-                      availability={availabilityQuery.data}
-                      selectedStart={state.startTime}
-                      onSelect={(s, e) =>
-                        dispatch({ type: "SET_TIME", startTime: s, endTime: e })
-                      }
-                    />
                   ) : (
-                    <OpenRangePicker
+                    <ArcTimePicker
                       availability={availabilityQuery.data}
                       selectedStart={state.startTime}
-                      onSelect={(s) =>
-                        dispatch({ type: "SET_TIME", startTime: s })
+                      selectedEnd={state.endTime}
+                      onChange={(s, e) =>
+                        dispatch({ type: "SET_TIME", startTime: s, endTime: e })
                       }
                     />
                   )}
                 </div>
               </div>
-            </section>
-          ) : null}
-
-          {state.step === "duration" ? (
-            <section className="space-y-4">
-              <h2 className="font-heading text-base font-semibold">Pick a duration</h2>
-              <DurationPicker
-                durations={durationsQuery.data?.durations ?? []}
-                selected={state.durationMinutes}
-                isLoading={durationsQuery.isPending}
-                onSelect={(mins) => {
-                  if (!state.startTime) return;
-                  const endIso = new Date(
-                    new Date(state.startTime).getTime() + mins * 60_000,
-                  ).toISOString();
-                  dispatch({
-                    type: "SET_DURATION",
-                    durationMinutes: mins,
-                    endTime: endIso,
-                  });
-                }}
-              />
             </section>
           ) : null}
 
