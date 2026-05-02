@@ -6,7 +6,6 @@ import type { AppointmentTypeWithRelations } from "@/types";
 
 export type BookingStep =
   | "entity"
-  | "date"
   | "time"
   | "duration"
   | "questions"
@@ -45,7 +44,7 @@ export type BookingAction =
   | { type: "HYDRATE"; state: Partial<BookingState> & { step: BookingStep } };
 
 export const INITIAL_STATE: BookingState = {
-  step: "date",
+  step: "time",
   capacityBooked: 1,
   answers: {},
 };
@@ -108,7 +107,7 @@ export function bookingReducer(
 export function activeSteps(type: AppointmentTypeWithRelations): BookingStep[] {
   const steps: BookingStep[] = [];
   if (type.assignmentMode === "MANUAL") steps.push("entity");
-  steps.push("date", "time");
+  steps.push("time");
   if (type.durationMode === "VARIABLE") steps.push("duration");
   if (type.bookingQuestions.length > 0) steps.push("questions");
   steps.push("review");

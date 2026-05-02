@@ -32,7 +32,7 @@ export function PublishBar({ type }: Props) {
 
   const shareUrl =
     type.shareToken
-      ? `${typeof window !== "undefined" ? window.location.origin : ""}/book/${type.shareToken}`
+      ? `${typeof window !== "undefined" ? window.location.origin : ""}/book/share/${type.shareToken}`
       : null;
 
   const handleCopyLink = async () => {

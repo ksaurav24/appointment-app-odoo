@@ -52,6 +52,7 @@ export class AuthService {
     email: string;
     password: string;
     fullName: string;
+    role?: 'CUSTOMER' | 'ORGANIZER';
     organization?: {
       name: string;
       slug: string;
@@ -64,12 +65,27 @@ export class AuthService {
   }): Promise<{ userId: string; organizationId?: string }> {
     this.password.validatePolicy(input.password);
 
+    const orgInput = input.organization;
+    // Resolution table (see onboarding-restructure-design §4.1):
+    //   role absent  + org absent  -> CUSTOMER, no org
+    //   role absent  + org present -> ORGANIZER + org (legacy atomic path)
+    //   CUSTOMER     + org absent  -> CUSTOMER
+    //   CUSTOMER     + org present -> 400 (conflict)
+    //   ORGANIZER    + org absent  -> ORGANIZER, no org (sequential path)
+    //   ORGANIZER    + org present -> ORGANIZER + org
+    if (input.role === 'CUSTOMER' && orgInput) {
+      throw new BadRequestException(
+        'A customer account cannot be registered with an organization payload',
+      );
+    }
+    const effectiveRole: Role =
+      input.role === 'ORGANIZER' || orgInput ? Role.ORGANIZER : Role.CUSTOMER;
+
     const existing = await this.users.findByEmail(input.email);
     if (existing) {
       throw new ConflictException('Email is already registered');
     }
 
-    const orgInput = input.organization;
     const slug = orgInput?.slug.toLowerCase();
     if (slug) {
       const slugTaken = await this.prisma.organization.findUnique({
@@ -89,7 +105,7 @@ export class AuthService {
             email: input.email.toLowerCase(),
             passwordHash,
             fullName: input.fullName,
-            role: orgInput ? Role.ORGANIZER : Role.CUSTOMER,
+            role: effectiveRole,
             emailVerified: false,
           },
         });
@@ -121,12 +137,21 @@ export class AuthService {
       : { userId: user.id };
   }
 
-  async verifyEmail(email: string, code: string): Promise<void> {
+  /**
+   * Verifies the signup OTP. On the first successful verification, mints
+   * auth tokens so the caller can set cookies and skip the manual login
+   * step. Idempotent re-verification (already verified) returns null tokens.
+   */
+  async verifyEmail(
+    email: string,
+    code: string,
+    meta: RequestMeta,
+  ): Promise<{ tokens: AuthTokens | null }> {
     const user = await this.users.findByEmail(email);
     if (!user) {
       throw new BadRequestException('Invalid or expired code');
     }
-    if (user.emailVerified) return;
+    if (user.emailVerified) return { tokens: null };
 
     const ok = await this.otp.verify(user.id, OtpPurpose.SIGNUP, code);
     if (!ok) {
@@ -135,6 +160,14 @@ export class AuthService {
 
     await this.users.setEmailVerified(user.id);
     await this.mailer.sendWelcome(user.email, user.fullName);
+
+    const refreshed = await this.users.findById(user.id);
+    if (!refreshed) {
+      // Should be impossible — we just updated this user.
+      throw new BadRequestException('Invalid or expired code');
+    }
+    const tokens = await this.issueTokens(refreshed, meta);
+    return { tokens };
   }
 
   /**

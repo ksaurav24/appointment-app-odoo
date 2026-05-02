@@ -13,6 +13,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import {
   RadioGroup,
@@ -20,12 +25,14 @@ import {
 } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { useAppointmentTypeMutations } from "@/hooks/useAppointmentTypes";
 import type {
   AssignmentMode,
   CreateAppointmentTypeInput,
   DurationMode,
   EntityType,
+  ScheduleRuleInput,
   ScheduleType,
 } from "@/types";
 
@@ -41,18 +48,56 @@ function slugify(name: string): string {
 }
 
 const DAYS = [
-  { value: 0, label: "Sunday" },
-  { value: 1, label: "Monday" },
-  { value: 2, label: "Tuesday" },
-  { value: 3, label: "Wednesday" },
-  { value: 4, label: "Thursday" },
-  { value: 5, label: "Friday" },
-  { value: 6, label: "Saturday" },
+  { value: 0, short: "Sun", label: "Sunday" },
+  { value: 1, short: "Mon", label: "Monday" },
+  { value: 2, short: "Tue", label: "Tuesday" },
+  { value: 3, short: "Wed", label: "Wednesday" },
+  { value: 4, short: "Thu", label: "Thursday" },
+  { value: 5, short: "Fri", label: "Friday" },
+  { value: 6, short: "Sat", label: "Saturday" },
 ];
+
+type DayHours = { startTime: string; endTime: string };
+
+const DEFAULT_HOURS: DayHours = { startTime: "09:00", endTime: "17:00" };
+
+const WEEKDAYS_PRESET: Record<number, DayHours> = {
+  1: { ...DEFAULT_HOURS },
+  2: { ...DEFAULT_HOURS },
+  3: { ...DEFAULT_HOURS },
+  4: { ...DEFAULT_HOURS },
+  5: { ...DEFAULT_HOURS },
+};
+
+function MinutesInput({
+  id,
+  value,
+  onChange,
+  required,
+}: {
+  id: string;
+  value: number;
+  onChange: (n: number) => void;
+  required?: boolean;
+}) {
+  return (
+    <InputGroup>
+      <InputGroupInput
+        id={id}
+        type="number"
+        min={1}
+        value={value}
+        onChange={(e) => onChange(Math.max(1, Number(e.target.value) || 1))}
+        required={required}
+      />
+      <InputGroupAddon align="inline-end">min</InputGroupAddon>
+    </InputGroup>
+  );
+}
 
 export default function NewAppointmentTypePage() {
   const router = useRouter();
-  const { createMutation } = useAppointmentTypeMutations();
+  const { createMutation, publishMutation } = useAppointmentTypeMutations();
 
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -68,9 +113,18 @@ export default function NewAppointmentTypePage() {
   const [maxDurationMins, setMaxDurationMins] = useState(60);
   const [durationStepMins, setDurationStepMins] = useState(15);
   const [scheduleType, setScheduleType] = useState<ScheduleType>("WEEKLY");
-  const [dayOfWeek, setDayOfWeek] = useState(1);
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("17:00");
+
+  const [weekly, setWeekly] = useState<Record<number, DayHours>>({
+    ...WEEKDAYS_PRESET,
+  });
+
+  const [flexDate, setFlexDate] = useState("");
+  const [flexStart, setFlexStart] = useState("09:00");
+  const [flexEnd, setFlexEnd] = useState("17:00");
+
+  const activeDays = Object.keys(weekly)
+    .map(Number)
+    .sort((a, b) => a - b);
 
   const effectiveSlug = slugTouched ? slug : slugify(name);
 
@@ -79,31 +133,114 @@ export default function NewAppointmentTypePage() {
     if (!slugTouched) setSlug(slugify(v));
   };
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const toggleDay = (day: number) => {
+    setWeekly((prev) => {
+      const next = { ...prev };
+      if (day in next) {
+        delete next[day];
+      } else {
+        const firstActive = Object.keys(prev)
+          .map(Number)
+          .sort((a, b) => a - b)[0];
+        next[day] =
+          firstActive != null ? { ...prev[firstActive] } : { ...DEFAULT_HOURS };
+      }
+      return next;
+    });
+  };
 
+  const setDayHours = (day: number, patch: Partial<DayHours>) => {
+    setWeekly((prev) => ({
+      ...prev,
+      [day]: { ...prev[day], ...patch },
+    }));
+  };
+
+  const applyToAll = () => {
+    if (activeDays.length < 2) return;
+    const ref = weekly[activeDays[0]];
+    setWeekly((prev) => {
+      const next: Record<number, DayHours> = {};
+      for (const d of Object.keys(prev).map(Number)) {
+        next[d] = { ...ref };
+      }
+      return next;
+    });
+    toast.success("Hours applied to all active days");
+  };
+
+  const setPreset = (preset: "weekdays" | "all" | "clear") => {
+    if (preset === "weekdays") {
+      setWeekly({ ...WEEKDAYS_PRESET });
+    } else if (preset === "all") {
+      const all: Record<number, DayHours> = {};
+      for (const d of DAYS) all[d.value] = { ...DEFAULT_HOURS };
+      setWeekly(all);
+    } else {
+      setWeekly({});
+    }
+  };
+
+  const buildBody = (): CreateAppointmentTypeInput | { error: string } => {
     if (effectiveSlug && !SLUG_REGEX.test(effectiveSlug)) {
-      toast.error("Slug must be lowercase letters, numbers, and dashes only.");
-      return;
+      return {
+        error: "Slug must be lowercase letters, numbers, and dashes only.",
+      };
     }
     if (entityIds.length === 0) {
-      toast.error("Select at least one entity.");
-      return;
-    }
-    if (!TIME_REGEX.test(startTime) || !TIME_REGEX.test(endTime)) {
-      toast.error("Times must be HH:MM (24h).");
-      return;
-    }
-    if (startTime >= endTime) {
-      toast.error("End time must be after start time.");
-      return;
+      return { error: "Select at least one entity." };
     }
     if (durationMode === "VARIABLE" && minDurationMins >= maxDurationMins) {
-      toast.error("Min duration must be less than max duration.");
-      return;
+      return { error: "Min duration must be less than max duration." };
     }
 
-    const body: CreateAppointmentTypeInput = {
+    let scheduleRules: ScheduleRuleInput[] = [];
+
+    if (scheduleType === "WEEKLY") {
+      if (activeDays.length === 0) {
+        return {
+          error: "Select at least one day for the weekly schedule.",
+        };
+      }
+      for (const d of activeDays) {
+        const { startTime, endTime } = weekly[d];
+        if (!TIME_REGEX.test(startTime) || !TIME_REGEX.test(endTime)) {
+          return { error: "All times must be HH:MM (24h)." };
+        }
+        if (startTime >= endTime) {
+          const dayName = DAYS.find((dd) => dd.value === d)?.label;
+          return { error: `End time must be after start time on ${dayName}.` };
+        }
+        scheduleRules.push({
+          dayOfWeek: d,
+          specificDate: null,
+          startTime,
+          endTime,
+          isAvailable: true,
+        });
+      }
+    } else {
+      if (!flexDate) {
+        return { error: "Pick a date for the initial flexible schedule rule." };
+      }
+      if (!TIME_REGEX.test(flexStart) || !TIME_REGEX.test(flexEnd)) {
+        return { error: "Times must be HH:MM (24h)." };
+      }
+      if (flexStart >= flexEnd) {
+        return { error: "End time must be after start time." };
+      }
+      scheduleRules = [
+        {
+          dayOfWeek: null,
+          specificDate: flexDate,
+          startTime: flexStart,
+          endTime: flexEnd,
+          isAvailable: true,
+        },
+      ];
+    }
+
+    return {
       name: name.trim(),
       slug: effectiveSlug || undefined,
       description: description.trim() || undefined,
@@ -119,28 +256,53 @@ export default function NewAppointmentTypePage() {
             durationStepMins,
           }),
       scheduleType,
-      scheduleRules: [
-        {
-          dayOfWeek,
-          specificDate: null,
-          startTime,
-          endTime,
-          isAvailable: true,
-        },
-      ],
+      scheduleRules,
     };
+  };
 
-    createMutation.mutate(body, {
+  const submit = (
+    e: React.SyntheticEvent,
+    intent: "draft" | "publish",
+  ) => {
+    e.preventDefault();
+    const result = buildBody();
+    if ("error" in result) {
+      toast.error(result.error);
+      return;
+    }
+
+    createMutation.mutate(result, {
       onSuccess: (created) => {
-        toast.success("Appointment type created");
-        router.push(`/organization/appointment-types/${created.id}`);
+        const detailUrl = `/organization/appointment-types/${created.id}`;
+        if (intent === "publish") {
+          publishMutation.mutate(created.id, {
+            onSuccess: () => {
+              toast.success("Created and published");
+              router.push(detailUrl);
+            },
+            onError: (err) => {
+              const msg =
+                err instanceof ApiError
+                  ? err.messages[0]
+                  : "Failed to publish";
+              toast.warning(`Created as draft. ${msg}`);
+              router.push(detailUrl);
+            },
+          });
+        } else {
+          toast.success("Appointment type created");
+          router.push(detailUrl);
+        }
       },
       onError: (err) => {
-        const msg = err instanceof ApiError ? err.messages[0] : "Create failed";
+        const msg =
+          err instanceof ApiError ? err.messages[0] : "Create failed";
         toast.error(msg);
       },
     });
   };
+
+  const isPending = createMutation.isPending || publishMutation.isPending;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -149,12 +311,15 @@ export default function NewAppointmentTypePage() {
           Create appointment type
         </h1>
         <p className="text-sm text-muted-foreground">
-          Set the basics. You&apos;ll add more schedule rules and questions
-          on the next page.
+          Set the basics. You can refine schedule rules and add questions on
+          the next page.
         </p>
       </header>
 
-      <form onSubmit={submit} className="space-y-4">
+      <form
+        onSubmit={(e) => submit(e, "draft")}
+        className="space-y-4"
+      >
         <Card>
           <CardHeader>
             <CardTitle>Basics</CardTitle>
@@ -272,15 +437,11 @@ export default function NewAppointmentTypePage() {
             </RadioGroup>
             {durationMode === "FIXED" ? (
               <div className="space-y-1">
-                <Label htmlFor="at-dur">Duration (minutes)</Label>
-                <Input
+                <Label htmlFor="at-dur">Duration</Label>
+                <MinutesInput
                   id="at-dur"
-                  type="number"
-                  min={1}
                   value={durationMinutes}
-                  onChange={(e) =>
-                    setDurationMinutes(Math.max(1, Number(e.target.value) || 1))
-                  }
+                  onChange={setDurationMinutes}
                   required
                 />
               </div>
@@ -288,40 +449,33 @@ export default function NewAppointmentTypePage() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="at-min">Min</Label>
-                  <Input
+                  <MinutesInput
                     id="at-min"
-                    type="number"
-                    min={1}
                     value={minDurationMins}
-                    onChange={(e) =>
-                      setMinDurationMins(Math.max(1, Number(e.target.value) || 1))
-                    }
+                    onChange={setMinDurationMins}
                     required
                   />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="at-max">Max</Label>
-                  <Input
+                  <MinutesInput
                     id="at-max"
-                    type="number"
-                    min={1}
                     value={maxDurationMins}
-                    onChange={(e) =>
-                      setMaxDurationMins(Math.max(1, Number(e.target.value) || 1))
-                    }
+                    onChange={setMaxDurationMins}
                     required
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="at-step">Step</Label>
-                  <Input
+                  <Label htmlFor="at-step">
+                    Step
+                    <span className="ml-1 font-normal text-muted-foreground">
+                      (increment)
+                    </span>
+                  </Label>
+                  <MinutesInput
                     id="at-step"
-                    type="number"
-                    min={1}
                     value={durationStepMins}
-                    onChange={(e) =>
-                      setDurationStepMins(Math.max(1, Number(e.target.value) || 1))
-                    }
+                    onChange={setDurationStepMins}
                     required
                   />
                 </div>
@@ -334,7 +488,7 @@ export default function NewAppointmentTypePage() {
           <CardHeader>
             <CardTitle>Initial schedule</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             <RadioGroup
               value={scheduleType}
               onValueChange={(v) => setScheduleType(v as ScheduleType)}
@@ -344,63 +498,197 @@ export default function NewAppointmentTypePage() {
                 <RadioGroupItem value="WEEKLY" /> Weekly recurring
               </label>
               <label className="flex items-center gap-2 text-sm">
-                <RadioGroupItem value="FLEXIBLE" /> Flexible
+                <RadioGroupItem value="FLEXIBLE" /> Specific dates
               </label>
             </RadioGroup>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="at-day">Day of week</Label>
-                <select
-                  id="at-day"
-                  value={dayOfWeek}
-                  onChange={(e) => setDayOfWeek(Number(e.target.value))}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  {DAYS.map((d) => (
-                    <option key={d.value} value={d.value}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
+
+            {scheduleType === "WEEKLY" ? (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Active days
+                  </Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DAYS.map((d) => {
+                      const active = d.value in weekly;
+                      return (
+                        <button
+                          key={d.value}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => toggleDay(d.value)}
+                          className={cn(
+                            "h-8 min-w-12 rounded-full border px-3 text-xs font-medium transition-colors",
+                            active
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-input bg-input/30 text-muted-foreground hover:bg-input/50",
+                          )}
+                        >
+                          {d.short}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setPreset("weekdays")}
+                      className="text-primary hover:underline"
+                    >
+                      Weekdays
+                    </button>
+                    <span className="text-muted-foreground">·</span>
+                    <button
+                      type="button"
+                      onClick={() => setPreset("all")}
+                      className="text-primary hover:underline"
+                    >
+                      All days
+                    </button>
+                    <span className="text-muted-foreground">·</span>
+                    <button
+                      type="button"
+                      onClick={() => setPreset("clear")}
+                      className="text-primary hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                {activeDays.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-input bg-muted/30 px-3 py-4 text-center text-sm text-muted-foreground">
+                    Pick at least one day above to set hours.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Hours per day
+                      </Label>
+                      {activeDays.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={applyToAll}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Apply first day&apos;s hours to all
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="space-y-2">
+                      {activeDays.map((d) => {
+                        const dayMeta = DAYS.find((x) => x.value === d)!;
+                        const hrs = weekly[d];
+                        return (
+                          <div
+                            key={d}
+                            className="grid grid-cols-[5rem_1fr_auto_1fr] items-center gap-2"
+                          >
+                            <span className="text-sm font-medium">
+                              {dayMeta.label}
+                            </span>
+                            <Input
+                              type="time"
+                              value={hrs.startTime}
+                              onChange={(e) =>
+                                setDayHours(d, { startTime: e.target.value })
+                              }
+                              required
+                              aria-label={`${dayMeta.label} start time`}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              to
+                            </span>
+                            <Input
+                              type="time"
+                              value={hrs.endTime}
+                              onChange={(e) =>
+                                setDayHours(d, { endTime: e.target.value })
+                              }
+                              required
+                              aria-label={`${dayMeta.label} end time`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="at-start">Start</Label>
-                <Input
-                  id="at-start"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  required
-                />
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Add one date now. You can add more dates after creating.
+                </p>
+                <div className="grid grid-cols-[1fr_1fr_auto_1fr] items-end gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="at-flex-date">Date</Label>
+                    <Input
+                      id="at-flex-date"
+                      type="date"
+                      value={flexDate}
+                      onChange={(e) => setFlexDate(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="at-flex-start">Start</Label>
+                    <Input
+                      id="at-flex-start"
+                      type="time"
+                      value={flexStart}
+                      onChange={(e) => setFlexStart(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <span className="pb-2 text-xs text-muted-foreground">
+                    to
+                  </span>
+                  <div className="space-y-1">
+                    <Label htmlFor="at-flex-end">End</Label>
+                    <Input
+                      id="at-flex-end"
+                      type="time"
+                      value={flexEnd}
+                      onChange={(e) => setFlexEnd(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="at-end">End</Label>
-                <Input
-                  id="at-end"
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              You can add more rules after creating the type.
-            </p>
+            )}
           </CardContent>
         </Card>
 
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button
             type="button"
             variant="outline"
             onClick={() => router.back()}
-            disabled={createMutation.isPending}
+            disabled={isPending}
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={createMutation.isPending}>
-            {createMutation.isPending ? "Creating…" : "Create"}
+          <Button
+            type="submit"
+            variant="outline"
+            disabled={isPending}
+          >
+            {createMutation.isPending && !publishMutation.isPending
+              ? "Creating…"
+              : "Create draft"}
+          </Button>
+          <Button
+            type="button"
+            onClick={(e) => submit(e, "publish")}
+            disabled={isPending}
+          >
+            {publishMutation.isPending
+              ? "Publishing…"
+              : createMutation.isPending
+                ? "Creating…"
+                : "Create & publish"}
           </Button>
         </div>
       </form>

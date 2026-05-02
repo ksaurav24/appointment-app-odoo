@@ -169,6 +169,20 @@ export function bookingConfirmedCustomerEmail(
   return { subject, text, html };
 }
 
+export function bookingAwaitingPaymentCustomerEmail(
+  ctx: BookingEmailContext,
+): RenderedEmail {
+  const subject = `Booking received — payment required`;
+  const text = `Hi ${ctx.recipientName}, we've received your booking for ${ctx.appointmentTypeName} with ${ctx.organizationName} on ${formatRange(ctx)}. Your slot is held while we wait for your payment to complete. You'll receive a separate confirmation email once payment succeeds.`;
+  const html = wrap(
+    'Booking received — payment required',
+    `<p>Hi ${ctx.recipientName},</p>
+     <p>We've received your booking and are holding your slot while we wait for payment to complete. You'll receive a separate confirmation email once payment succeeds.</p>
+     ${bookingDetailsBlock(ctx)}`,
+  );
+  return { subject, text, html };
+}
+
 export function bookingPendingApprovalCustomerEmail(
   ctx: BookingEmailContext,
 ): RenderedEmail {

@@ -22,11 +22,12 @@ import {
   useLoginTwoFactor,
   useResendOtp,
 } from "@/hooks/useAuth";
+import { defaultRouteForRole } from "@/lib/redirects";
+import type { Role } from "@/types";
 
 export function LoginForm() {
   const router = useRouter();
   const search = useSearchParams();
-  const redirect = search.get("redirect") ?? "/";
   const nextParam = search?.get("next") ?? null;
   const safeNext = nextParam && nextParam.startsWith("/") ? nextParam : null;
 
@@ -40,9 +41,12 @@ export function LoginForm() {
   const [code, setCode] = useState("");
   const [stage, setStage] = useState<"credentials" | "2fa">("credentials");
 
+  const targetFor = (role: Role) => safeNext ?? defaultRouteForRole(role);
+
   useEffect(() => {
-    if (user) router.replace(safeNext ?? redirect);
-  }, [user, redirect, safeNext, router]);
+    if (user) router.replace(targetFor(user.role));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, safeNext, router]);
 
   const submitCredentials = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,9 +57,9 @@ export function LoginForm() {
           if (data.twoFactorRequired) {
             setStage("2fa");
             toast.info("Verification code sent to your email.");
-          } else {
+          } else if (data.user) {
             toast.success("Welcome back.");
-            router.replace(safeNext ?? redirect);
+            router.replace(targetFor(data.user.role));
           }
         },
       },
@@ -67,9 +71,9 @@ export function LoginForm() {
     twoFactorMutation.mutate(
       { email, code },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           toast.success("Welcome back.");
-          router.replace(safeNext ?? redirect);
+          router.replace(targetFor(data.user.role));
         },
       },
     );

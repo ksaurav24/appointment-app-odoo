@@ -12,6 +12,7 @@ import {
   DashboardShell,
   type NavItem,
 } from "@/components/dashboard/dashboard-shell";
+import { OrgApprovalBanner } from "@/components/organization/org-approval-banner";
 
 const NAV: NavItem[] = [
   {
@@ -41,6 +42,7 @@ export default function OrganizationLayout({
 }) {
   return (
     <DashboardShell brand="Organizer" role="ORGANIZER" nav={NAV}>
+      <OrgApprovalBanner />
       {children}
     </DashboardShell>
   );

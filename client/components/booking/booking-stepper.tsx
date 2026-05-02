@@ -183,13 +183,24 @@ export function BookingStepper({ type }: BookingStepperProps) {
     if (next) dispatch({ type: "GO_TO_STEP", step: next });
   }, [router, state.step, type, user, userPending]);
 
+  const acquireRequestedRef = useRef(false);
+  const acquireMutate = acquire.mutate;
+
+  useEffect(() => {
+    if (state.step !== "review") {
+      acquireRequestedRef.current = false;
+    }
+  }, [state.step]);
+
   useEffect(() => {
     if (state.step !== "review") return;
     if (state.slotLockId) return;
+    if (acquireRequestedRef.current) return;
     if (!state.startTime || !state.endTime) return;
     if (!user) return;
 
-    acquire.mutate(
+    acquireRequestedRef.current = true;
+    acquireMutate(
       {
         appointmentTypeId: type.id,
         entityId:
@@ -206,6 +217,7 @@ export function BookingStepper({ type }: BookingStepperProps) {
           });
         },
         onError: (err) => {
+          acquireRequestedRef.current = false;
           if (err.status === 409) {
             toast.error("This time was just taken. Pick another.");
             dispatch({ type: "GO_TO_STEP", step: "time" });
@@ -224,7 +236,7 @@ export function BookingStepper({ type }: BookingStepperProps) {
     type.id,
     type.assignmentMode,
     user,
-    acquire,
+    acquireMutate,
   ]);
 
   const handleExtend = useCallback(() => {
@@ -313,20 +325,38 @@ export function BookingStepper({ type }: BookingStepperProps) {
     );
   };
 
+  const createIntentRequestedRef = useRef(false);
+  const createIntentMutate = createIntent.mutate;
+
+  useEffect(() => {
+    if (state.step !== "payment") {
+      createIntentRequestedRef.current = false;
+    }
+  }, [state.step]);
+
   useEffect(() => {
     if (state.step !== "payment") return;
     if (!state.appointmentPublicId) return;
     if (paymentIntent) return;
-    createIntent.mutate(
+    if (createIntentRequestedRef.current) return;
+
+    createIntentRequestedRef.current = true;
+    createIntentMutate(
       { appointmentPublicId: state.appointmentPublicId },
       {
         onSuccess: (intent) => setPaymentIntent(intent),
         onError: (err) => {
+          createIntentRequestedRef.current = false;
           toast.error(err.messages[0] ?? "Couldn't start payment.");
         },
       },
     );
-  }, [state.step, state.appointmentPublicId, paymentIntent, createIntent]);
+  }, [
+    state.step,
+    state.appointmentPublicId,
+    paymentIntent,
+    createIntentMutate,
+  ]);
 
   const handleVerified = (handle: {
     razorpayOrderId: string;
@@ -379,10 +409,8 @@ export function BookingStepper({ type }: BookingStepperProps) {
     switch (state.step) {
       case "entity":
         return !state.entityId;
-      case "date":
-        return !state.date;
       case "time":
-        return !state.startTime || !state.endTime;
+        return !state.date || !state.startTime;
       case "duration":
         return !state.durationMinutes;
       case "questions": {
@@ -395,7 +423,8 @@ export function BookingStepper({ type }: BookingStepperProps) {
   })();
 
   const tz = type.schedules[0]?.timezone ?? type.organization.timezone;
-  const confirmExit = state.step !== "entity" && state.step !== "date";
+  const confirmExit =
+    state.step !== "entity" && !(state.step === "time" && !state.date);
 
   return (
     <CheckoutShell
@@ -422,44 +451,55 @@ export function BookingStepper({ type }: BookingStepperProps) {
             </section>
           ) : null}
 
-          {state.step === "date" ? (
-            <section className="space-y-4">
-              <h2 className="font-heading text-base font-semibold">Pick a date</h2>
-              <AvailabilityCalendar
-                schedules={type.schedules}
-                selected={state.date}
-                onSelect={(d) => dispatch({ type: "SET_DATE", date: d })}
-              />
-              <p className="text-xs text-muted-foreground">Times in {tz}.</p>
-            </section>
-          ) : null}
-
           {state.step === "time" ? (
             <section className="space-y-4">
-              <h2 className="font-heading text-base font-semibold">Pick a time</h2>
-              {availabilityQuery.isPending ? (
-                <Spinner className="size-4" />
-              ) : availabilityQuery.isError || !availabilityQuery.data ? (
-                <p className="text-sm text-destructive">
-                  Couldn&apos;t load times. Try a different date.
-                </p>
-              ) : availabilityQuery.data.durationMode === "FIXED" ? (
-                <SlotList
-                  availability={availabilityQuery.data}
-                  selectedStart={state.startTime}
-                  onSelect={(s, e) =>
-                    dispatch({ type: "SET_TIME", startTime: s, endTime: e })
-                  }
-                />
-              ) : (
-                <OpenRangePicker
-                  availability={availabilityQuery.data}
-                  selectedStart={state.startTime}
-                  onSelect={(s) =>
-                    dispatch({ type: "SET_TIME", startTime: s })
-                  }
-                />
-              )}
+              <h2 className="font-heading text-base font-semibold">
+                Pick a date and time
+              </h2>
+              <div className="grid gap-6 md:grid-cols-[auto_1fr]">
+                <div>
+                  <AvailabilityCalendar
+                    schedules={type.schedules}
+                    selected={state.date}
+                    onSelect={(d) => dispatch({ type: "SET_DATE", date: d })}
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Times in {tz}.
+                  </p>
+                </div>
+                <div>
+                  <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
+                    Available times
+                  </p>
+                  {!state.date ? (
+                    <p className="rounded-md border border-dashed border-input bg-muted/30 px-3 py-6 text-center text-sm text-muted-foreground">
+                      Select a date to see available times.
+                    </p>
+                  ) : availabilityQuery.isPending ? (
+                    <Spinner className="size-4" />
+                  ) : availabilityQuery.isError || !availabilityQuery.data ? (
+                    <p className="text-sm text-destructive">
+                      Couldn&apos;t load times. Try a different date.
+                    </p>
+                  ) : availabilityQuery.data.durationMode === "FIXED" ? (
+                    <SlotList
+                      availability={availabilityQuery.data}
+                      selectedStart={state.startTime}
+                      onSelect={(s, e) =>
+                        dispatch({ type: "SET_TIME", startTime: s, endTime: e })
+                      }
+                    />
+                  ) : (
+                    <OpenRangePicker
+                      availability={availabilityQuery.data}
+                      selectedStart={state.startTime}
+                      onSelect={(s) =>
+                        dispatch({ type: "SET_TIME", startTime: s })
+                      }
+                    />
+                  )}
+                </div>
+              </div>
             </section>
           ) : null}
 

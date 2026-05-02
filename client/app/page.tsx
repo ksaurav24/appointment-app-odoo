@@ -1,4 +1,4 @@
-import { HomeContent } from "@/components/auth/home-content";
+import { HomeContent } from "@/components/landing/home-content";
 
 export default function Page() {
   return <HomeContent />;

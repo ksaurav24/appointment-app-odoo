@@ -512,6 +512,199 @@ describe('Auth (e2e)', () => {
     });
   });
 
+  describe('verify-email auto-login', () => {
+    it('sets auth cookies and returns user on first-time verify', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email: 'first@example.com',
+          password: PASSWORD,
+          fullName: 'First',
+        })
+        .expect(201);
+      const code = extractOtp(mailer.getLastMessage()!.text);
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/verify-email')
+        .send({ email: 'first@example.com', code })
+        .expect(200);
+
+      expect(res.body.message).toBe('Email verified.');
+      expect(res.body.user?.email).toBe('first@example.com');
+      const cookies = parseSetCookies(res.headers['set-cookie']);
+      expect(cookies[ACCESS_COOKIE_NAME]).toBeTruthy();
+      expect(cookies[REFRESH_COOKIE_NAME]).toBeTruthy();
+
+      // The cookies are usable immediately.
+      const me = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Cookie', cookieHeader(cookies))
+        .expect(200);
+      expect(me.body.email).toBe('first@example.com');
+    });
+
+    it('does not set cookies on idempotent re-verify', async () => {
+      await registerAndVerify('alice@example.com');
+      mailer.resetLastMessage();
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/verify-email')
+        .send({ email: 'alice@example.com', code: '000000' })
+        .expect(200);
+      expect(res.body.message).toBe('Email already verified.');
+      expect(res.body.user).toBeUndefined();
+      expect(res.headers['set-cookie']).toBeUndefined();
+    });
+  });
+
+  describe('register role resolution', () => {
+    it('CUSTOMER + organization payload is rejected with 400', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email: 'mismatch@example.com',
+          password: PASSWORD,
+          fullName: 'Mismatch',
+          role: 'CUSTOMER',
+          organization: {
+            name: 'Should Fail',
+            slug: 'should-fail',
+            contactEmail: 'mismatch@example.com',
+          },
+        })
+        .expect(400);
+    });
+
+    it('ORGANIZER without organization creates organizer with no org (sequential path)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email: 'org-pending@example.com',
+          password: PASSWORD,
+          fullName: 'Pending Organizer',
+          role: 'ORGANIZER',
+        })
+        .expect(201);
+      expect(res.body.organizationId).toBeUndefined();
+
+      const user = await prisma.user.findUnique({
+        where: { email: 'org-pending@example.com' },
+      });
+      expect(user?.role).toBe(Role.ORGANIZER);
+      const org = await prisma.organization.findUnique({
+        where: { organiserId: user!.id },
+      });
+      expect(org).toBeNull();
+    });
+
+    it('explicit role=CUSTOMER without org creates a customer', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email: 'explicit-cust@example.com',
+          password: PASSWORD,
+          fullName: 'Explicit Customer',
+          role: 'CUSTOMER',
+        })
+        .expect(201);
+      const user = await prisma.user.findUnique({
+        where: { email: 'explicit-cust@example.com' },
+      });
+      expect(user?.role).toBe(Role.CUSTOMER);
+    });
+  });
+
+  describe('POST /organizations (sequential org creation)', () => {
+    async function registerVerifiedOrganizerNoOrg(
+      email: string,
+    ): Promise<CookieMap> {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({
+          email,
+          password: PASSWORD,
+          fullName: 'Seq Organizer',
+          role: 'ORGANIZER',
+        })
+        .expect(201);
+      const code = extractOtp(mailer.getLastMessage()!.text);
+      const verify = await request(app.getHttpServer())
+        .post('/auth/verify-email')
+        .send({ email, code })
+        .expect(200);
+      return parseSetCookies(verify.headers['set-cookie']);
+    }
+
+    it('creates a PENDING organization for a verified organizer with no org', async () => {
+      const cookies = await registerVerifiedOrganizerNoOrg(
+        'seq@example.com',
+      );
+
+      const res = await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Cookie', cookieHeader(cookies))
+        .send({
+          name: 'Sequential Inc',
+          slug: 'sequential-inc',
+          description: 'Created after email verification',
+          contactPhone: '+91-9000000000',
+          address: '1 Main St',
+          timezone: 'Asia/Kolkata',
+        })
+        .expect(201);
+
+      expect(res.body.approvalStatus).toBe('PENDING');
+      expect(res.body.slug).toBe('sequential-inc');
+      // contactEmail falls back to the organizer's email when omitted
+      expect(res.body.contactEmail).toBe('seq@example.com');
+    });
+
+    it('rejects a second POST with 409 (organizer already has an org)', async () => {
+      const cookies = await registerVerifiedOrganizerNoOrg(
+        'seq2@example.com',
+      );
+      await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Cookie', cookieHeader(cookies))
+        .send({ name: 'First Co', slug: 'first-co' })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Cookie', cookieHeader(cookies))
+        .send({ name: 'Second Co', slug: 'second-co' })
+        .expect(409);
+    });
+
+    it('rejects a duplicate slug with 409', async () => {
+      const a = await registerVerifiedOrganizerNoOrg('seqa@example.com');
+      const b = await registerVerifiedOrganizerNoOrg('seqb@example.com');
+      await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Cookie', cookieHeader(a))
+        .send({ name: 'Aco', slug: 'shared-slug' })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Cookie', cookieHeader(b))
+        .send({ name: 'Bco', slug: 'shared-slug' })
+        .expect(409);
+    });
+
+    it('blocks customers from creating organizations (403)', async () => {
+      await registerAndVerify('cust@example.com');
+      const login = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'cust@example.com', password: PASSWORD })
+        .expect(200);
+      const cookies = parseSetCookies(login.headers['set-cookie']);
+      await request(app.getHttpServer())
+        .post('/organizations')
+        .set('Cookie', cookieHeader(cookies))
+        .send({ name: 'Nope', slug: 'nope-co' })
+        .expect(403);
+    });
+  });
+
   describe('change password', () => {
     it('rejects wrong current password and accepts correct one', async () => {
       await registerAndVerify('alice@example.com');

@@ -285,7 +285,7 @@ export function RescheduleStepper({ appointment }: Props) {
       case "date":
         return !state.date;
       case "time":
-        return !state.startTime || !state.endTime;
+        return !state.startTime;
       case "duration":
         return !state.durationMinutes;
       default:

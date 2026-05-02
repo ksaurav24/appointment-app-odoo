@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsEmail,
+  IsEnum,
   IsOptional,
   IsString,
   Matches,
@@ -10,6 +11,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { SLUG_REGEX } from '../../utils/slug';
+
+export type RegisterRole = 'CUSTOMER' | 'ORGANIZER';
+const REGISTER_ROLES: RegisterRole[] = ['CUSTOMER', 'ORGANIZER'];
 
 export class RegisterOrganizationDto {
   @ApiProperty({ example: 'Acme Dental Clinic', minLength: 2, maxLength: 120 })
@@ -94,6 +98,15 @@ export class RegisterDto {
   @MinLength(1)
   @MaxLength(120)
   fullName!: string;
+
+  @ApiPropertyOptional({
+    enum: REGISTER_ROLES,
+    description:
+      'Explicit role for the new account. Omit for legacy callers — role is then inferred from the presence of `organization` (CUSTOMER if absent, ORGANIZER if present). Sending CUSTOMER together with an `organization` block is rejected.',
+  })
+  @IsOptional()
+  @IsEnum(REGISTER_ROLES)
+  role?: RegisterRole;
 
   @ApiPropertyOptional({
     type: () => RegisterOrganizationDto,

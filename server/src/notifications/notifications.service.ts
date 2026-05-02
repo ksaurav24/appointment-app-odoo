@@ -12,6 +12,7 @@ import { MailerService } from '../mailer/mailer.service';
 import {
   RenderedEmail,
   bookingApprovedCustomerEmail,
+  bookingAwaitingPaymentCustomerEmail,
   bookingCancelledEmail,
   bookingConfirmedCustomerEmail,
   bookingNoticeForBookablePersonEmail,
@@ -185,7 +186,7 @@ export class NotificationsService {
           appointment.customerId,
           customerEmail,
           NotificationType.APPOINTMENT_CREATED,
-          bookingConfirmedCustomerEmail({
+          bookingAwaitingPaymentCustomerEmail({
             ...ctx,
             recipientName: customerName,
           }),

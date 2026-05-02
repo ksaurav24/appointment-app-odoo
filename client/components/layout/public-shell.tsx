@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -56,14 +57,16 @@ export function PublicShell({ children, showBrowseLink = true }: PublicShellProp
                 {user.fullName}
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-48">
-                <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem render={<Link href="/bookings" />}>
-                  My bookings
-                </DropdownMenuItem>
-                <DropdownMenuItem render={<Link href="/account" />}>
-                  Account settings
-                </DropdownMenuItem>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem render={<Link href="/bookings" />}>
+                    My bookings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem render={<Link href="/account" />}>
+                    Account settings
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onLogout} disabled={logout.isPending}>
                   {logout.isPending ? <Spinner className="mr-2 size-4" /> : null}
