@@ -150,10 +150,17 @@ describe('AppointmentsService.create', () => {
       }),
     };
     notifications = makeNotifications();
+    const cacheStub = {
+      invalidateOrgScope: jest.fn().mockResolvedValue(undefined),
+      invalidateAdminScope: jest.fn().mockResolvedValue(undefined),
+      invalidatePrefix: jest.fn().mockResolvedValue(undefined),
+      getOrSet: jest.fn(),
+    } as unknown as ConstructorParameters<typeof AppointmentsService>[3];
     service = new AppointmentsService(
       makePrisma(handles),
       {} as OrganizationsService,
       notifications.service,
+      cacheStub,
     );
   });
 

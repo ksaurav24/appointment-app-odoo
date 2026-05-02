@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   EntityType,
   NotificationChannel,
+  NotificationPriority,
   NotificationRecipientType,
   NotificationStatus,
   NotificationType,
@@ -147,6 +148,7 @@ export class NotificationsService {
       recipientType: NotificationRecipientType,
       recipientId: string | null,
       notificationType: NotificationType,
+      priority: NotificationPriority = NotificationPriority.NORMAL,
     ) =>
       this.recordNotification(client, {
         recipientType,
@@ -155,6 +157,7 @@ export class NotificationsService {
         appointmentId: appointment.id,
         notificationType,
         channel: NotificationChannel.IN_APP,
+        priority,
       });
 
     const email = (
@@ -163,6 +166,7 @@ export class NotificationsService {
       recipientEmail: string,
       notificationType: NotificationType,
       rendered: RenderedEmail,
+      priority: NotificationPriority = NotificationPriority.NORMAL,
     ) =>
       this.recordEmail(client, jobs, {
         recipientType,
@@ -171,6 +175,7 @@ export class NotificationsService {
         appointmentId: appointment.id,
         notificationType,
         rendered,
+        priority,
       });
 
     switch (event.type) {
@@ -330,6 +335,12 @@ export class NotificationsService {
         break;
       }
       case 'APPOINTMENT_CANCELLED': {
+        // Organiser-initiated cancellations are higher-priority for the
+        // customer because they were not requested by the customer themselves.
+        const customerPriority =
+          event.actor === 'organiser'
+            ? NotificationPriority.HIGH
+            : NotificationPriority.NORMAL;
         await email(
           NotificationRecipientType.USER,
           appointment.customerId,
@@ -340,12 +351,15 @@ export class NotificationsService {
             recipientName: customerName,
             actor: event.actor,
             reason: event.reason,
+            priority: customerPriority,
           }),
+          customerPriority,
         );
         await inApp(
           NotificationRecipientType.USER,
           appointment.customerId,
           NotificationType.APPOINTMENT_CANCELLED,
+          customerPriority,
         );
         if (personEmail && bookablePerson) {
           await email(
@@ -506,6 +520,7 @@ export class NotificationsService {
       appointmentId: bigint;
       notificationType: NotificationType;
       channel: NotificationChannel;
+      priority?: NotificationPriority;
     },
   ): Promise<bigint> {
     const created = await client.notification.create({
@@ -516,6 +531,7 @@ export class NotificationsService {
         appointmentId: input.appointmentId,
         notificationType: input.notificationType,
         channel: input.channel,
+        priority: input.priority ?? NotificationPriority.NORMAL,
         status: NotificationStatus.PENDING,
       },
     });
@@ -532,6 +548,7 @@ export class NotificationsService {
       appointmentId: bigint;
       notificationType: NotificationType;
       rendered: RenderedEmail;
+      priority?: NotificationPriority;
     },
   ): Promise<void> {
     const id = await this.recordNotification(client, {
@@ -541,6 +558,7 @@ export class NotificationsService {
       appointmentId: input.appointmentId,
       notificationType: input.notificationType,
       channel: NotificationChannel.EMAIL,
+      priority: input.priority,
     });
     jobs.push({
       to: input.recipientEmail,

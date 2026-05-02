@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AdminModule } from './admin/admin.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppointmentTypesModule } from './appointment-types/appointment-types.module';
@@ -51,6 +52,7 @@ import { UsersModule } from './users/users.module';
     OrganizationsModule,
     AuthModule,
     AdminModule,
+    AnalyticsModule,
     BookablePersonsModule,
     BookableResourcesModule,
     AppointmentTypesModule,
