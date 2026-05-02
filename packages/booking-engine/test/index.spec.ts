@@ -1,0 +1,15 @@
+import './availability/schedule-resolver.spec.ts';
+import './availability/assignment-expander.spec.ts';
+import './availability/slot-generator.spec.ts';
+import './availability/capacity-calculator.spec.ts';
+import './availability/availability-engine.spec.ts';
+import './availability/overlap-checker.spec.ts';
+import './availability/timezone-resolver.spec.ts';
+import './concurrency/hold-engine.spec.ts';
+import './concurrency/booking-guard.spec.ts';
+import './concurrency/request-evaluator.spec.ts';
+import './realtime/event-builder.spec.ts';
+import './realtime/affected-date-resolver.spec.ts';
+import './ml/feature-builder.spec.ts';
+import './ml/no-show-scorer.spec.ts';
+import './ml/recommendation-engine.spec.ts';

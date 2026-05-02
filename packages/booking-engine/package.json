@@ -1,0 +1,13 @@
+{
+  "name": "@appointment-app/booking-engine",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node --experimental-strip-types scripts/build-check.ts",
+    "test": "node --experimental-strip-types --test --test-concurrency=1 --test-isolation=none test/index.spec.ts",
+    "stress": "node --experimental-strip-types scripts/stress-test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2"
+  }
+}
