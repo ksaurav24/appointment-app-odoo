@@ -1,0 +1,556 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity & access
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  ORGANIZER
+  CUSTOMER
+}
+
+enum OtpPurpose {
+  SIGNUP
+  LOGIN
+  PASSWORD_RESET
+}
+
+enum OrganizationApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ---------------------------------------------------------------------------
+// Bookable inventory & appointment configuration
+// ---------------------------------------------------------------------------
+
+enum EntityType {
+  PERSON
+  RESOURCE
+}
+
+enum ScheduleType {
+  WEEKLY
+  FLEXIBLE
+}
+
+enum DurationMode {
+  FIXED
+  VARIABLE
+}
+
+enum AssignmentMode {
+  AUTO
+  MANUAL
+}
+
+enum QuestionType {
+  TEXT
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  NUMBER
+  DATE
+}
+
+// ---------------------------------------------------------------------------
+// Appointment lifecycle
+// ---------------------------------------------------------------------------
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+// ---------------------------------------------------------------------------
+// Notifications & audit
+// ---------------------------------------------------------------------------
+
+enum NotificationRecipientType {
+  USER
+  GUEST
+  ORGANIZER
+  ADMIN
+}
+
+enum NotificationType {
+  APPOINTMENT_CREATED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_REMINDER
+  APPOINTMENT_RESCHEDULED
+  APPOINTMENT_CANCELLED
+  PAYMENT_RECEIVED
+  PAYMENT_REFUNDED
+  ORGANIZER_APPROVED
+  ORGANIZER_REJECTED
+  CUSTOM
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  QUEUED
+  SENT
+  FAILED
+  BOUNCED
+}
+
+// ===========================================================================
+// Models
+// ===========================================================================
+
+model User {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  passwordHash     String
+  fullName         String
+  role             Role     @default(CUSTOMER)
+  isActive         Boolean  @default(true)
+  emailVerified    Boolean  @default(false)
+  twoFactorEnabled Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  otpVerifications      OtpVerification[]
+  passwordResets        PasswordReset[]
+  refreshTokens         RefreshToken[]
+  organization          Organization?     @relation("OrganizationOrganiser")
+  approvedOrganizations Organization[]    @relation("OrganizationApprover")
+
+  appointmentsAsCustomer Appointment[]           @relation("AppointmentCustomer")
+  reschedulesPerformed   AppointmentReschedule[] @relation("RescheduledByUser")
+  payments               Payment[]
+  slotLocks              SlotLock[]
+  auditLogs              AuditLog[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model Organization {
+  id             String                     @id @default(cuid())
+  organiserId    String                     @unique
+  organiser      User                       @relation("OrganizationOrganiser", fields: [organiserId], references: [id], onDelete: Cascade)
+  name           String
+  slug           String                     @unique
+  description    String?
+  logoUrl        String?
+  contactEmail   String
+  contactPhone   String?
+  address        String?
+  timezone       String                     @default("UTC")
+  isActive       Boolean                    @default(true)
+
+  approvalStatus OrganizationApprovalStatus @default(PENDING)
+  approvedAt     DateTime?
+  approvedById   String?
+  approvedBy     User?                      @relation("OrganizationApprover", fields: [approvedById], references: [id])
+  rejectedAt     DateTime?
+  rejectedReason String?
+
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  bookablePersons   BookablePerson[]
+  bookableResources BookableResource[]
+  appointmentTypes  AppointmentType[]
+  appointments      Appointment[]
+
+  @@index([approvalStatus])
+  @@index([isActive])
+  @@map("organizations")
+}
+
+model OtpVerification {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code       String
+  purpose    OtpPurpose
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
+  @@map("otp_verifications")
+}
+
+model PasswordReset {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_resets")
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  familyId   String
+  deviceInfo String?
+  ipAddress  String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Bookable inventory
+// ---------------------------------------------------------------------------
+
+model BookablePerson {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  contactEmail   String?
+  phone          String?
+  designation    String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  appointmentTypeEntities AppointmentTypeEntity[]
+  appointments            Appointment[]
+  previousReschedules     AppointmentReschedule[] @relation("PreviousPerson")
+  slotLocks               SlotLock[]
+
+  @@index([organizationId, isActive])
+  @@map("bookable_persons")
+}
+
+model BookableResource {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  resourceType   String?
+  description    String?
+  capacity       Int          @default(1)
+  location       String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  appointmentTypeEntities AppointmentTypeEntity[]
+  appointments            Appointment[]
+  previousReschedules     AppointmentReschedule[] @relation("PreviousResource")
+  slotLocks               SlotLock[]
+
+  @@index([organizationId, isActive])
+  @@map("bookable_resources")
+}
+
+// ---------------------------------------------------------------------------
+// Appointment types & scheduling
+// ---------------------------------------------------------------------------
+
+model AppointmentType {
+  id                       String         @id @default(cuid())
+  organizationId           String
+  organization             Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                     String
+  slug                     String
+  description              String?
+  entityType               EntityType
+  scheduleType             ScheduleType
+  durationMode             DurationMode   @default(FIXED)
+  durationMinutes          Int?
+  minDurationMins          Int?
+  maxDurationMins          Int?
+  durationStepMins         Int?
+  maxBookingsPerSlot       Int            @default(1)
+  manageCapacity           Boolean        @default(false)
+  manualConfirmation       Boolean        @default(false)
+  advancePaymentEnabled    Boolean        @default(false)
+  advancePaymentAmount     Decimal?       @db.Decimal(12, 2)
+  assignmentMode           AssignmentMode @default(AUTO)
+  cancellationAllowed      Boolean        @default(true)
+  cancellationWindowHours  Int?
+  rescheduleAllowed        Boolean        @default(true)
+  rescheduleWindowHours    Int?
+  maxReschedulesAllowed    Int?
+  isPublished              Boolean        @default(false)
+  shareToken               String?        @unique
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+
+  entities         AppointmentTypeEntity[]
+  schedules        Schedule[]
+  bookingQuestions BookingQuestion[]
+  appointments     Appointment[]
+  slotLocks        SlotLock[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, isPublished])
+  @@map("appointment_types")
+}
+
+model AppointmentTypeEntity {
+  id                 String            @id @default(cuid())
+  appointmentTypeId  String
+  appointmentType    AppointmentType   @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
+  bookablePersonId   String?
+  bookablePerson     BookablePerson?   @relation(fields: [bookablePersonId], references: [id], onDelete: Cascade)
+  bookableResourceId String?
+  bookableResource   BookableResource? @relation(fields: [bookableResourceId], references: [id], onDelete: Cascade)
+  createdAt          DateTime          @default(now())
+
+  @@unique([appointmentTypeId, bookablePersonId])
+  @@unique([appointmentTypeId, bookableResourceId])
+  @@index([bookablePersonId])
+  @@index([bookableResourceId])
+  @@map("appointment_type_entities")
+}
+
+model Schedule {
+  id                String          @id @default(cuid())
+  appointmentTypeId String
+  appointmentType   AppointmentType @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
+  scheduleType      ScheduleType
+  timezone          String          @default("UTC")
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  rules ScheduleRule[]
+
+  @@index([appointmentTypeId])
+  @@map("schedules")
+}
+
+model ScheduleRule {
+  id           String    @id @default(cuid())
+  scheduleId   String
+  schedule     Schedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  dayOfWeek    Int?
+  specificDate DateTime? @db.Date
+  startTime    String
+  endTime      String
+  isAvailable  Boolean   @default(true)
+
+  @@index([scheduleId, dayOfWeek])
+  @@index([scheduleId, specificDate])
+  @@map("schedule_rules")
+}
+
+model BookingQuestion {
+  id                String          @id @default(cuid())
+  appointmentTypeId String
+  appointmentType   AppointmentType @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
+  questionText      String
+  questionType      QuestionType
+  isRequired        Boolean         @default(false)
+  options           Json?
+  displayOrder      Int             @default(0)
+
+  answers AppointmentAnswer[]
+
+  @@index([appointmentTypeId, displayOrder])
+  @@map("booking_questions")
+}
+
+// ---------------------------------------------------------------------------
+// Appointments
+// ---------------------------------------------------------------------------
+
+model Appointment {
+  id                 String            @id @default(cuid())
+  appointmentTypeId  String
+  appointmentType    AppointmentType   @relation(fields: [appointmentTypeId], references: [id])
+  customerId         String
+  customer           User              @relation("AppointmentCustomer", fields: [customerId], references: [id])
+  organizationId     String
+  organization       Organization      @relation(fields: [organizationId], references: [id])
+  bookablePersonId   String?
+  bookablePerson     BookablePerson?   @relation(fields: [bookablePersonId], references: [id])
+  bookableResourceId String?
+  bookableResource   BookableResource? @relation(fields: [bookableResourceId], references: [id])
+  startTime          DateTime
+  endTime            DateTime
+  durationMins       Int
+  status             AppointmentStatus @default(PENDING)
+  rescheduleCount    Int               @default(0)
+  capacityBooked     Int               @default(1)
+  totalAmount        Decimal?          @db.Decimal(12, 2)
+  paymentStatus      PaymentStatus     @default(PENDING)
+  cancellationReason String?
+  cancelledAt        DateTime?
+  confirmationCode   String            @unique
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  reschedules   AppointmentReschedule[]
+  answers       AppointmentAnswer[]
+  payments      Payment[]
+  notifications Notification[]
+
+  @@index([appointmentTypeId, startTime])
+  @@index([organizationId, startTime])
+  @@index([customerId, startTime])
+  @@index([bookablePersonId, startTime])
+  @@index([bookableResourceId, startTime])
+  @@index([status])
+  @@map("appointments")
+}
+
+model AppointmentReschedule {
+  id                  String            @id @default(cuid())
+  appointmentId       String
+  appointment         Appointment       @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  rescheduledByUserId String
+  rescheduledBy       User              @relation("RescheduledByUser", fields: [rescheduledByUserId], references: [id])
+  previousStartTime   DateTime
+  previousEndTime     DateTime
+  newStartTime        DateTime
+  newEndTime          DateTime
+  previousPersonId    String?
+  previousPerson      BookablePerson?   @relation("PreviousPerson", fields: [previousPersonId], references: [id])
+  previousResourceId  String?
+  previousResource    BookableResource? @relation("PreviousResource", fields: [previousResourceId], references: [id])
+  reason              String?
+  rescheduledAt       DateTime          @default(now())
+
+  @@index([appointmentId])
+  @@index([rescheduledByUserId])
+  @@map("appointment_reschedules")
+}
+
+model AppointmentAnswer {
+  id            String          @id @default(cuid())
+  appointmentId String
+  appointment   Appointment     @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      BookingQuestion @relation(fields: [questionId], references: [id])
+  answerText    String?
+  createdAt     DateTime        @default(now())
+
+  @@unique([appointmentId, questionId])
+  @@index([questionId])
+  @@map("appointment_answers")
+}
+
+model Payment {
+  id                   String        @id @default(cuid())
+  appointmentId        String
+  appointment          Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  customerId           String
+  customer             User          @relation(fields: [customerId], references: [id])
+  amount               Decimal       @db.Decimal(12, 2)
+  currency             String        @default("INR")
+  paymentGateway       String?
+  gatewayTransactionId String?
+  status               PaymentStatus @default(PENDING)
+  paidAt               DateTime?
+  refundedAt           DateTime?
+  createdAt            DateTime      @default(now())
+
+  @@index([appointmentId])
+  @@index([customerId])
+  @@index([status])
+  @@index([gatewayTransactionId])
+  @@map("payments")
+}
+
+model SlotLock {
+  id                 String            @id @default(cuid())
+  appointmentTypeId  String
+  appointmentType    AppointmentType   @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
+  bookablePersonId   String?
+  bookablePerson     BookablePerson?   @relation(fields: [bookablePersonId], references: [id], onDelete: Cascade)
+  bookableResourceId String?
+  bookableResource   BookableResource? @relation(fields: [bookableResourceId], references: [id], onDelete: Cascade)
+  slotStart          DateTime
+  slotEnd            DateTime
+  customerId         String
+  customer           User              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  expiresAt          DateTime
+  createdAt          DateTime          @default(now())
+
+  @@index([appointmentTypeId, slotStart])
+  @@index([bookablePersonId, slotStart])
+  @@index([bookableResourceId, slotStart])
+  @@index([expiresAt])
+  @@index([customerId])
+  @@map("slot_locks")
+}
+
+// ---------------------------------------------------------------------------
+// Notifications & audit
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id               String                    @id @default(cuid())
+  recipientType    NotificationRecipientType
+  recipientId      String?
+  recipientEmail   String?
+  appointmentId    String?
+  appointment      Appointment?              @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  notificationType NotificationType
+  channel          NotificationChannel
+  status           NotificationStatus        @default(PENDING)
+  sentAt           DateTime?
+  createdAt        DateTime                  @default(now())
+
+  @@index([recipientId])
+  @@index([appointmentId])
+  @@index([status, createdAt])
+  @@index([notificationType])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorRole  Role?
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
