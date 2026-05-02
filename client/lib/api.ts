@@ -1,580 +1,1185 @@
-import axios from "axios";
-import { DEMO_OTP } from "@/constants";
+import axios, { AxiosError, type AxiosRequestConfig } from "axios";
 import type {
-  ApiEnvelope,
-  AuthUser,
-  CreateOrgPayload,
-  ForgotPasswordFormValues,
-  ForgotPasswordResult,
-  LoginFormValues,
-  LoginResult,
-  OrgDetail,
-  OrgListing,
-  OrgRegistrationPayload,
+  AcquireSlotLockInput,
+  AdminAppointmentItem,
+  AdminDashboard,
+  AdminOrganizationStatusFilter,
+  AdminTimeseriesQuery,
+  AdminUserDetail,
+  ApiErrorBody,
+  AppointmentType,
+  AppointmentTypeWithRelations,
+  AppointmentWithRelations,
+  AuditLog,
+  AvailabilityQuery,
+  AvailabilityResponse,
+  BookablePerson,
+  BookableResource,
+  CancelAppointmentInput,
+  ChangePasswordInput,
+  ChangeRoleInput,
+  CreateAppointmentInput,
+  CreateAppointmentTypeInput,
+  CreateBookablePersonInput,
+  CreateBookableResourceInput,
+  CreateOrganizationInput,
+  CreatePaymentIntentInput,
+  CreatePaymentIntentResult,
+  DeleteResult,
+  DisableTwoFactorInput,
+  DurationOptionsQuery,
+  DurationOptionsResponse,
+  ForgotPasswordInput,
+  GenericMessage,
+  ListAdminAppointmentsQuery,
+  ListAppointmentTypesQuery,
+  ListAuditLogsQuery,
+  ListMyAppointmentsQuery,
+  ListOrgAppointmentsQuery,
+  ListUsersQuery,
+  LoginInput,
+  LoginResponse,
+  OrgByAppointmentType,
+  OrgBusyHours,
+  OrgDashboard,
+  OrgTimeseriesQuery,
   Organization,
-  OtpVerificationFormValues,
-  RegisterResult,
-  ResetPasswordFormValues,
-  ResetPasswordResult,
-  VerifyEmailResult,
+  OrganizationWithOrganiser,
+  PaginatedResult,
+  RegisterInput,
+  RegisterResponse,
+  RejectAppointmentInput,
+  RejectOrganizationInput,
+  ResendOtpInput,
+  RescheduleAppointmentInput,
+  ResetPasswordInput,
+  SafeUser,
+  SetBookingQuestionsInput,
+  SetEntitiesInput,
+  SetScheduleInput,
+  SlotLock,
+  TimeBucket,
+  TopOrganization,
+  TopOrganizationsQuery,
+  UpdateAppointmentTypeInput,
+  UpdateBookablePersonInput,
+  UpdateBookableResourceInput,
+  VerifyEmailInput,
+  VerifyPaymentInput,
+  VerifyPaymentResult,
+  VerifyTwoFactorInput,
 } from "@/types";
 
-// ─── Mock data (used when NEXT_PUBLIC_API_URL is not set) ─────────────────────
+const baseURL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-type MockUserRecord = {
-  id: string;
-  fullName: string;
-  email: string;
-  password: string;
-  emailVerified: boolean;
-};
-
-// Mock organisations used when NEXT_PUBLIC_API_URL is not set.
-const MOCK_ORGS: OrgListing[] = [
-  {
-    id: "1",
-    name: "Workout Club",
-    slug: "workout-club",
-    address: "Bandra West, Mumbai",
-    description:
-      "Premium fitness center equipped with modern strength machines, cardio zones, and expert personal trainers to help you achieve your goals.",
-    appointmentCount: 15,
-    workingHours: "06:00 – 23:00",
-    logoUrl: null,
-  },
-  {
-    id: "2",
-    name: "LeadsTrackr",
-    slug: "leads-trackr",
-    address: "Byculla, Mumbai",
-    description:
-      "We build a profitable CRM for business owners. Optimize your sales pipeline and manage customer relationships effortlessly.",
-    appointmentCount: 0,
-    workingHours: "09:00 – 17:00",
-    logoUrl: null,
-  },
-  {
-    id: "3",
-    name: "Urban Oasis Spa",
-    slug: "urban-oasis-spa",
-    address: "Juhu, Mumbai",
-    description:
-      "A luxury wellness retreat offering deep tissue massages, aromatherapy, and rejuvenating facial treatments in a tranquil environment.",
-    appointmentCount: 4,
-    workingHours: "10:00 – 21:00",
-    logoUrl: null,
-  },
-  {
-    id: "4",
-    name: "Bright Smiles Dental",
-    slug: "bright-smiles-dental",
-    address: "Andheri East, Mumbai",
-    description:
-      "Comprehensive dental care including routine checkups, cosmetic dentistry, and emergency treatments with state-of-the-art technology.",
-    appointmentCount: 8,
-    workingHours: "09:30 – 19:30",
-    logoUrl: null,
-  },
-  {
-    id: "5",
-    name: "Nexus Tech Consulting",
-    slug: "nexus-tech",
-    address: "BKC, Mumbai",
-    description:
-      "Strategic IT consulting and digital transformation services for enterprise clients. Book an initial discovery call with our experts.",
-    appointmentCount: 3,
-    workingHours: "09:00 – 18:00",
-    logoUrl: null,
-  },
-];
-
-// Extended detail records keyed by slug.
-// WHY a Record (not array): profile page looks up by slug — O(1) vs O(n) linear scan.
-const MOCK_ORG_DETAILS: Record<string, OrgDetail> = {
-  "workout-club": {
-    ...MOCK_ORGS[0]!,
-    contactPhone: "+91 98765 11111",
-    contactEmail: "hello@workoutclub.in",
-    timezone: "Asia/Kolkata",
-  },
-  "leads-trackr": {
-    ...MOCK_ORGS[1]!,
-    contactPhone: "+91 90012 22222",
-    contactEmail: "sales@leadstrackr.com",
-    timezone: "Asia/Kolkata",
-  },
-  "urban-oasis-spa": {
-    ...MOCK_ORGS[2]!,
-    contactPhone: "+91 88990 33333",
-    contactEmail: "bookings@urbanoasis.in",
-    timezone: "Asia/Kolkata",
-  },
-  "bright-smiles-dental": {
-    ...MOCK_ORGS[3]!,
-    contactPhone: "+91 77001 44444",
-    contactEmail: "appointments@brightsmiles.in",
-    timezone: "Asia/Kolkata",
-  },
-  "nexus-tech": {
-    ...MOCK_ORGS[4]!,
-    contactPhone: "+91 98100 55555",
-    contactEmail: "consult@nexustech.in",
-    timezone: "Asia/Kolkata",
-  },
-};
-
-// In-memory mock user store (cleared on page refresh — development only).
-const mockUsers = new Map<string, MockUserRecord>();
-
-// ─── Axios instance ───────────────────────────────────────────────────────────
-
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-
-// WHY withCredentials: true — the backend sets httpOnly access + refresh cookies.
-// Axios must include credentials on every request so the browser sends those
-// cookies automatically. No manual token handling needed.
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: { "Content-Type": "application/json" },
+export const api = axios.create({
+  baseURL,
   withCredentials: true,
+  headers: { "Content-Type": "application/json" },
 });
 
-// ─── Error helper ─────────────────────────────────────────────────────────────
+export class ApiError extends Error {
+  status: number;
+  messages: string[];
+  raw: unknown;
 
-function extractApiError(error: unknown): never {
-  if (axios.isAxiosError(error)) {
-    const msg = error.response?.data?.message;
-    if (Array.isArray(msg)) throw new Error(msg[0] as string);
-    if (typeof msg === "string") throw new Error(msg);
-    throw new Error(error.message ?? "An unexpected error occurred.");
+  constructor(status: number, messages: string[], raw: unknown) {
+    super(messages[0] ?? "Request failed");
+    this.status = status;
+    this.messages = messages;
+    this.raw = raw;
   }
-  throw error;
 }
 
-// ─── Mock helpers ─────────────────────────────────────────────────────────────
-
-function wait(delay = 500) {
-  return new Promise((resolve) => setTimeout(resolve, delay));
+export function extractApiError(err: unknown): never {
+  if (axios.isAxiosError(err)) {
+    const axiosErr = err as AxiosError<ApiErrorBody>;
+    const status = axiosErr.response?.status ?? 0;
+    const body = axiosErr.response?.data;
+    const raw = body?.message;
+    const messages = Array.isArray(raw)
+      ? raw
+      : typeof raw === "string"
+        ? [raw]
+        : [axiosErr.message || "Request failed"];
+    throw new ApiError(status, messages, body);
+  }
+  if (err instanceof Error) {
+    throw new ApiError(0, [err.message], err);
+  }
+  throw new ApiError(0, ["Unknown error"], err);
 }
 
-function buildMockUser(record: MockUserRecord): AuthUser {
-  return {
-    id: record.id,
-    email: record.email,
-    fullName: record.fullName,
-    role: "CUSTOMER",
-    isActive: true,
-    emailVerified: record.emailVerified,
-    twoFactorEnabled: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-}
+type RetriableConfig = AxiosRequestConfig & { _retry?: boolean };
 
-// ─── Auth API ─────────────────────────────────────────────────────────────────
+let refreshInFlight: Promise<void> | null = null;
 
-/**
- * POST /auth/register  (Customer path)
- * Registers a new customer. No organization object → backend sets role=CUSTOMER.
- * Returns { userId, message }. No cookies issued — user must verify email then login.
- */
-export async function registerCustomer(creds: {
-  fullName: string;
-  email: string;
-  password: string;
-}): Promise<RegisterResult> {
-  if (api.defaults.baseURL) {
-    try {
-      const { data } = await api.post<RegisterResult>("/auth/register", {
-        fullName: creds.fullName,
-        email: creds.email,
-        password: creds.password,
+async function refreshSession(): Promise<void> {
+  if (!refreshInFlight) {
+    refreshInFlight = api
+      .post("/auth/refresh")
+      .then(() => undefined)
+      .finally(() => {
+        refreshInFlight = null;
       });
-      return data;
-    } catch (err) {
-      extractApiError(err);
-    }
   }
-
-  // MOCK
-  await wait();
-  const key = creds.email.toLowerCase();
-  if (mockUsers.has(key)) throw new Error("Email is already registered.");
-  const user: MockUserRecord = {
-    id: crypto.randomUUID(),
-    fullName: creds.fullName.trim(),
-    email: key,
-    password: creds.password,
-    emailVerified: false,
-  };
-  mockUsers.set(key, user);
-  return {
-    userId: user.id,
-    message: "Account created — check your email for a verification code.",
-  };
+  return refreshInFlight;
 }
 
-/**
- * POST /auth/register  (Organizer path)
- * Registers a new organizer with their organization data in one atomic transaction.
- * Backend sets role=ORGANIZER and creates the org record together.
- * Returns { userId, organizationId, message }.
- * No cookies issued — user must verify email then login.
- *
- * Backend RegisterOrganizationDto fields:
- *   name, slug, contactEmail (required)
- *   description, contactPhone, address, timezone (optional)
- */
-export async function registerOrgUser(
-  payload: OrgRegistrationPayload,
-): Promise<RegisterResult> {
-  if (api.defaults.baseURL) {
-    try {
-      const { data } = await api.post<RegisterResult>("/auth/register", {
-        fullName: payload.user.fullName,
-        email: payload.user.email,
-        password: payload.user.password,
-        organization: {
-          name: payload.org.name,
-          slug: payload.org.slug,
-          contactEmail: payload.user.email, // org contact = user email
-          description: payload.org.description,
-          contactPhone: payload.org.contactPhone,
-          address: payload.org.address,
-          timezone: payload.org.timezone,
-        },
-      });
-      return data;
-    } catch (err) {
-      extractApiError(err);
+api.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const original = error.config as RetriableConfig | undefined;
+    const status = error.response?.status;
+
+    if (
+      status !== 401 ||
+      !original ||
+      original._retry ||
+      original.url?.startsWith("/auth/refresh") ||
+      original.url?.startsWith("/auth/login") ||
+      original.url === "/auth/me"
+    ) {
+      return Promise.reject(error);
     }
-  }
 
-  // MOCK
-  await wait();
-  const key = payload.user.email.toLowerCase();
-  if (mockUsers.has(key)) throw new Error("Email is already registered.");
-  const user: MockUserRecord = {
-    id: crypto.randomUUID(),
-    fullName: payload.user.fullName.trim(),
-    email: key,
-    password: payload.user.password,
-    emailVerified: false,
-  };
-  mockUsers.set(key, user);
-  return {
-    userId: user.id,
-    organizationId: crypto.randomUUID(),
-    message: "Organisation registered — check your email to verify your account.",
-  };
-}
-
-/**
- * POST /auth/verify-email
- * Verifies the 6-digit OTP sent to the user's email on signup.
- * Returns { message } only — user must then call loginUser() to get cookies.
- */
-export async function verifyEmail(
-  payload: OtpVerificationFormValues,
-): Promise<VerifyEmailResult> {
-  if (api.defaults.baseURL) {
+    original._retry = true;
     try {
-      const { data } = await api.post<VerifyEmailResult>("/auth/verify-email", {
-        email: payload.email,
-        code: payload.code,
-      });
-      return data;
-    } catch (err) {
-      extractApiError(err);
-    }
-  }
-
-  // MOCK
-  await wait();
-  const key = payload.email.toLowerCase();
-  const user = mockUsers.get(key);
-  if (!user) throw new Error("Invalid or expired code.");
-  if (payload.code !== DEMO_OTP) throw new Error("Invalid or expired code.");
-  user.emailVerified = true;
-  return { message: "Email verified." };
-}
-
-/**
- * POST /auth/resend-otp
- * Resends OTP for the given purpose (SIGNUP or LOGIN for 2FA).
- */
-export async function resendOtp(
-  email: string,
-  purpose: "SIGNUP" | "LOGIN",
-): Promise<{ message: string }> {
-  if (api.defaults.baseURL) {
-    try {
-      const { data } = await api.post<{ message: string }>("/auth/resend-otp", {
-        email,
-        purpose,
-      });
-      return data;
-    } catch (err) {
-      extractApiError(err);
-    }
-  }
-
-  await wait();
-  return {
-    message: `If an account exists, a code has been sent. (Demo: use ${DEMO_OTP})`,
-  };
-}
-
-/**
- * POST /auth/login
- * Authenticates with email and password.
- *
- * Two possible success shapes:
- *   { twoFactorRequired: true } — 2FA OTP emailed; cookies NOT set yet.
- *   { user: SafeUser }          — cookies set; session is active.
- *
- * WHY no token: backend uses httpOnly cookies. Axios sends them automatically
- * on all subsequent requests due to withCredentials: true on the axios instance.
- */
-export async function loginUser(payload: LoginFormValues): Promise<LoginResult> {
-  if (api.defaults.baseURL) {
-    try {
-      const { data } = await api.post<LoginResult>("/auth/login", {
-        email: payload.email,
-        password: payload.password,
-      });
-      return data;
-    } catch (err) {
-      extractApiError(err);
-    }
-  }
-
-  // MOCK
-  await wait();
-  const user = mockUsers.get(payload.email.toLowerCase());
-  if (!user || user.password !== payload.password) {
-    throw new Error("Invalid credentials.");
-  }
-  if (!user.emailVerified) {
-    throw new Error("Email not verified. Check your inbox for the OTP.");
-  }
-  return { user: buildMockUser(user) };
-}
-
-/**
- * POST /auth/login/2fa
- * Completes 2FA login after submitting the emailed OTP.
- * Returns { user: SafeUser } with httpOnly cookies set.
- */
-export async function loginTwoFactor(
-  email: string,
-  code: string,
-): Promise<{ user: AuthUser }> {
-  if (api.defaults.baseURL) {
-    try {
-      const { data } = await api.post<{ user: AuthUser }>("/auth/login/2fa", {
-        email,
-        code,
-      });
-      return data;
-    } catch (err) {
-      extractApiError(err);
-    }
-  }
-
-  await wait();
-  throw new Error("Two-factor authentication is not available in demo mode.");
-}
-
-/**
- * GET /auth/me
- * Returns the currently authenticated user from the httpOnly access cookie.
- * Used on app init to rehydrate Zustand auth state.
- * Returns null (not throws) when unauthenticated.
- */
-export async function getCurrentUser(): Promise<AuthUser | null> {
-  if (api.defaults.baseURL) {
-    try {
-      const { data } = await api.get<AuthUser>("/auth/me");
-      return data;
+      await refreshSession();
     } catch {
+      return Promise.reject(error);
+    }
+    return api.request(original);
+  },
+);
+
+export async function getCurrentUser(): Promise<SafeUser | null> {
+  try {
+    const { data } = await api.get<SafeUser>("/auth/me");
+    return data;
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 401) {
       return null;
     }
-  }
-  return null;
-}
-
-/**
- * POST /auth/logout
- * Revokes the current refresh token and clears auth cookies server-side.
- */
-export async function logoutUser(): Promise<void> {
-  if (api.defaults.baseURL) {
-    try {
-      await api.post("/auth/logout");
-    } catch (err) {
-      extractApiError(err);
-    }
+    extractApiError(err);
   }
 }
 
-/**
- * POST /auth/forgot-password
- * Sends a password reset link to the provided email.
- * Always returns success (backend is silent on unknown emails).
- */
+export async function loginUser(body: LoginInput): Promise<LoginResponse> {
+  try {
+    const { data } = await api.post<LoginResponse>("/auth/login", body);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function loginTwoFactor(
+  body: VerifyTwoFactorInput,
+): Promise<{ user: SafeUser }> {
+  try {
+    const { data } = await api.post<{ user: SafeUser }>(
+      "/auth/login/2fa",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function registerUser(
+  body: RegisterInput,
+): Promise<RegisterResponse> {
+  try {
+    const { data } = await api.post<RegisterResponse>("/auth/register", body);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function verifyEmail(
+  body: VerifyEmailInput,
+): Promise<GenericMessage> {
+  try {
+    const { data } = await api.post<GenericMessage>(
+      "/auth/verify-email",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function resendOtp(
+  body: ResendOtpInput,
+): Promise<GenericMessage> {
+  try {
+    const { data } = await api.post<GenericMessage>("/auth/resend-otp", body);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
 export async function forgotPassword(
-  payload: ForgotPasswordFormValues,
-): Promise<ForgotPasswordResult> {
-  if (api.defaults.baseURL) {
-    try {
-      const { data } = await api.post<ForgotPasswordResult>(
-        "/auth/forgot-password",
-        { email: payload.email },
-      );
-      return data;
-    } catch (err) {
-      extractApiError(err);
-    }
+  body: ForgotPasswordInput,
+): Promise<GenericMessage> {
+  try {
+    const { data } = await api.post<GenericMessage>(
+      "/auth/forgot-password",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
   }
-
-  await wait();
-  return {
-    message:
-      "If an account exists for this email, a reset link has been sent.",
-  };
 }
 
-/**
- * POST /auth/reset-password
- * Resets the password using a token from the reset email link.
- * Token is extracted from the URL query param ?token= by the page component.
- */
 export async function resetPassword(
-  payload: ResetPasswordFormValues,
-): Promise<ResetPasswordResult> {
-  if (api.defaults.baseURL) {
-    try {
-      const { data } = await api.post<ResetPasswordResult>(
-        "/auth/reset-password",
-        { token: payload.token, newPassword: payload.newPassword },
-      );
-      return data;
-    } catch (err) {
-      extractApiError(err);
-    }
+  body: ResetPasswordInput,
+): Promise<GenericMessage> {
+  try {
+    const { data } = await api.post<GenericMessage>(
+      "/auth/reset-password",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
   }
-
-  await wait();
-  return { message: "Password reset. Please log in." };
 }
 
-// ─── Organisation API ──────────────────────────────────────────────────────────
+export async function changePassword(
+  body: ChangePasswordInput,
+): Promise<GenericMessage> {
+  try {
+    const { data } = await api.post<GenericMessage>(
+      "/auth/change-password",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
 
-/**
- * POST /organizations
- * Creates a new organisation for the signed-in organiser.
- *
- * WHY multipart/form-data: The logo is a File object — cannot be sent as JSON.
- * FormData lets us attach the file and text fields in one request.
- *
- * Auth: cookies sent automatically via withCredentials.
- */
+export async function logoutUser(): Promise<GenericMessage> {
+  try {
+    const { data } = await api.post<GenericMessage>("/auth/logout");
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function logoutAll(): Promise<GenericMessage> {
+  try {
+    const { data } = await api.post<GenericMessage>("/auth/logout-all");
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function enableTwoFactor(): Promise<GenericMessage> {
+  try {
+    const { data } = await api.post<GenericMessage>("/auth/2fa/enable");
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function disableTwoFactor(
+  body: DisableTwoFactorInput,
+): Promise<GenericMessage> {
+  try {
+    const { data } = await api.post<GenericMessage>("/auth/2fa/disable", body);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getMyOrganization(): Promise<Organization | null> {
+  try {
+    const { data } = await api.get<Organization>("/organizations/me");
+    return data;
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      const status = err.response?.status;
+      if (status === 404 || status === 401 || status === 403) return null;
+    }
+    extractApiError(err);
+  }
+}
+
 export async function createOrganization(
-  payload: CreateOrgPayload,
+  body: CreateOrganizationInput,
 ): Promise<Organization> {
-  if (api.defaults.baseURL) {
-    const form = new FormData();
-    form.append("name", payload.name);
-    form.append("slug", payload.slug);
-    form.append("description", payload.description);
-    form.append("contactPhone", payload.contactPhone);
-    form.append("address", payload.address);
-    form.append("timezone", payload.timezone);
-    if (payload.logoFile) form.append("logo", payload.logoFile);
-
-    try {
-      const { data } = await api.post<ApiEnvelope<Organization>>(
-        "/organizations",
-        form,
-        { headers: { "Content-Type": "multipart/form-data" } },
-      );
-      return data.data;
-    } catch (err) {
-      extractApiError(err);
-    }
+  try {
+    const { data } = await api.post<Organization>("/organizations", body);
+    return data;
+  } catch (err) {
+    extractApiError(err);
   }
-
-  // MOCK
-  await wait(1000);
-  return {
-    id: crypto.randomUUID(),
-    organiserId: "mock-user-id",
-    name: payload.name,
-    slug: payload.slug,
-    description: payload.description,
-    logoUrl: null,
-    contactEmail: null,
-    contactPhone: payload.contactPhone,
-    address: payload.address,
-    timezone: payload.timezone,
-    isActive: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
 }
 
-/**
- * GET /organizations/public?q=<query>
- * Fetches the public list of active organisations.
- * Auth: None — public endpoint.
- */
-export async function getOrganizations(query?: string): Promise<OrgListing[]> {
-  if (api.defaults.baseURL) {
-    try {
-      const params = query ? { q: query } : {};
-      const { data } = await api.get<ApiEnvelope<OrgListing[]>>(
-        "/organizations/public",
-        { params },
-      );
-      return data.data;
-    } catch (err) {
-      extractApiError(err);
-    }
+export async function getAdminDashboard(): Promise<AdminDashboard> {
+  try {
+    const { data } = await api.get<AdminDashboard>("/admin/analytics/dashboard");
+    return data;
+  } catch (err) {
+    extractApiError(err);
   }
-
-  // MOCK — filter the static list by name, description, or address.
-  await wait(400);
-  if (!query || query.trim() === "") return MOCK_ORGS;
-  const q = query.toLowerCase();
-  return MOCK_ORGS.filter(
-    (org) =>
-      org.name.toLowerCase().includes(q) ||
-      org.description.toLowerCase().includes(q) ||
-      org.address.toLowerCase().includes(q),
-  );
 }
 
-/**
- * GET /organizations/public/:slug
- * Fetches the full detail of one organisation by its URL slug.
- * Auth: None — public endpoint.
- */
-export async function getOrganizationBySlug(slug: string): Promise<OrgDetail> {
-  if (api.defaults.baseURL) {
-    try {
-      const { data } = await api.get<ApiEnvelope<OrgDetail>>(
-        `/organizations/public/${slug}`,
-      );
-      return data.data;
-    } catch (err) {
-      extractApiError(err);
-    }
+export async function getAdminTimeseries(
+  query: AdminTimeseriesQuery,
+): Promise<TimeBucket[]> {
+  try {
+    const { data } = await api.get<TimeBucket[]>("/admin/analytics/timeseries", {
+      params: query,
+    });
+    return data;
+  } catch (err) {
+    extractApiError(err);
   }
+}
 
-  // MOCK — O(1) Record lookup.
-  await wait(300);
-  const org = MOCK_ORG_DETAILS[slug];
-  if (!org) throw new Error("Organisation not found.");
-  return org;
+export async function getTopOrganizations(
+  query: TopOrganizationsQuery = {},
+): Promise<TopOrganization[]> {
+  try {
+    const { data } = await api.get<TopOrganization[]>(
+      "/admin/analytics/top-organizations",
+      { params: query },
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getOrgDashboard(): Promise<OrgDashboard> {
+  try {
+    const { data } = await api.get<OrgDashboard>(
+      "/organizations/me/analytics/dashboard",
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getOrgTimeseries(
+  query: OrgTimeseriesQuery,
+): Promise<TimeBucket[]> {
+  try {
+    const { data } = await api.get<TimeBucket[]>(
+      "/organizations/me/analytics/timeseries",
+      { params: query },
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getOrgByAppointmentType(): Promise<OrgByAppointmentType[]> {
+  try {
+    const { data } = await api.get<OrgByAppointmentType[]>(
+      "/organizations/me/analytics/by-appointment-type",
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getOrgBusyHours(): Promise<OrgBusyHours> {
+  try {
+    const { data } = await api.get<OrgBusyHours>(
+      "/organizations/me/analytics/busy-hours",
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Admin: users ────────────────────────────────────────────────
+
+export async function listAdminUsers(
+  query: ListUsersQuery = {},
+): Promise<PaginatedResult<SafeUser>> {
+  try {
+    const { data } = await api.get<PaginatedResult<SafeUser>>("/admin/users", {
+      params: query,
+    });
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getAdminUser(userId: string): Promise<AdminUserDetail> {
+  try {
+    const { data } = await api.get<AdminUserDetail>(`/admin/users/${userId}`);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function activateUser(userId: string): Promise<SafeUser> {
+  try {
+    const { data } = await api.patch<SafeUser>(
+      `/admin/users/${userId}/activate`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function deactivateUser(userId: string): Promise<SafeUser> {
+  try {
+    const { data } = await api.patch<SafeUser>(
+      `/admin/users/${userId}/deactivate`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function changeUserRole(
+  userId: string,
+  body: ChangeRoleInput,
+): Promise<SafeUser> {
+  try {
+    const { data } = await api.patch<SafeUser>(
+      `/admin/users/${userId}/role`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Admin: organizations ────────────────────────────────────────
+
+export async function listAdminOrganizations(
+  status: AdminOrganizationStatusFilter = "APPROVED",
+): Promise<OrganizationWithOrganiser[]> {
+  try {
+    const { data } = await api.get<OrganizationWithOrganiser[]>(
+      "/admin/organizations",
+      { params: { status } },
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function approveOrganization(
+  organizationId: string,
+): Promise<Organization> {
+  try {
+    const { data } = await api.post<Organization>(
+      `/admin/organizations/${organizationId}/approve`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function rejectOrganization(
+  organizationId: string,
+  body: RejectOrganizationInput = {},
+): Promise<Organization> {
+  try {
+    const { data } = await api.post<Organization>(
+      `/admin/organizations/${organizationId}/reject`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function activateOrganization(
+  organizationId: string,
+): Promise<Organization> {
+  try {
+    const { data } = await api.patch<Organization>(
+      `/admin/organizations/${organizationId}/activate`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function deactivateOrganization(
+  organizationId: string,
+): Promise<Organization> {
+  try {
+    const { data } = await api.patch<Organization>(
+      `/admin/organizations/${organizationId}/deactivate`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Admin: appointments ─────────────────────────────────────────
+
+export async function listAdminAppointments(
+  query: ListAdminAppointmentsQuery = {},
+): Promise<PaginatedResult<AdminAppointmentItem>> {
+  try {
+    const { data } = await api.get<PaginatedResult<AdminAppointmentItem>>(
+      "/admin/appointments",
+      { params: query },
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Admin: audit logs ───────────────────────────────────────────
+
+export async function listAuditLogs(
+  query: ListAuditLogsQuery = {},
+): Promise<PaginatedResult<AuditLog>> {
+  try {
+    const { data } = await api.get<PaginatedResult<AuditLog>>(
+      "/admin/audit-logs",
+      { params: query },
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Public discovery ────────────────────────────────────────────
+
+export async function listPublicAppointmentTypes(): Promise<AppointmentType[]> {
+  try {
+    const { data } = await api.get<AppointmentType[]>(
+      "/public/appointment-types",
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getPublicAppointmentType(
+  id: string,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.get<AppointmentTypeWithRelations>(
+      `/public/appointment-types/${id}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getPublicAppointmentTypeByToken(
+  token: string,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.get<AppointmentTypeWithRelations>(
+      `/public/appointment-types/share/${token}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getAvailability(
+  appointmentTypeId: string,
+  query: AvailabilityQuery,
+): Promise<AvailabilityResponse> {
+  try {
+    const { data } = await api.get<AvailabilityResponse>(
+      `/public/appointment-types/${appointmentTypeId}/availability`,
+      { params: query },
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getDurationOptions(
+  appointmentTypeId: string,
+  query: DurationOptionsQuery,
+): Promise<DurationOptionsResponse> {
+  try {
+    const { data } = await api.get<DurationOptionsResponse>(
+      `/public/appointment-types/${appointmentTypeId}/availability/duration-options`,
+      { params: query },
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Slot locks ──────────────────────────────────────────────────
+
+export async function acquireSlotLock(
+  body: AcquireSlotLockInput,
+): Promise<SlotLock> {
+  try {
+    const { data } = await api.post<SlotLock>("/slot-locks", body);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function extendSlotLock(id: string): Promise<SlotLock> {
+  try {
+    const { data } = await api.post<SlotLock>(`/slot-locks/${id}/extend`);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function releaseSlotLock(id: string): Promise<void> {
+  try {
+    await api.delete(`/slot-locks/${id}`);
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// Best-effort release using sendBeacon for tab-close. No-op if unsupported.
+export function releaseSlotLockBeacon(id: string): void {
+  if (typeof navigator === "undefined" || !("sendBeacon" in navigator)) return;
+  const baseURL =
+    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  const url = `${baseURL}/slot-locks/${id}`;
+  // sendBeacon does not support DELETE; we POST a tombstone the server's
+  // existing DELETE handles. For now, we attempt fetch with keepalive as
+  // the most reliable cross-browser option.
+  try {
+    fetch(url, { method: "DELETE", credentials: "include", keepalive: true });
+  } catch {
+    // best-effort only
+  }
+}
+
+// ─── Appointments (customer) ─────────────────────────────────────
+
+export async function createAppointment(
+  body: CreateAppointmentInput,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      "/appointments",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getMyAppointment(
+  publicId: string,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.get<AppointmentWithRelations>(
+      `/appointments/${publicId}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function cancelMyAppointment(
+  publicId: string,
+  body: CancelAppointmentInput = {},
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/appointments/${publicId}/cancel`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Payments ────────────────────────────────────────────────────
+
+export async function createPaymentIntent(
+  body: CreatePaymentIntentInput,
+): Promise<CreatePaymentIntentResult> {
+  try {
+    const { data } = await api.post<CreatePaymentIntentResult>(
+      "/payments/intent",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function verifyPayment(
+  body: VerifyPaymentInput,
+): Promise<VerifyPaymentResult> {
+  try {
+    const { data } = await api.post<VerifyPaymentResult>(
+      "/payments/verify",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Bookable persons ──────────────────────────────────────────
+
+export async function listBookablePersons(
+  includeInactive = false,
+): Promise<BookablePerson[]> {
+  try {
+    const { data } = await api.get<BookablePerson[]>("/bookable-persons", {
+      params: { includeInactive },
+    });
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getBookablePerson(id: string): Promise<BookablePerson> {
+  try {
+    const { data } = await api.get<BookablePerson>(`/bookable-persons/${id}`);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function createBookablePerson(
+  body: CreateBookablePersonInput,
+): Promise<BookablePerson> {
+  try {
+    const { data } = await api.post<BookablePerson>("/bookable-persons", body);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function updateBookablePerson(
+  id: string,
+  body: UpdateBookablePersonInput,
+): Promise<BookablePerson> {
+  try {
+    const { data } = await api.patch<BookablePerson>(
+      `/bookable-persons/${id}`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function deleteBookablePerson(id: string): Promise<DeleteResult> {
+  try {
+    const { data } = await api.delete<DeleteResult>(`/bookable-persons/${id}`);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Bookable resources ────────────────────────────────────────
+
+export async function listBookableResources(
+  includeInactive = false,
+): Promise<BookableResource[]> {
+  try {
+    const { data } = await api.get<BookableResource[]>("/bookable-resources", {
+      params: { includeInactive },
+    });
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getBookableResource(
+  id: string,
+): Promise<BookableResource> {
+  try {
+    const { data } = await api.get<BookableResource>(
+      `/bookable-resources/${id}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function createBookableResource(
+  body: CreateBookableResourceInput,
+): Promise<BookableResource> {
+  try {
+    const { data } = await api.post<BookableResource>(
+      "/bookable-resources",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function updateBookableResource(
+  id: string,
+  body: UpdateBookableResourceInput,
+): Promise<BookableResource> {
+  try {
+    const { data } = await api.patch<BookableResource>(
+      `/bookable-resources/${id}`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function deleteBookableResource(
+  id: string,
+): Promise<DeleteResult> {
+  try {
+    const { data } = await api.delete<DeleteResult>(
+      `/bookable-resources/${id}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Appointment types ─────────────────────────────────────────
+
+export async function listAppointmentTypes(
+  query: ListAppointmentTypesQuery = {},
+): Promise<AppointmentType[]> {
+  try {
+    const { data } = await api.get<AppointmentType[]>("/appointment-types", {
+      params: query,
+    });
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getAppointmentType(
+  id: string,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.get<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function createAppointmentType(
+  body: CreateAppointmentTypeInput,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentTypeWithRelations>(
+      "/appointment-types",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function updateAppointmentType(
+  id: string,
+  body: UpdateAppointmentTypeInput,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.patch<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function deleteAppointmentType(id: string): Promise<void> {
+  try {
+    await api.delete(`/appointment-types/${id}`);
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function setAppointmentTypeEntities(
+  id: string,
+  body: SetEntitiesInput,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.put<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}/entities`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function setAppointmentTypeSchedule(
+  id: string,
+  body: SetScheduleInput,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.put<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}/schedule`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function setAppointmentTypeQuestions(
+  id: string,
+  body: SetBookingQuestionsInput,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.put<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}/questions`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function publishAppointmentType(
+  id: string,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}/publish`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function unpublishAppointmentType(
+  id: string,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}/unpublish`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function regenerateShareToken(
+  id: string,
+): Promise<{ shareToken: string }> {
+  try {
+    const { data } = await api.post<{ shareToken: string }>(
+      `/appointment-types/${id}/share-token`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Organizer appointments ────────────────────────────────────
+
+export async function listOrgAppointments(
+  query: ListOrgAppointmentsQuery = {},
+): Promise<AppointmentWithRelations[]> {
+  try {
+    const { data } = await api.get<AppointmentWithRelations[]>(
+      "/organizations/me/appointments",
+      { params: query },
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getOrgAppointment(
+  publicId: string,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.get<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function approveOrgAppointment(
+  publicId: string,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}/approve`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function rejectOrgAppointment(
+  publicId: string,
+  body: RejectAppointmentInput = {},
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}/reject`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function completeOrgAppointment(
+  publicId: string,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}/complete`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function noShowOrgAppointment(
+  publicId: string,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}/no-show`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function cancelOrgAppointment(
+  publicId: string,
+  body: CancelAppointmentInput = {},
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}/cancel`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function rescheduleOrgAppointment(
+  publicId: string,
+  body: RescheduleAppointmentInput,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}/reschedule`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function listMyAppointments(
+  query: ListMyAppointmentsQuery = {},
+): Promise<AppointmentWithRelations[]> {
+  try {
+    const { data } = await api.get<AppointmentWithRelations[]>(
+      "/appointments/me",
+      { params: query },
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function rescheduleAppointment(
+  publicId: string,
+  body: RescheduleAppointmentInput,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/appointments/${publicId}/reschedule`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
 }

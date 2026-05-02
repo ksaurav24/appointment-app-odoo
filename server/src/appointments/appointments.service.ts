@@ -13,6 +13,7 @@ import {
   Prisma,
   Role,
 } from '@prisma/client';
+import { AnalyticsCacheService } from '../analytics/cache/analytics-cache.service';
 import { writeAuditLog } from '../common/audit/audit-log.helper';
 import { REFUND_HANDLER, RefundHandler } from '../common/refund-handler.token';
 import {
@@ -56,10 +57,20 @@ export class AppointmentsService {
     private readonly prisma: PrismaService,
     private readonly organizations: OrganizationsService,
     private readonly notifications: NotificationsService,
+    private readonly analyticsCache: AnalyticsCacheService,
     @Optional()
     @Inject(REFUND_HANDLER)
     private readonly refundHandler: RefundHandler | null = null,
   ) {}
+
+  private async invalidateAnalyticsCache(
+    organizationId: string,
+  ): Promise<void> {
+    await Promise.all([
+      this.analyticsCache.invalidateOrgScope(organizationId),
+      this.analyticsCache.invalidateAdminScope(),
+    ]);
+  }
 
   // -------------------------------------------------------------------------
   // Customer flows
@@ -186,6 +197,7 @@ export class AppointmentsService {
     });
 
     await this.notifications.flush(mailJobs);
+    await this.invalidateAnalyticsCache(result.organizationId);
     return result;
   }
 
@@ -311,6 +323,7 @@ export class AppointmentsService {
       return this.loadById(tx, updated.id);
     });
     await this.notifications.flush(mailJobs);
+    await this.invalidateAnalyticsCache(result.organizationId);
     return result;
   }
 
@@ -345,6 +358,7 @@ export class AppointmentsService {
       return this.loadById(tx, updated.id);
     });
     await this.notifications.flush(mailJobs);
+    await this.invalidateAnalyticsCache(result.organizationId);
     return result;
   }
 
@@ -362,6 +376,7 @@ export class AppointmentsService {
       where: { publicId },
       data: { status: AppointmentStatus.COMPLETED },
     });
+    await this.invalidateAnalyticsCache(existing.organizationId);
     return this.findOneForOrganiser(organiserId, publicId);
   }
 
@@ -379,6 +394,7 @@ export class AppointmentsService {
       where: { publicId },
       data: { status: AppointmentStatus.NO_SHOW },
     });
+    await this.invalidateAnalyticsCache(existing.organizationId);
     return this.findOneForOrganiser(organiserId, publicId);
   }
 
@@ -515,6 +531,7 @@ export class AppointmentsService {
       return this.loadById(tx, existing.id);
     });
     await this.notifications.flush(mailJobs);
+    await this.invalidateAnalyticsCache(existing.organizationId);
     return result;
   }
 
@@ -672,6 +689,7 @@ export class AppointmentsService {
       return this.loadById(tx, existing.id);
     });
     await this.notifications.flush(mailJobs);
+    await this.invalidateAnalyticsCache(existing.organizationId);
     return result;
   }
 

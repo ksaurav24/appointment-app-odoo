@@ -1,10 +1,11 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AppointmentType } from '@prisma/client';
 import { Public } from '../auth/decorators/public.decorator';
 import {
   AppointmentTypeWithRelations,
   AppointmentTypesService,
+  PublicOrganizationSummary,
 } from './appointment-types.service';
 
 @ApiTags('public-appointment-types')
@@ -17,7 +18,9 @@ export class AppointmentTypesPublicController {
   @ApiOperation({
     summary: 'List published appointment types from approved organizations',
   })
-  list(): Promise<AppointmentType[]> {
+  list(): Promise<
+    (AppointmentType & { organization: PublicOrganizationSummary })[]
+  > {
     return this.appointmentTypes.publicList();
   }
 
@@ -36,7 +39,9 @@ export class AppointmentTypesPublicController {
   @ApiOperation({
     summary: 'Fetch a published appointment type with all sub-resources',
   })
-  findOne(@Param('id') id: string): Promise<AppointmentTypeWithRelations> {
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<AppointmentTypeWithRelations> {
     return this.appointmentTypes.publicFindById(id);
   }
 }

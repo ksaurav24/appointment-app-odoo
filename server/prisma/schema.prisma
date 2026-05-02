@@ -122,6 +122,12 @@ enum NotificationStatus {
   BOUNCED
 }
 
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
 // ===========================================================================
 // Models
 // ===========================================================================
@@ -151,6 +157,7 @@ model User {
   auditLogs              AuditLog[]
 
   @@index([role])
+  @@index([role, createdAt])
   @@map("users")
 }
 
@@ -431,6 +438,8 @@ model Appointment {
   @@index([bookablePersonId, startTime])
   @@index([bookableResourceId, startTime])
   @@index([status])
+  @@index([organizationId, status, startTime])
+  @@index([organizationId, paymentStatus, createdAt])
   @@map("appointments")
 }
 
@@ -489,6 +498,7 @@ model Payment {
   @@index([appointmentId])
   @@index([customerId])
   @@index([status])
+  @@index([status, createdAt])
   @@index([gatewayTransactionId])
   @@map("payments")
 }
@@ -529,6 +539,7 @@ model Notification {
   appointment      Appointment?              @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
   notificationType NotificationType
   channel          NotificationChannel
+  priority         NotificationPriority      @default(NORMAL)
   status           NotificationStatus        @default(PENDING)
   sentAt           DateTime?
   createdAt        DateTime                  @default(now())
@@ -557,5 +568,7 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@index([action])
+  @@index([action, createdAt])
+  @@index([actorRole, createdAt])
   @@map("audit_logs")
 }
