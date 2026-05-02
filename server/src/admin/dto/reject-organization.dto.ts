@@ -1,6 +1,6 @@
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 
-export class RejectOrganizerDto {
+export class RejectOrganizationDto {
   @IsOptional()
   @IsString()
   @MaxLength(1000)

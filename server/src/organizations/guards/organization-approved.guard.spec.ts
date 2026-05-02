@@ -1,8 +1,8 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { OrganizationApprovalStatus, Role } from '@prisma/client';
-import { OrganizationsService } from '../../organizations/organizations.service';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { IS_PUBLIC_KEY } from '../../auth/decorators/public.decorator';
+import { OrganizationsService } from '../organizations.service';
 import { SKIP_ORG_APPROVAL_KEY } from '../decorators/skip-organization-approval.decorator';
 import { OrganizationApprovedGuard } from './organization-approved.guard';
 

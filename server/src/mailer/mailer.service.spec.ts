@@ -58,14 +58,10 @@ describe('MailerService (queue)', () => {
     expect(jobs[0].data.text).toContain('https://app/reset?token=abc');
   });
 
-  it('enqueues organizer invite and welcome emails', async () => {
+  it('enqueues a welcome email', async () => {
     const jobs: QueuedJob[] = [];
     const svc = new MailerService(makeQueue(jobs));
     await svc.sendWelcome('u@x.com', 'Alice');
     expect(jobs[jobs.length - 1].data.text).toContain('Alice');
-
-    await svc.sendOrganizerInvite('o@x.com', 'Bob', 'https://app/setup?t=z');
-    expect(jobs[jobs.length - 1].data.text).toContain('Bob');
-    expect(jobs[jobs.length - 1].data.text).toContain('https://app/setup?t=z');
   });
 });

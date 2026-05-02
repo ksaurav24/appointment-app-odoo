@@ -4,6 +4,8 @@ import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import type { EnvVars } from './config/env.validation';
+import { NodeEnv } from './config/env.validation';
+import { setupSwagger } from './swagger';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -28,6 +30,10 @@ async function bootstrap(): Promise<void> {
     origin: corsOrigins,
     credentials: true,
   });
+
+  if (config.get('NODE_ENV', { infer: true }) !== NodeEnv.Production) {
+    setupSwagger(app);
+  }
 
   const port = config.get('PORT', { infer: true });
   await app.listen(port);

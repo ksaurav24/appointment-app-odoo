@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ThrottlerGuard } from '@nestjs/throttler';
@@ -9,7 +8,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { MailerService } from '../src/mailer/mailer.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from '../src/common/cookies';
+import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from '../src/utils/cookies';
 
 const PASSWORD = 'CorrectHorse1';
 
@@ -351,7 +350,7 @@ describe('Auth (e2e)', () => {
         .expect(403);
     });
 
-    it('allows admins on /admin/ping and creates organizers', async () => {
+    it('allows admins on /admin/ping', async () => {
       const admin = await createAdmin();
       const login = await request(app.getHttpServer())
         .post('/auth/login')
@@ -362,27 +361,6 @@ describe('Auth (e2e)', () => {
         .get('/admin/ping')
         .set('Cookie', cookieHeader(cookies))
         .expect(200);
-
-      const res = await request(app.getHttpServer())
-        .post('/auth/admin/organizers')
-        .set('Cookie', cookieHeader(cookies))
-        .send({
-          email: 'org@example.com',
-          fullName: 'Org Owner',
-          organizationName: 'Org Owner LLC',
-          organizationSlug: 'org-owner-llc',
-        })
-        .expect(201);
-      expect(res.body.role).toBe('ORGANIZER');
-      expect(mailer.getLastMessage()?.subject.toLowerCase()).toContain(
-        'invited',
-      );
-
-      const org = await prisma.organization.findUnique({
-        where: { slug: 'org-owner-llc' },
-      });
-      expect(org).toBeTruthy();
-      expect(org?.approvalStatus).toBe('APPROVED');
     });
   });
 
@@ -412,14 +390,16 @@ describe('Auth (e2e)', () => {
     }> {
       const email = `${slug}@example.com`;
       const res = await request(app.getHttpServer())
-        .post('/auth/register-organizer')
+        .post('/auth/register')
         .send({
           email,
           password: PASSWORD,
           fullName: 'Org User',
-          organizationName: slug.toUpperCase(),
-          organizationSlug: slug,
-          contactEmail: email,
+          organization: {
+            name: slug.toUpperCase(),
+            slug,
+            contactEmail: email,
+          },
         })
         .expect(201);
       return {
@@ -436,7 +416,7 @@ describe('Auth (e2e)', () => {
         .expect(200);
     }
 
-    it('lets organizer log in pre-approval; /auth/me shows PENDING; admin approves and email is sent', async () => {
+    it('lets organizer log in pre-approval; /organizations/me shows PENDING; admin approves and email is sent', async () => {
       const { email, organizationId } = await selfRegisterOrganizer('acme');
       await verifyOrganizerEmail(email);
       const login = await request(app.getHttpServer())
@@ -449,35 +429,43 @@ describe('Auth (e2e)', () => {
         .get('/auth/me')
         .set('Cookie', cookieHeader(orgCookies))
         .expect(200);
-      expect(me.body.organization.approvalStatus).toBe('PENDING');
+      expect(me.body.email).toBe(email);
+      expect(me.body.organization).toBeUndefined();
+
+      const orgMe = await request(app.getHttpServer())
+        .get('/organizations/me')
+        .set('Cookie', cookieHeader(orgCookies))
+        .expect(200);
+      expect(orgMe.body.id).toBe(organizationId);
+      expect(orgMe.body.approvalStatus).toBe('PENDING');
 
       const adminCookies = await createAdminAndLogin();
       const pending = await request(app.getHttpServer())
-        .get('/auth/admin/organizers/pending')
+        .get('/admin/organizations/pending')
         .set('Cookie', cookieHeader(adminCookies))
         .expect(200);
       expect(pending.body).toHaveLength(1);
       expect(pending.body[0].id).toBe(organizationId);
 
       const defaultList = await request(app.getHttpServer())
-        .get('/auth/admin/organizers')
+        .get('/admin/organizations')
         .set('Cookie', cookieHeader(adminCookies))
         .expect(200);
       expect(defaultList.body).toHaveLength(0);
 
       await request(app.getHttpServer())
-        .post(`/auth/admin/organizers/${organizationId}/approve`)
+        .post(`/admin/organizations/${organizationId}/approve`)
         .set('Cookie', cookieHeader(adminCookies))
         .expect(200);
       expect(mailer.getLastMessage()?.subject.toLowerCase()).toContain(
         'approved',
       );
 
-      const me2 = await request(app.getHttpServer())
-        .get('/auth/me')
+      const orgMe2 = await request(app.getHttpServer())
+        .get('/organizations/me')
         .set('Cookie', cookieHeader(orgCookies))
         .expect(200);
-      expect(me2.body.organization.approvalStatus).toBe('APPROVED');
+      expect(orgMe2.body.approvalStatus).toBe('APPROVED');
     });
 
     it('rejects with reason, emails the organizer, and revokes their sessions', async () => {
@@ -491,7 +479,7 @@ describe('Auth (e2e)', () => {
 
       const adminCookies = await createAdminAndLogin();
       await request(app.getHttpServer())
-        .post(`/auth/admin/organizers/${organizationId}/reject`)
+        .post(`/admin/organizations/${organizationId}/reject`)
         .set('Cookie', cookieHeader(adminCookies))
         .send({ reason: 'incomplete details' })
         .expect(200);
@@ -509,14 +497,16 @@ describe('Auth (e2e)', () => {
     it('rejects duplicate slug at registration', async () => {
       await selfRegisterOrganizer('dup-slug');
       await request(app.getHttpServer())
-        .post('/auth/register-organizer')
+        .post('/auth/register')
         .send({
           email: 'other@example.com',
           password: PASSWORD,
           fullName: 'Other',
-          organizationName: 'Other',
-          organizationSlug: 'dup-slug',
-          contactEmail: 'other@example.com',
+          organization: {
+            name: 'Other',
+            slug: 'dup-slug',
+            contactEmail: 'other@example.com',
+          },
         })
         .expect(409);
     });
