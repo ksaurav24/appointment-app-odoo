@@ -55,6 +55,7 @@ function buildAuthResult(user: MockUserRecord, message: string): AuthResult {
 // \u2500\u2500\u2500 Auth API \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 export async function signupUser(payload: SignupFormValues): Promise<AuthResult> {
+  // If backend URL exists, use real API. Otherwise use local mock mode for demo speed.
   if (api.defaults.baseURL) {
     const { data } = await api.post<ApiEnvelope<AuthResult>>("/auth/signup", payload);
     return data.data;

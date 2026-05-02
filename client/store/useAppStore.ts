@@ -20,6 +20,7 @@ interface AppStore {
 }
 
 export const useAppStore = create<AppStore>((set) => ({
+  // Auth session starts empty and gets filled only after successful auth actions.
   user: null,
   token: null,
   role: null,
