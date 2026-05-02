@@ -9,6 +9,7 @@ export const ROUTES = {
   login: "/login",
   signup: "/signup",
   forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
   otpVerification: "/otp-verification",
   signupRole: "/signup-role",
 

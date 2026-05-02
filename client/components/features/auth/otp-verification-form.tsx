@@ -1,16 +1,19 @@
 "use client";
 
-// OTP verification form \u2014 verifies the 6-digit code sent to the user's email.
+// OTP verification form — verifies the 6-digit code sent to the user's email.
 //
-// Routing after OTP depends on the flow query param:
-//   flow=signup + role=organiser  \u2192  /onboarding/setup (3-step org setup)
-//   flow=signup + role=customer   \u2192  /  (home, no setup needed)
-//   flow=signup + no role stored  \u2192  /signup-role (fallback \u2014 shouldn't normally happen)
-//   any other flow                \u2192  /login (e.g. password reset)
+// Flow after successful verification:
+//   flow=signup + role=organiser  → /onboarding/setup (3-step org setup)
+//   flow=signup + role=customer   → /dashboard/user
+//   flow=signup + no role in store → /signup-role (fallback — shouldn't normally happen)
+//   flow=reset (any)              → /login (password was reset, user must log in fresh)
 //
-// WHY read role from Zustand: the role is stored when the user picks it on
-// /signup-role. By the time they reach this page, the role is already set.
+// WHY no session after verify-email:
+//   The backend /auth/verify-email only marks the user as verified — it does NOT
+//   issue auth cookies. For the signup flow, the user is redirected to login after
+//   verification. Cookies are set only by /auth/login.
 
+import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -28,38 +31,36 @@ export function OtpVerificationForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const emailFromQuery = searchParams.get("email") ?? "";
-  // One OTP page serves multiple flows; query param decides post-verify route.
   const flow = searchParams.get("flow");
 
-  const { otpVerificationMutation } = useAuth();
-  // Role was stored in Zustand when user selected it on /signup-role.
+  const { verifyEmailMutation, resendOtpMutation } = useAuth();
   const role = useAppStore((state) => state.role);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
-  const { register, handleSubmit, formState } = useForm<OtpVerificationFormValues>({
-    resolver: zodResolver(otpVerificationSchema),
-    defaultValues: { email: emailFromQuery, code: "" },
-  });
+  const { register, handleSubmit, formState } =
+    useForm<OtpVerificationFormValues>({
+      resolver: zodResolver(otpVerificationSchema),
+      defaultValues: { email: emailFromQuery, code: "" },
+    });
 
   async function onSubmit(values: OtpVerificationFormValues) {
     try {
-      const result = await otpVerificationMutation.mutateAsync(values);
+      const result = await verifyEmailMutation.mutateAsync(values);
       toast.success(result.message);
 
       if (flow === "signup") {
-        // Route by role \u2014 organiser goes to 3-step org setup, customer goes home.
+        // Signup flow: email is now verified. Route by role for next step.
         if (role === "organiser") {
           router.push(ROUTES.onboardingSetup);
-        } else if (role === "customer") {
-          // Customer needs no org setup — go directly to their dashboard.
-          router.push(ROUTES.dashboardUser);
         } else {
-          // Fallback: role not in store (user accessed URL directly without signup).
-          router.push(ROUTES.signupRole);
+          // Customer or no role: go to login to get session cookies.
+          toast.info("Email verified! Please sign in to continue.");
+          router.push(ROUTES.login);
         }
         return;
       }
 
-      // Non-signup flows (e.g. password reset) go back to login.
+      // Non-signup flows (password reset OTP, etc.) go back to login.
       router.push(ROUTES.login);
     } catch (error) {
       const message =
@@ -68,31 +69,68 @@ export function OtpVerificationForm() {
     }
   }
 
-  function onInvalidSubmit() {
-    toast.error("Please fix form errors.");
+  async function handleResend() {
+    if (resendCooldown > 0 || !emailFromQuery) return;
+    try {
+      const result = await resendOtpMutation.mutateAsync({
+        email: emailFromQuery,
+        purpose: "SIGNUP",
+      });
+      toast.success(result.message);
+      // 60-second cooldown to prevent spam.
+      setResendCooldown(60);
+      const interval = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) { clearInterval(interval); return 0; }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to resend OTP.";
+      toast.error(message);
+    }
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit, onInvalidSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {emailFromQuery && (
+        <p className="text-center text-xs text-gray-500">
+          Code sent to <span className="font-medium text-gray-900">{emailFromQuery}</span>
+        </p>
+      )}
       <div className="space-y-1">
-        <Label htmlFor="code">OTP Code</Label>
+        <Label htmlFor="code">Verification Code</Label>
         <Input
           id="code"
           type="text"
           inputMode="numeric"
           maxLength={6}
           placeholder="123456"
+          autoComplete="one-time-code"
           {...register("code")}
         />
         <p className="text-xs text-red-600">{formState.errors.code?.message}</p>
       </div>
       <Button
         type="submit"
-        disabled={otpVerificationMutation.isPending}
+        disabled={verifyEmailMutation.isPending}
         className="w-full"
       >
-        {otpVerificationMutation.isPending ? "Verifying..." : "Verify OTP"}
+        {verifyEmailMutation.isPending ? "Verifying..." : "Verify Code"}
       </Button>
+      <div className="text-center">
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={resendCooldown > 0 || resendOtpMutation.isPending}
+          className="text-xs text-gray-500 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {resendCooldown > 0
+            ? `Resend code in ${resendCooldown}s`
+            : "Didn't receive a code? Resend"}
+        </button>
+      </div>
     </form>
   );
 }

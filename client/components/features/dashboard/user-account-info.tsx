@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 export function UserAccountInfo() {
   const user = useAppStore((state) => state.user);
 
-  const initial = user?.name?.charAt(0).toUpperCase() ?? "U";
+  const initial = user?.fullName?.charAt(0).toUpperCase() ?? "U";
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -39,7 +39,7 @@ export function UserAccountInfo() {
 
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-gray-900">
-              {user?.name ?? "—"}
+              {user?.fullName ?? "—"}
             </p>
             <p className="truncate text-xs text-gray-500">
               {user?.email ?? "—"}

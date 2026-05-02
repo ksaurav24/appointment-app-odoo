@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
+import { SessionProvider } from "@/components/layout/session-provider";
 
 interface ProvidersProps {
   children: React.ReactNode;
@@ -21,7 +22,11 @@ export function Providers({ children }: ProvidersProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      {/* SessionProvider calls GET /auth/me once on mount to restore the
+          user object from the httpOnly access cookie into Zustand. */}
+      <SessionProvider>
+        {children}
+      </SessionProvider>
       <Toaster richColors position="top-right" />
     </QueryClientProvider>
   );
