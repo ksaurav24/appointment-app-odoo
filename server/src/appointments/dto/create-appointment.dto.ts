@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsInt,
+  IsNumberString,
   IsOptional,
   IsString,
   Min,
@@ -10,7 +11,7 @@ import {
 } from 'class-validator';
 
 export class AppointmentAnswerDto {
-  @IsString()
+  @IsNumberString({ no_symbols: true })
   questionId!: string;
 
   @IsOptional()
@@ -19,7 +20,7 @@ export class AppointmentAnswerDto {
 }
 
 export class CreateAppointmentDto {
-  @IsString()
+  @IsNumberString({ no_symbols: true })
   slotLockId!: string;
 
   @IsOptional()

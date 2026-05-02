@@ -13,6 +13,7 @@ import { Role, SlotLock } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { JwtUserPayload } from '../auth/token.service';
+import { ParseBigIntPipe } from '../common/pipes';
 import { AcquireSlotLockDto } from './dto/acquire-slot-lock.dto';
 import { SlotLocksService } from './slot-locks.service';
 
@@ -45,7 +46,7 @@ export class SlotLocksController {
   @ApiOperation({ summary: 'Extend an active slot lock by 5 minutes' })
   extend(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
   ): Promise<SlotLock> {
     return this.slotLocks.extend(user.sub, id);
   }
@@ -55,7 +56,7 @@ export class SlotLocksController {
   @ApiOperation({ summary: 'Release a slot lock' })
   async release(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
   ): Promise<void> {
     await this.slotLocks.release(user.sub, id);
   }

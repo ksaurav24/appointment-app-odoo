@@ -91,7 +91,7 @@ export class SlotLocksService {
     });
   }
 
-  async release(customerId: string, lockId: string): Promise<void> {
+  async release(customerId: string, lockId: bigint): Promise<void> {
     const lock = await this.prisma.slotLock.findUnique({
       where: { id: lockId },
     });
@@ -104,7 +104,7 @@ export class SlotLocksService {
 
   async extend(
     customerId: string,
-    lockId: string,
+    lockId: bigint,
     extraMinutes = DEFAULT_TTL_MINUTES,
   ): Promise<SlotLock> {
     const lock = await this.prisma.slotLock.findUnique({

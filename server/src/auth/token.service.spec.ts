@@ -6,7 +6,7 @@ import { TokenService } from './token.service';
 import type { PrismaService } from '../prisma/prisma.service';
 
 interface FakeRefresh {
-  id: string;
+  id: bigint;
   userId: string;
   tokenHash: string;
   familyId: string;
@@ -46,7 +46,7 @@ function makePrismaMock() {
       refreshToken: {
         create: ({ data }: { data: CreateData }) => {
           const record: FakeRefresh = {
-            id: `rt-${refreshTokens.length + 1}`,
+            id: BigInt(refreshTokens.length + 1),
             userId: data.userId,
             tokenHash: data.tokenHash,
             familyId: data.familyId,
@@ -80,7 +80,7 @@ function makePrismaMock() {
           where,
           data,
         }: {
-          where: { id: string };
+          where: { id: bigint };
           data: Partial<FakeRefresh>;
         }) => {
           const idx = refreshTokens.findIndex((t) => t.id === where.id);

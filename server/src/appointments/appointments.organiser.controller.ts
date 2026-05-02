@@ -36,57 +36,57 @@ export class AppointmentsOrganiserController {
     return this.appointments.listForOrganiser(user.sub, query);
   }
 
-  @Get(':id')
+  @Get(':publicId')
   @ApiOperation({ summary: 'Fetch an appointment in the current organization' })
   findOne(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('publicId') publicId: string,
   ): Promise<AppointmentWithRelations> {
-    return this.appointments.findOneForOrganiser(user.sub, id);
+    return this.appointments.findOneForOrganiser(user.sub, publicId);
   }
 
-  @Post(':id/approve')
+  @Post(':publicId/approve')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Approve a PENDING appointment (manual confirmation)',
   })
   approve(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('publicId') publicId: string,
   ): Promise<AppointmentWithRelations> {
-    return this.appointments.approve(user.sub, id);
+    return this.appointments.approve(user.sub, publicId);
   }
 
-  @Post(':id/reject')
+  @Post(':publicId/reject')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Reject a PENDING appointment with an optional reason',
   })
   reject(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('publicId') publicId: string,
     @Body() body: RejectAppointmentDto,
   ): Promise<AppointmentWithRelations> {
-    return this.appointments.reject(user.sub, id, body.reason);
+    return this.appointments.reject(user.sub, publicId, body.reason);
   }
 
-  @Post(':id/complete')
+  @Post(':publicId/complete')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark a CONFIRMED appointment as completed' })
   complete(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('publicId') publicId: string,
   ): Promise<AppointmentWithRelations> {
-    return this.appointments.markCompleted(user.sub, id);
+    return this.appointments.markCompleted(user.sub, publicId);
   }
 
-  @Post(':id/no-show')
+  @Post(':publicId/no-show')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark a CONFIRMED appointment as a no-show' })
   noShow(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('publicId') publicId: string,
   ): Promise<AppointmentWithRelations> {
-    return this.appointments.markNoShow(user.sub, id);
+    return this.appointments.markNoShow(user.sub, publicId);
   }
 }

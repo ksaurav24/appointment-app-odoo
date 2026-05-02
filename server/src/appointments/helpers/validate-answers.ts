@@ -22,11 +22,14 @@ export function validateAnswers(
   questions: BookingQuestion[],
   answers: AnswerInput[],
 ): NormalizedAnswer[] {
+  // BookingQuestion.id is BigInt; AnswerInput.questionId arrives as a numeric
+  // string from the DTO. Compare via string keys so both sides line up.
   const byQuestionId = new Map(answers.map((a) => [a.questionId, a]));
   const out: NormalizedAnswer[] = [];
 
   for (const q of questions) {
-    const supplied = byQuestionId.get(q.id);
+    const qid = q.id.toString();
+    const supplied = byQuestionId.get(qid);
     const text = supplied?.answerText?.toString().trim() ?? '';
     if (!text) {
       if (q.isRequired) {
@@ -34,7 +37,7 @@ export function validateAnswers(
           `Answer to required question "${q.questionText}" is missing`,
         );
       }
-      out.push({ questionId: q.id, answerText: null });
+      out.push({ questionId: qid, answerText: null });
       continue;
     }
 
@@ -46,7 +49,7 @@ export function validateAnswers(
             `Answer to "${q.questionText}" must be a number`,
           );
         }
-        out.push({ questionId: q.id, answerText: String(n) });
+        out.push({ questionId: qid, answerText: String(n) });
         break;
       }
       case QuestionType.DATE: {
@@ -56,7 +59,7 @@ export function validateAnswers(
             `Answer to "${q.questionText}" must be a valid date`,
           );
         }
-        out.push({ questionId: q.id, answerText: text });
+        out.push({ questionId: qid, answerText: text });
         break;
       }
       case QuestionType.SINGLE_CHOICE: {
@@ -66,7 +69,7 @@ export function validateAnswers(
             `Answer to "${q.questionText}" must be one of: ${options.join(', ')}`,
           );
         }
-        out.push({ questionId: q.id, answerText: text });
+        out.push({ questionId: qid, answerText: text });
         break;
       }
       case QuestionType.MULTIPLE_CHOICE: {
@@ -81,18 +84,18 @@ export function validateAnswers(
             `Answer to "${q.questionText}" contains invalid choices: ${invalid.join(', ')}`,
           );
         }
-        out.push({ questionId: q.id, answerText: picks.join(',') });
+        out.push({ questionId: qid, answerText: picks.join(',') });
         break;
       }
       case QuestionType.TEXT:
       default:
-        out.push({ questionId: q.id, answerText: text });
+        out.push({ questionId: qid, answerText: text });
         break;
     }
   }
 
   // Reject answers that don't correspond to any question (defensive).
-  const validIds = new Set(questions.map((q) => q.id));
+  const validIds = new Set(questions.map((q) => q.id.toString()));
   for (const id of byQuestionId.keys()) {
     if (!validIds.has(id)) {
       throw new BadRequestException(

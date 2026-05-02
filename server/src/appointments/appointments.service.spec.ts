@@ -13,7 +13,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppointmentsService } from './appointments.service';
 
 const customerId = 'cust-1';
-const lockId = 'lock-1';
+const lockId = 1n;
+const lockIdString = lockId.toString();
+const questionId = 1n;
+const questionIdString = questionId.toString();
 const appointmentTypeId = 'at-1';
 
 function makeLock(overrides: Partial<Record<string, unknown>> = {}) {
@@ -57,7 +60,7 @@ function makeAppointmentType(overrides: Record<string, unknown> = {}) {
     scheduleType: ScheduleType.WEEKLY,
     bookingQuestions: [
       {
-        id: 'q-1',
+        id: questionId,
         appointmentTypeId,
         questionText: 'Number of players',
         questionType: QuestionType.NUMBER,
@@ -117,13 +120,14 @@ describe('AppointmentsService.create', () => {
         .mockResolvedValue({ _sum: { capacityBooked: 0 } }),
       slotLockCount: jest.fn().mockResolvedValue(0),
       appointmentCreate: jest.fn((args: { data: Record<string, unknown> }) =>
-        Promise.resolve({ id: 'apt-1', ...args.data }),
+        Promise.resolve({ id: 100n, ...args.data }),
       ),
       appointmentAnswerCreateMany: jest.fn().mockResolvedValue({ count: 1 }),
       slotLockDelete: jest.fn().mockResolvedValue({}),
       appointmentFindUnique: jest.fn().mockResolvedValue({
-        id: 'apt-1',
+        publicId: 'apt-public-1',
         status: AppointmentStatus.CONFIRMED,
+        confirmationCode: 'CC-XYZ',
       }),
     };
     service = new AppointmentsService(
@@ -134,10 +138,10 @@ describe('AppointmentsService.create', () => {
 
   it('creates a CONFIRMED appointment and deletes the lock', async () => {
     const result = await service.create(customerId, {
-      slotLockId: lockId,
-      answers: [{ questionId: 'q-1', answerText: '10' }],
+      slotLockId: lockIdString,
+      answers: [{ questionId: questionIdString, answerText: '10' }],
     });
-    expect(result.id).toBe('apt-1');
+    expect(result.status).toBe(AppointmentStatus.CONFIRMED);
 
     const created = handles.appointmentCreate.mock.calls[0][0] as {
       data: Record<string, unknown>;
@@ -155,8 +159,8 @@ describe('AppointmentsService.create', () => {
       makeAppointmentType({ manualConfirmation: true }),
     );
     await service.create(customerId, {
-      slotLockId: lockId,
-      answers: [{ questionId: 'q-1', answerText: '10' }],
+      slotLockId: lockIdString,
+      answers: [{ questionId: questionIdString, answerText: '10' }],
     });
     const created = handles.appointmentCreate.mock.calls[0][0] as {
       data: Record<string, unknown>;
@@ -170,8 +174,8 @@ describe('AppointmentsService.create', () => {
     );
     await expect(
       service.create(customerId, {
-        slotLockId: lockId,
-        answers: [{ questionId: 'q-1', answerText: '10' }],
+        slotLockId: lockIdString,
+        answers: [{ questionId: questionIdString, answerText: '10' }],
       }),
     ).rejects.toThrow(NotFoundException);
   });
@@ -182,8 +186,8 @@ describe('AppointmentsService.create', () => {
     );
     await expect(
       service.create(customerId, {
-        slotLockId: lockId,
-        answers: [{ questionId: 'q-1', answerText: '10' }],
+        slotLockId: lockIdString,
+        answers: [{ questionId: questionIdString, answerText: '10' }],
       }),
     ).rejects.toThrow(ConflictException);
   });
@@ -194,8 +198,8 @@ describe('AppointmentsService.create', () => {
     });
     await expect(
       service.create(customerId, {
-        slotLockId: lockId,
-        answers: [{ questionId: 'q-1', answerText: '10' }],
+        slotLockId: lockIdString,
+        answers: [{ questionId: questionIdString, answerText: '10' }],
       }),
     ).rejects.toThrow(ConflictException);
     expect(handles.appointmentCreate).not.toHaveBeenCalled();
@@ -203,7 +207,7 @@ describe('AppointmentsService.create', () => {
 
   it('rejects answers that fail required-question validation', async () => {
     await expect(
-      service.create(customerId, { slotLockId: lockId, answers: [] }),
+      service.create(customerId, { slotLockId: lockIdString, answers: [] }),
     ).rejects.toThrow(/Number of players/);
   });
 
@@ -215,8 +219,8 @@ describe('AppointmentsService.create', () => {
       }),
     );
     await service.create(customerId, {
-      slotLockId: lockId,
-      answers: [{ questionId: 'q-1', answerText: '10' }],
+      slotLockId: lockIdString,
+      answers: [{ questionId: questionIdString, answerText: '10' }],
     });
     const created = handles.appointmentCreate.mock.calls[0][0] as {
       data: Record<string, unknown>;
