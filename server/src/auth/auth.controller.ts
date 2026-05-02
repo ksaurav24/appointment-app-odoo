@@ -1,18 +1,25 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
+  Query,
   Req,
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
-import { Role } from '@prisma/client';
+import { Organization, OrganizationApprovalStatus, Role } from '@prisma/client';
 import type { Request, Response } from 'express';
+import {
+  OrganizationsService,
+  OrganizationWithOrganiser,
+} from '../organizations/organizations.service';
 import {
   ACCESS_COOKIE_NAME,
   REFRESH_COOKIE_NAME,
@@ -26,12 +33,15 @@ import { AuthService, AuthTokens } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 import { Roles } from './decorators/roles.decorator';
+import { SkipOrganizationApproval } from './decorators/skip-organization-approval.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateOrganizerDto } from './dto/create-organizer.dto';
 import { DisableTwoFactorDto } from './dto/disable-2fa.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { RegisterOrganizerDto } from './dto/register-organizer.dto';
+import { RejectOrganizerDto } from './dto/reject-organizer.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -74,6 +84,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly users: UsersService,
+    private readonly organizations: OrganizationsService,
     config: ConfigService<EnvVars, true>,
   ) {
     this.cookieEnv = {
@@ -95,6 +106,21 @@ export class AuthController {
     return {
       userId: result.userId,
       message: 'Account created — check your email for a verification code.',
+    };
+  }
+
+  @Public()
+  @Throttle({ register: { limit: 3, ttl: 3_600_000 } })
+  @Post('register-organizer')
+  async registerOrganizer(
+    @Body() dto: RegisterOrganizerDto,
+  ): Promise<{ userId: string; organizationId: string; message: string }> {
+    const result = await this.auth.registerOrganizer(dto);
+    return {
+      userId: result.userId,
+      organizationId: result.organizationId,
+      message:
+        'Account created — verify your email, then wait for admin approval before managing your organization.',
     };
   }
 
@@ -169,6 +195,7 @@ export class AuthController {
     return { message: 'Refreshed.' };
   }
 
+  @SkipOrganizationApproval()
   @HttpCode(HttpStatus.OK)
   @Post('logout')
   async logout(
@@ -180,6 +207,7 @@ export class AuthController {
     return { message: 'Logged out.' };
   }
 
+  @SkipOrganizationApproval()
   @HttpCode(HttpStatus.OK)
   @Post('logout-all')
   async logoutAll(
@@ -191,9 +219,33 @@ export class AuthController {
     return { message: 'Logged out everywhere.' };
   }
 
+  @SkipOrganizationApproval()
   @Get('me')
-  async me(@CurrentUser() user: JwtUserPayload): Promise<SafeUser> {
-    return this.users.getSafeById(user.sub);
+  async me(@CurrentUser() user: JwtUserPayload): Promise<
+    SafeUser & {
+      organization?: {
+        id: string;
+        name: string;
+        slug: string;
+        approvalStatus: OrganizationApprovalStatus;
+        rejectedReason: string | null;
+      };
+    }
+  > {
+    const safeUser = await this.users.getSafeById(user.sub);
+    if (safeUser.role !== Role.ORGANIZER) return safeUser;
+    const org = await this.organizations.findByOrganiserId(user.sub);
+    if (!org) return safeUser;
+    return {
+      ...safeUser,
+      organization: {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        approvalStatus: org.approvalStatus,
+        rejectedReason: org.rejectedReason,
+      },
+    };
   }
 
   @Public()
@@ -221,6 +273,7 @@ export class AuthController {
     return { message: 'Password reset. Please log in.' };
   }
 
+  @SkipOrganizationApproval()
   @HttpCode(HttpStatus.OK)
   @Post('change-password')
   async changePassword(
@@ -237,6 +290,7 @@ export class AuthController {
     return { message: 'Password changed. Please log in again.' };
   }
 
+  @SkipOrganizationApproval()
   @HttpCode(HttpStatus.OK)
   @Post('2fa/enable')
   async enable2fa(
@@ -246,6 +300,7 @@ export class AuthController {
     return { message: 'Two-factor authentication enabled.' };
   }
 
+  @SkipOrganizationApproval()
   @HttpCode(HttpStatus.OK)
   @Post('2fa/disable')
   async disable2fa(
@@ -258,8 +313,62 @@ export class AuthController {
 
   @Roles(Role.ADMIN)
   @Post('admin/organizers')
-  async createOrganizer(@Body() dto: CreateOrganizerDto): Promise<SafeUser> {
-    return this.auth.createOrganizer(dto);
+  async createOrganizer(
+    @CurrentUser() admin: JwtUserPayload,
+    @Body() dto: CreateOrganizerDto,
+  ): Promise<SafeUser> {
+    return this.auth.createOrganizer({ ...dto, adminUserId: admin.sub });
+  }
+
+  @Roles(Role.ADMIN)
+  @Get('admin/organizers')
+  async listOrganizers(
+    @Query('status') status?: string,
+  ): Promise<OrganizationWithOrganiser[]> {
+    if (status === undefined || status === '') {
+      return this.organizations.list(OrganizationApprovalStatus.APPROVED);
+    }
+    if (status.toUpperCase() === 'ALL') {
+      return this.organizations.list();
+    }
+    const upper = status.toUpperCase();
+    if (
+      upper !== OrganizationApprovalStatus.PENDING &&
+      upper !== OrganizationApprovalStatus.APPROVED &&
+      upper !== OrganizationApprovalStatus.REJECTED
+    ) {
+      throw new BadRequestException(
+        'status must be one of PENDING, APPROVED, REJECTED, ALL',
+      );
+    }
+    return this.organizations.list(upper);
+  }
+
+  @Roles(Role.ADMIN)
+  @Get('admin/organizers/pending')
+  async listPendingOrganizers(): Promise<OrganizationWithOrganiser[]> {
+    return this.organizations.list(OrganizationApprovalStatus.PENDING);
+  }
+
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @Post('admin/organizers/:organizationId/approve')
+  async approveOrganizer(
+    @CurrentUser() admin: JwtUserPayload,
+    @Param('organizationId') organizationId: string,
+  ): Promise<Organization> {
+    return this.auth.approveOrganizer(organizationId, admin.sub);
+  }
+
+  @Roles(Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @Post('admin/organizers/:organizationId/reject')
+  async rejectOrganizer(
+    @CurrentUser() admin: JwtUserPayload,
+    @Param('organizationId') organizationId: string,
+    @Body() dto: RejectOrganizerDto,
+  ): Promise<Organization> {
+    return this.auth.rejectOrganizer(organizationId, admin.sub, dto.reason);
   }
 
   private async completeLogin(

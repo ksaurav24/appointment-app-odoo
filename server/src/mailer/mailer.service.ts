@@ -13,7 +13,9 @@ import {
   RenderedEmail,
   emailVerificationOtp,
   loginTwoFactorOtp,
+  organizerApprovedEmail,
   organizerInviteEmail,
+  organizerRejectedEmail,
   passwordResetEmail,
   welcomeEmail,
 } from './templates';
@@ -91,6 +93,22 @@ export class MailerService implements OnModuleInit {
 
   async sendWelcome(email: string, fullName: string): Promise<void> {
     await this.send(email, welcomeEmail(fullName));
+  }
+
+  async sendOrganizerApproved(
+    email: string,
+    fullName: string,
+    loginUrl: string,
+  ): Promise<void> {
+    await this.send(email, organizerApprovedEmail(fullName, loginUrl));
+  }
+
+  async sendOrganizerRejected(
+    email: string,
+    fullName: string,
+    reason?: string,
+  ): Promise<void> {
+    await this.send(email, organizerRejectedEmail(fullName, reason));
   }
 
   getLastMessage(): SentEmailRecord | null {

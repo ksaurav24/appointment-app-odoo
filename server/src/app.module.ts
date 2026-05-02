@@ -6,9 +6,11 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { OrganizationApprovedGuard } from './auth/guards/organization-approved.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 
@@ -32,6 +34,7 @@ import { UsersModule } from './users/users.module';
     PrismaModule,
     MailerModule,
     UsersModule,
+    OrganizationsModule,
     AuthModule,
   ],
   controllers: [AppController],
@@ -40,6 +43,7 @@ import { UsersModule } from './users/users.module';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: OrganizationApprovedGuard },
   ],
 })
 export class AppModule {}

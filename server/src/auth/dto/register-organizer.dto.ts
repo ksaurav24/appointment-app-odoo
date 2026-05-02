@@ -9,9 +9,14 @@ import {
 
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-export class CreateOrganizerDto {
+export class RegisterOrganizerDto {
   @IsEmail()
   email!: string;
+
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  password!: string;
 
   @IsString()
   @MinLength(1)
@@ -32,9 +37,8 @@ export class CreateOrganizerDto {
   })
   organizationSlug!: string;
 
-  @IsOptional()
   @IsEmail()
-  contactEmail?: string;
+  contactEmail!: string;
 
   @IsOptional()
   @IsString()

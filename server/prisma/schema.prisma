@@ -18,6 +18,12 @@ enum OtpPurpose {
   LOGIN_2FA
 }
 
+enum OrganizationApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id               String   @id @default(cuid())
   email            String   @unique
@@ -30,11 +36,40 @@ model User {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  otpVerifications OtpVerification[]
-  passwordResets   PasswordReset[]
-  refreshTokens    RefreshToken[]
+  otpVerifications      OtpVerification[]
+  passwordResets        PasswordReset[]
+  refreshTokens         RefreshToken[]
+  organization          Organization?     @relation("OrganizationOrganiser")
+  approvedOrganizations Organization[]    @relation("OrganizationApprover")
 
   @@map("users")
+}
+
+model Organization {
+  id             String                     @id @default(cuid())
+  organiserId    String                     @unique
+  organiser      User                       @relation("OrganizationOrganiser", fields: [organiserId], references: [id], onDelete: Cascade)
+  name           String
+  slug           String                     @unique
+  description    String?
+  contactEmail   String
+  contactPhone   String?
+  address        String?
+  timezone       String                     @default("UTC")
+  isActive       Boolean                    @default(true)
+
+  approvalStatus OrganizationApprovalStatus @default(PENDING)
+  approvedAt     DateTime?
+  approvedById   String?
+  approvedBy     User?                      @relation("OrganizationApprover", fields: [approvedById], references: [id])
+  rejectedAt     DateTime?
+  rejectedReason String?
+
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@index([approvalStatus])
+  @@map("organizations")
 }
 
 model OtpVerification {

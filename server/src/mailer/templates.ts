@@ -66,6 +66,44 @@ export function organizerInviteEmail(
   return { subject, text, html };
 }
 
+export function organizerApprovedEmail(
+  fullName: string,
+  loginUrl: string,
+): RenderedEmail {
+  const subject = 'Your organizer account has been approved';
+  const text = `Hi ${fullName}, your organizer account has been approved. Sign in here: ${loginUrl}`;
+  const html = wrap(
+    'Your account is approved',
+    `<p>Hi ${fullName},</p>
+     <p>Your organizer account has been approved. You can now sign in and start setting up your organization.</p>
+     <p><a href="${loginUrl}" style="display: inline-block; padding: 10px 16px; background: #16a34a; color: #fff; text-decoration: none; border-radius: 6px;">Sign in</a></p>
+     <p style="font-size: 12px; color: #6b7280;">Or paste this URL: ${loginUrl}</p>`,
+  );
+  return { subject, text, html };
+}
+
+export function organizerRejectedEmail(
+  fullName: string,
+  reason?: string,
+): RenderedEmail {
+  const subject = 'Update on your organizer application';
+  const reasonLine = reason
+    ? `Reason provided by the reviewer: ${reason}`
+    : 'No additional reason was provided.';
+  const text = `Hi ${fullName}, after review your organizer application was not approved. ${reasonLine}`;
+  const reasonHtml = reason
+    ? `<p><strong>Reason:</strong> ${reason}</p>`
+    : '<p>No additional reason was provided.</p>';
+  const html = wrap(
+    'Application update',
+    `<p>Hi ${fullName},</p>
+     <p>Thanks for your interest. After review, your organizer application was not approved at this time.</p>
+     ${reasonHtml}
+     <p>If you believe this was a mistake or would like to provide more information, please reply to this email.</p>`,
+  );
+  return { subject, text, html };
+}
+
 export function welcomeEmail(fullName: string): RenderedEmail {
   const subject = 'Welcome aboard';
   const text = `Hi ${fullName}, your email has been verified.`;

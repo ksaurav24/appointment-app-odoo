@@ -7,10 +7,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OtpPurpose, Role, User } from '@prisma/client';
+import { OtpPurpose, Organization, Role, User } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { EnvVars } from '../config/env.validation';
 import { MailerService } from '../mailer/mailer.service';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { UsersService, SafeUser } from '../users/users.service';
 import { OtpService } from './otp.service';
 import { PasswordService } from './password.service';
@@ -44,9 +46,117 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly resets: PasswordResetService,
     private readonly mailer: MailerService,
+    private readonly organizations: OrganizationsService,
+    private readonly prisma: PrismaService,
     config: ConfigService<EnvVars, true>,
   ) {
     this.appBaseUrl = config.get('APP_BASE_URL', { infer: true });
+  }
+
+  async registerOrganizer(input: {
+    email: string;
+    password: string;
+    fullName: string;
+    organizationName: string;
+    organizationSlug: string;
+    contactEmail: string;
+    description?: string;
+    contactPhone?: string;
+    address?: string;
+    timezone?: string;
+  }): Promise<{ userId: string; organizationId: string }> {
+    this.password.validatePolicy(input.password);
+
+    const existing = await this.users.findByEmail(input.email);
+    if (existing) {
+      throw new ConflictException('Email is already registered');
+    }
+    const slug = input.organizationSlug.toLowerCase();
+    const slugTaken = await this.prisma.organization.findUnique({
+      where: { slug },
+    });
+    if (slugTaken) {
+      throw new ConflictException('Organization slug is already taken');
+    }
+
+    const passwordHash = await this.password.hash(input.password);
+
+    const { user, organization } = await this.prisma.$transaction(
+      async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            email: input.email.toLowerCase(),
+            passwordHash,
+            fullName: input.fullName,
+            role: Role.ORGANIZER,
+            emailVerified: false,
+          },
+        });
+        const organization = await this.organizations.createForOrganiser(
+          user.id,
+          {
+            name: input.organizationName,
+            slug,
+            contactEmail: input.contactEmail,
+            description: input.description,
+            contactPhone: input.contactPhone,
+            address: input.address,
+            timezone: input.timezone,
+          },
+          tx,
+        );
+        return { user, organization };
+      },
+    );
+
+    const { code } = await this.otp.issue(
+      user.id,
+      OtpPurpose.EMAIL_VERIFICATION,
+    );
+    await this.mailer.sendOtp(user.email, code, OtpPurpose.EMAIL_VERIFICATION);
+
+    return { userId: user.id, organizationId: organization.id };
+  }
+
+  async approveOrganizer(
+    organizationId: string,
+    adminUserId: string,
+  ): Promise<Organization> {
+    const result = await this.organizations.approve(
+      organizationId,
+      adminUserId,
+    );
+    if (result.changed) {
+      const loginUrl = `${this.appBaseUrl}/login`;
+      await this.mailer.sendOrganizerApproved(
+        result.organiser.email,
+        result.organiser.fullName,
+        loginUrl,
+      );
+    }
+    return result.organization;
+  }
+
+  async rejectOrganizer(
+    organizationId: string,
+    adminUserId: string,
+    reason?: string,
+  ): Promise<Organization> {
+    const result = await this.organizations.reject(
+      organizationId,
+      adminUserId,
+      reason,
+    );
+    if (result.changed) {
+      await this.mailer.sendOrganizerRejected(
+        result.organiser.email,
+        result.organiser.fullName,
+        reason,
+      );
+      // Force re-login on rejection in case the organizer was already signed in.
+      await this.tokens.revokeAllForUser(result.organiser.id);
+    }
+    return result.organization;
   }
 
   async register(input: {
@@ -244,10 +354,25 @@ export class AuthService {
   async createOrganizer(input: {
     email: string;
     fullName: string;
+    organizationName: string;
+    organizationSlug: string;
+    contactEmail?: string;
+    description?: string;
+    contactPhone?: string;
+    address?: string;
+    timezone?: string;
+    adminUserId: string;
   }): Promise<SafeUser> {
     const existing = await this.users.findByEmail(input.email);
     if (existing) {
       throw new ConflictException('Email is already registered');
+    }
+    const slug = input.organizationSlug.toLowerCase();
+    const slugTaken = await this.prisma.organization.findUnique({
+      where: { slug },
+    });
+    if (slugTaken) {
+      throw new ConflictException('Organization slug is already taken');
     }
 
     // Random placeholder hash. The organizer sets their real password via the
@@ -256,12 +381,31 @@ export class AuthService {
       randomBytes(32).toString('base64'),
     );
 
-    const user = await this.users.create({
-      email: input.email,
-      passwordHash: placeholder,
-      fullName: input.fullName,
-      role: Role.ORGANIZER,
-      emailVerified: true,
+    const { user } = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email: input.email.toLowerCase(),
+          passwordHash: placeholder,
+          fullName: input.fullName,
+          role: Role.ORGANIZER,
+          emailVerified: true,
+        },
+      });
+      await this.organizations.createApprovedForOrganiser(
+        user.id,
+        input.adminUserId,
+        {
+          name: input.organizationName,
+          slug,
+          contactEmail: input.contactEmail ?? user.email,
+          description: input.description,
+          contactPhone: input.contactPhone,
+          address: input.address,
+          timezone: input.timezone,
+        },
+        tx,
+      );
+      return { user };
     });
 
     const token = await this.resets.issue({

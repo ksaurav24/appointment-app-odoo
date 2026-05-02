@@ -82,6 +82,7 @@ describe('Auth (e2e)', () => {
     await prisma.refreshToken.deleteMany();
     await prisma.passwordReset.deleteMany();
     await prisma.otpVerification.deleteMany();
+    await prisma.organization.deleteMany();
     await prisma.user.deleteMany();
     mailer.resetLastMessage();
   });
@@ -365,12 +366,159 @@ describe('Auth (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/auth/admin/organizers')
         .set('Cookie', cookieHeader(cookies))
-        .send({ email: 'org@example.com', fullName: 'Org Owner' })
+        .send({
+          email: 'org@example.com',
+          fullName: 'Org Owner',
+          organizationName: 'Org Owner LLC',
+          organizationSlug: 'org-owner-llc',
+        })
         .expect(201);
       expect(res.body.role).toBe('ORGANIZER');
       expect(mailer.getLastMessage()?.subject.toLowerCase()).toContain(
         'invited',
       );
+
+      const org = await prisma.organization.findUnique({
+        where: { slug: 'org-owner-llc' },
+      });
+      expect(org).toBeTruthy();
+      expect(org?.approvalStatus).toBe('APPROVED');
+    });
+  });
+
+  describe('organizer self-registration + admin approval', () => {
+    async function createAdminAndLogin(): Promise<CookieMap> {
+      const email = 'approval-admin@example.com';
+      const passwordHash = await bcrypt.hash(PASSWORD, 4);
+      await prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          fullName: 'Admin',
+          role: Role.ADMIN,
+          emailVerified: true,
+        },
+      });
+      const login = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: PASSWORD })
+        .expect(200);
+      return parseSetCookies(login.headers['set-cookie']);
+    }
+
+    async function selfRegisterOrganizer(slug: string): Promise<{
+      email: string;
+      organizationId: string;
+    }> {
+      const email = `${slug}@example.com`;
+      const res = await request(app.getHttpServer())
+        .post('/auth/register-organizer')
+        .send({
+          email,
+          password: PASSWORD,
+          fullName: 'Org User',
+          organizationName: slug.toUpperCase(),
+          organizationSlug: slug,
+          contactEmail: email,
+        })
+        .expect(201);
+      return {
+        email,
+        organizationId: res.body.organizationId as string,
+      };
+    }
+
+    async function verifyOrganizerEmail(email: string): Promise<void> {
+      const code = extractOtp(mailer.getLastMessage()!.text);
+      await request(app.getHttpServer())
+        .post('/auth/verify-email')
+        .send({ email, code })
+        .expect(200);
+    }
+
+    it('lets organizer log in pre-approval; /auth/me shows PENDING; admin approves and email is sent', async () => {
+      const { email, organizationId } = await selfRegisterOrganizer('acme');
+      await verifyOrganizerEmail(email);
+      const login = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: PASSWORD })
+        .expect(200);
+      const orgCookies = parseSetCookies(login.headers['set-cookie']);
+
+      const me = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Cookie', cookieHeader(orgCookies))
+        .expect(200);
+      expect(me.body.organization.approvalStatus).toBe('PENDING');
+
+      const adminCookies = await createAdminAndLogin();
+      const pending = await request(app.getHttpServer())
+        .get('/auth/admin/organizers/pending')
+        .set('Cookie', cookieHeader(adminCookies))
+        .expect(200);
+      expect(pending.body).toHaveLength(1);
+      expect(pending.body[0].id).toBe(organizationId);
+
+      const defaultList = await request(app.getHttpServer())
+        .get('/auth/admin/organizers')
+        .set('Cookie', cookieHeader(adminCookies))
+        .expect(200);
+      expect(defaultList.body).toHaveLength(0);
+
+      await request(app.getHttpServer())
+        .post(`/auth/admin/organizers/${organizationId}/approve`)
+        .set('Cookie', cookieHeader(adminCookies))
+        .expect(200);
+      expect(mailer.getLastMessage()?.subject.toLowerCase()).toContain(
+        'approved',
+      );
+
+      const me2 = await request(app.getHttpServer())
+        .get('/auth/me')
+        .set('Cookie', cookieHeader(orgCookies))
+        .expect(200);
+      expect(me2.body.organization.approvalStatus).toBe('APPROVED');
+    });
+
+    it('rejects with reason, emails the organizer, and revokes their sessions', async () => {
+      const { email, organizationId } = await selfRegisterOrganizer('beta');
+      await verifyOrganizerEmail(email);
+      const login = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: PASSWORD })
+        .expect(200);
+      const orgCookies = parseSetCookies(login.headers['set-cookie']);
+
+      const adminCookies = await createAdminAndLogin();
+      await request(app.getHttpServer())
+        .post(`/auth/admin/organizers/${organizationId}/reject`)
+        .set('Cookie', cookieHeader(adminCookies))
+        .send({ reason: 'incomplete details' })
+        .expect(200);
+      const last = mailer.getLastMessage();
+      expect(last?.subject.toLowerCase()).toContain('application');
+      expect(last?.text).toContain('incomplete details');
+
+      // Organizer's refresh token should be revoked.
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .set('Cookie', cookieHeader(orgCookies))
+        .expect(401);
+    });
+
+    it('rejects duplicate slug at registration', async () => {
+      await selfRegisterOrganizer('dup-slug');
+      await request(app.getHttpServer())
+        .post('/auth/register-organizer')
+        .send({
+          email: 'other@example.com',
+          password: PASSWORD,
+          fullName: 'Other',
+          organizationName: 'Other',
+          organizationSlug: 'dup-slug',
+          contactEmail: 'other@example.com',
+        })
+        .expect(409);
     });
   });
 
