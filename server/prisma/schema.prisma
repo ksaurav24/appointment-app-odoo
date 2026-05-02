@@ -124,7 +124,7 @@ enum NotificationStatus {
 // ===========================================================================
 
 model User {
-  id               String   @id @default(cuid())
+  id               String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
   email            String   @unique
   passwordHash     String
   fullName         String
@@ -152,8 +152,8 @@ model User {
 }
 
 model Organization {
-  id             String                     @id @default(cuid())
-  organiserId    String                     @unique
+  id             String                     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organiserId    String                     @unique @db.Uuid
   organiser      User                       @relation("OrganizationOrganiser", fields: [organiserId], references: [id], onDelete: Cascade)
   name           String
   slug           String                     @unique
@@ -167,7 +167,7 @@ model Organization {
 
   approvalStatus OrganizationApprovalStatus @default(PENDING)
   approvedAt     DateTime?
-  approvedById   String?
+  approvedById   String?                    @db.Uuid
   approvedBy     User?                      @relation("OrganizationApprover", fields: [approvedById], references: [id])
   rejectedAt     DateTime?
   rejectedReason String?
@@ -186,8 +186,8 @@ model Organization {
 }
 
 model OtpVerification {
-  id         String     @id @default(cuid())
-  userId     String
+  id         BigInt     @id @default(autoincrement())
+  userId     String     @db.Uuid
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   code       String
   purpose    OtpPurpose
@@ -201,8 +201,8 @@ model OtpVerification {
 }
 
 model PasswordReset {
-  id         String    @id @default(cuid())
-  userId     String
+  id         BigInt    @id @default(autoincrement())
+  userId     String    @db.Uuid
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenHash  String
   expiresAt  DateTime
@@ -215,8 +215,8 @@ model PasswordReset {
 }
 
 model RefreshToken {
-  id         String    @id @default(cuid())
-  userId     String
+  id         BigInt    @id @default(autoincrement())
+  userId     String    @db.Uuid
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenHash  String    @unique
   familyId   String
@@ -236,8 +236,8 @@ model RefreshToken {
 // ---------------------------------------------------------------------------
 
 model BookablePerson {
-  id             String       @id @default(cuid())
-  organizationId String
+  id             String       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organizationId String       @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   contactEmail   String?
@@ -257,8 +257,8 @@ model BookablePerson {
 }
 
 model BookableResource {
-  id             String       @id @default(cuid())
-  organizationId String
+  id             String       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organizationId String       @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   resourceType   String?
@@ -283,8 +283,8 @@ model BookableResource {
 // ---------------------------------------------------------------------------
 
 model AppointmentType {
-  id                       String         @id @default(cuid())
-  organizationId           String
+  id                       String         @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  organizationId           String         @db.Uuid
   organization             Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name                     String
   slug                     String
@@ -324,12 +324,12 @@ model AppointmentType {
 }
 
 model AppointmentTypeEntity {
-  id                 String            @id @default(cuid())
-  appointmentTypeId  String
+  id                 BigInt            @id @default(autoincrement())
+  appointmentTypeId  String            @db.Uuid
   appointmentType    AppointmentType   @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
-  bookablePersonId   String?
+  bookablePersonId   String?           @db.Uuid
   bookablePerson     BookablePerson?   @relation(fields: [bookablePersonId], references: [id], onDelete: Cascade)
-  bookableResourceId String?
+  bookableResourceId String?           @db.Uuid
   bookableResource   BookableResource? @relation(fields: [bookableResourceId], references: [id], onDelete: Cascade)
   createdAt          DateTime          @default(now())
 
@@ -341,8 +341,8 @@ model AppointmentTypeEntity {
 }
 
 model Schedule {
-  id                String          @id @default(cuid())
-  appointmentTypeId String
+  id                BigInt          @id @default(autoincrement())
+  appointmentTypeId String          @db.Uuid
   appointmentType   AppointmentType @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
   scheduleType      ScheduleType
   timezone          String          @default("UTC")
@@ -356,8 +356,8 @@ model Schedule {
 }
 
 model ScheduleRule {
-  id           String    @id @default(cuid())
-  scheduleId   String
+  id           BigInt    @id @default(autoincrement())
+  scheduleId   BigInt
   schedule     Schedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   dayOfWeek    Int?
   specificDate DateTime? @db.Date
@@ -371,8 +371,8 @@ model ScheduleRule {
 }
 
 model BookingQuestion {
-  id                String          @id @default(cuid())
-  appointmentTypeId String
+  id                BigInt          @id @default(autoincrement())
+  appointmentTypeId String          @db.Uuid
   appointmentType   AppointmentType @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
   questionText      String
   questionType      QuestionType
@@ -391,16 +391,17 @@ model BookingQuestion {
 // ---------------------------------------------------------------------------
 
 model Appointment {
-  id                 String            @id @default(cuid())
-  appointmentTypeId  String
+  id                 BigInt            @id @default(autoincrement())
+  publicId           String            @unique @default(cuid())
+  appointmentTypeId  String            @db.Uuid
   appointmentType    AppointmentType   @relation(fields: [appointmentTypeId], references: [id])
-  customerId         String
+  customerId         String            @db.Uuid
   customer           User              @relation("AppointmentCustomer", fields: [customerId], references: [id])
-  organizationId     String
+  organizationId     String            @db.Uuid
   organization       Organization      @relation(fields: [organizationId], references: [id])
-  bookablePersonId   String?
+  bookablePersonId   String?           @db.Uuid
   bookablePerson     BookablePerson?   @relation(fields: [bookablePersonId], references: [id])
-  bookableResourceId String?
+  bookableResourceId String?           @db.Uuid
   bookableResource   BookableResource? @relation(fields: [bookableResourceId], references: [id])
   startTime          DateTime
   endTime            DateTime
@@ -431,18 +432,18 @@ model Appointment {
 }
 
 model AppointmentReschedule {
-  id                  String            @id @default(cuid())
-  appointmentId       String
+  id                  BigInt            @id @default(autoincrement())
+  appointmentId       BigInt
   appointment         Appointment       @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  rescheduledByUserId String
+  rescheduledByUserId String            @db.Uuid
   rescheduledBy       User              @relation("RescheduledByUser", fields: [rescheduledByUserId], references: [id])
   previousStartTime   DateTime
   previousEndTime     DateTime
   newStartTime        DateTime
   newEndTime          DateTime
-  previousPersonId    String?
+  previousPersonId    String?           @db.Uuid
   previousPerson      BookablePerson?   @relation("PreviousPerson", fields: [previousPersonId], references: [id])
-  previousResourceId  String?
+  previousResourceId  String?           @db.Uuid
   previousResource    BookableResource? @relation("PreviousResource", fields: [previousResourceId], references: [id])
   reason              String?
   rescheduledAt       DateTime          @default(now())
@@ -453,24 +454,25 @@ model AppointmentReschedule {
 }
 
 model AppointmentAnswer {
-  id            String          @id @default(cuid())
-  appointmentId String
+  appointmentId BigInt
   appointment   Appointment     @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  questionId    String
+  questionId    BigInt
   question      BookingQuestion @relation(fields: [questionId], references: [id])
   answerText    String?
   createdAt     DateTime        @default(now())
 
+  @@id([appointmentId, questionId])
   @@unique([appointmentId, questionId])
   @@index([questionId])
   @@map("appointment_answers")
 }
 
 model Payment {
-  id                   String        @id @default(cuid())
-  appointmentId        String
+  id                   BigInt        @id @default(autoincrement())
+  publicId             String        @unique @default(cuid())
+  appointmentId        BigInt
   appointment          Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  customerId           String
+  customerId           String        @db.Uuid
   customer             User          @relation(fields: [customerId], references: [id])
   amount               Decimal       @db.Decimal(12, 2)
   currency             String        @default("INR")
@@ -489,16 +491,16 @@ model Payment {
 }
 
 model SlotLock {
-  id                 String            @id @default(cuid())
-  appointmentTypeId  String
+  id                 BigInt            @id @default(autoincrement())
+  appointmentTypeId  String            @db.Uuid
   appointmentType    AppointmentType   @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
-  bookablePersonId   String?
+  bookablePersonId   String?           @db.Uuid
   bookablePerson     BookablePerson?   @relation(fields: [bookablePersonId], references: [id], onDelete: Cascade)
-  bookableResourceId String?
+  bookableResourceId String?           @db.Uuid
   bookableResource   BookableResource? @relation(fields: [bookableResourceId], references: [id], onDelete: Cascade)
   slotStart          DateTime
   slotEnd            DateTime
-  customerId         String
+  customerId         String            @db.Uuid
   customer           User              @relation(fields: [customerId], references: [id], onDelete: Cascade)
   expiresAt          DateTime
   createdAt          DateTime          @default(now())
@@ -516,11 +518,11 @@ model SlotLock {
 // ---------------------------------------------------------------------------
 
 model Notification {
-  id               String                    @id @default(cuid())
+  id               BigInt                    @id @default(autoincrement())
   recipientType    NotificationRecipientType
   recipientId      String?
   recipientEmail   String?
-  appointmentId    String?
+  appointmentId    BigInt?
   appointment      Appointment?              @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
   notificationType NotificationType
   channel          NotificationChannel
@@ -536,8 +538,8 @@ model Notification {
 }
 
 model AuditLog {
-  id         String   @id @default(cuid())
-  actorId    String?
+  id         BigInt   @id @default(autoincrement())
+  actorId    String?  @db.Uuid
   actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
   actorRole  Role?
   action     String

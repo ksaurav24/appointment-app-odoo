@@ -32,7 +32,7 @@ const baseAppointmentType = {
   shareToken: null,
   entities: [
     {
-      id: 'ate-1',
+      id: 1n,
       bookablePersonId: null,
       bookableResourceId: 'res-1',
     },
@@ -60,14 +60,14 @@ describe('SlotLocksService.acquire', () => {
         .fn()
         .mockResolvedValue({ _sum: { capacityBooked: 0 } }),
       slotLockCount: jest.fn().mockResolvedValue(0),
-      slotLockCreate: jest.fn().mockResolvedValue({ id: 'lock-1' }),
+      slotLockCreate: jest.fn().mockResolvedValue({ id: 1n }),
     };
     service = new SlotLocksService(makePrismaMock(state));
   });
 
   it('creates a lock when the slot is free', async () => {
     const lock = await service.acquire('cust-1', validRequest);
-    expect(lock.id).toBe('lock-1');
+    expect(lock.id).toBe(1n);
     expect(state.slotLockCreate).toHaveBeenCalledTimes(1);
   });
 
@@ -105,8 +105,8 @@ describe('SlotLocksService.acquire', () => {
       ...baseAppointmentType,
       assignmentMode: AssignmentMode.AUTO,
       entities: [
-        { id: 'ate-1', bookablePersonId: null, bookableResourceId: 'res-1' },
-        { id: 'ate-2', bookablePersonId: null, bookableResourceId: 'res-2' },
+        { id: 1n, bookablePersonId: null, bookableResourceId: 'res-1' },
+        { id: 2n, bookablePersonId: null, bookableResourceId: 'res-2' },
       ],
     });
     // First candidate is busy; second is free.

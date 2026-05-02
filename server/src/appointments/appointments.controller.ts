@@ -46,12 +46,12 @@ export class AppointmentsController {
     return this.appointments.listForCustomer(user.sub, query);
   }
 
-  @Get(':id')
+  @Get(':publicId')
   @ApiOperation({ summary: 'Fetch the current customer’s appointment by id' })
   findOne(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('publicId') publicId: string,
   ): Promise<AppointmentWithRelations> {
-    return this.appointments.findOneForCustomer(user.sub, id);
+    return this.appointments.findOneForCustomer(user.sub, publicId);
   }
 }

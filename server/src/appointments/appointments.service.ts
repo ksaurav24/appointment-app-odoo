@@ -25,8 +25,12 @@ const APPOINTMENT_INCLUDE = {
   answers: { include: { question: true } },
 } satisfies Prisma.AppointmentInclude;
 
+// BigInt `id` is internal; clients address appointments by `publicId`.
+const APPOINTMENT_OMIT = { id: true } satisfies Prisma.AppointmentOmit;
+
 export type AppointmentWithRelations = Prisma.AppointmentGetPayload<{
   include: typeof APPOINTMENT_INCLUDE;
+  omit: typeof APPOINTMENT_OMIT;
 }>;
 
 @Injectable()
@@ -44,8 +48,9 @@ export class AppointmentsService {
     customerId: string,
     input: CreateAppointmentDto,
   ): Promise<AppointmentWithRelations> {
+    const slotLockId = BigInt(input.slotLockId);
     const lock = await this.prisma.slotLock.findUnique({
-      where: { id: input.slotLockId },
+      where: { id: slotLockId },
     });
     if (!lock || lock.customerId !== customerId) {
       throw new NotFoundException('Slot lock not found');
@@ -119,7 +124,7 @@ export class AppointmentsService {
         await tx.appointmentAnswer.createMany({
           data: answers.map((a) => ({
             appointmentId: appointment.id,
-            questionId: a.questionId,
+            questionId: BigInt(a.questionId),
             answerText: a.answerText,
           })),
         });
@@ -138,17 +143,19 @@ export class AppointmentsService {
     return this.prisma.appointment.findMany({
       where: this.buildListFilter({ customerId }, query),
       include: APPOINTMENT_INCLUDE,
+      omit: APPOINTMENT_OMIT,
       orderBy: { startTime: 'desc' },
     });
   }
 
   async findOneForCustomer(
     customerId: string,
-    id: string,
+    publicId: string,
   ): Promise<AppointmentWithRelations> {
     const appointment = await this.prisma.appointment.findFirst({
-      where: { id, customerId },
+      where: { publicId, customerId },
       include: APPOINTMENT_INCLUDE,
+      omit: APPOINTMENT_OMIT,
     });
     if (!appointment) throw new NotFoundException('Appointment not found');
     return appointment;
@@ -166,18 +173,20 @@ export class AppointmentsService {
     return this.prisma.appointment.findMany({
       where: this.buildListFilter({ organizationId: org.id }, query),
       include: APPOINTMENT_INCLUDE,
+      omit: APPOINTMENT_OMIT,
       orderBy: { startTime: 'desc' },
     });
   }
 
   async findOneForOrganiser(
     organiserId: string,
-    id: string,
+    publicId: string,
   ): Promise<AppointmentWithRelations> {
     const org = await this.organizations.requireForOrganiser(organiserId);
     const appointment = await this.prisma.appointment.findFirst({
-      where: { id, organizationId: org.id },
+      where: { publicId, organizationId: org.id },
       include: APPOINTMENT_INCLUDE,
+      omit: APPOINTMENT_OMIT,
     });
     if (!appointment) throw new NotFoundException('Appointment not found');
     return appointment;
@@ -186,76 +195,76 @@ export class AppointmentsService {
   /** Approve a PENDING appointment (when manualConfirmation is enabled). */
   async approve(
     organiserId: string,
-    id: string,
+    publicId: string,
   ): Promise<AppointmentWithRelations> {
-    const existing = await this.findOneForOrganiser(organiserId, id);
+    const existing = await this.findOneForOrganiser(organiserId, publicId);
     if (existing.status !== AppointmentStatus.PENDING) {
       throw new ConflictException(
         `Cannot approve an appointment in status ${existing.status}`,
       );
     }
     await this.prisma.appointment.update({
-      where: { id },
+      where: { publicId },
       data: { status: AppointmentStatus.CONFIRMED },
     });
-    return this.findOneForOrganiser(organiserId, id);
+    return this.findOneForOrganiser(organiserId, publicId);
   }
 
   /** Reject a PENDING appointment with an optional reason. */
   async reject(
     organiserId: string,
-    id: string,
+    publicId: string,
     reason?: string,
   ): Promise<AppointmentWithRelations> {
-    const existing = await this.findOneForOrganiser(organiserId, id);
+    const existing = await this.findOneForOrganiser(organiserId, publicId);
     if (existing.status !== AppointmentStatus.PENDING) {
       throw new ConflictException(
         `Cannot reject an appointment in status ${existing.status}`,
       );
     }
     await this.prisma.appointment.update({
-      where: { id },
+      where: { publicId },
       data: {
         status: AppointmentStatus.CANCELLED,
         cancellationReason: reason ?? 'Rejected by organiser',
         cancelledAt: new Date(),
       },
     });
-    return this.findOneForOrganiser(organiserId, id);
+    return this.findOneForOrganiser(organiserId, publicId);
   }
 
   async markCompleted(
     organiserId: string,
-    id: string,
+    publicId: string,
   ): Promise<AppointmentWithRelations> {
-    const existing = await this.findOneForOrganiser(organiserId, id);
+    const existing = await this.findOneForOrganiser(organiserId, publicId);
     if (existing.status !== AppointmentStatus.CONFIRMED) {
       throw new ConflictException(
         `Only CONFIRMED appointments can be marked completed (current: ${existing.status})`,
       );
     }
     await this.prisma.appointment.update({
-      where: { id },
+      where: { publicId },
       data: { status: AppointmentStatus.COMPLETED },
     });
-    return this.findOneForOrganiser(organiserId, id);
+    return this.findOneForOrganiser(organiserId, publicId);
   }
 
   async markNoShow(
     organiserId: string,
-    id: string,
+    publicId: string,
   ): Promise<AppointmentWithRelations> {
-    const existing = await this.findOneForOrganiser(organiserId, id);
+    const existing = await this.findOneForOrganiser(organiserId, publicId);
     if (existing.status !== AppointmentStatus.CONFIRMED) {
       throw new ConflictException(
         `Only CONFIRMED appointments can be marked no-show (current: ${existing.status})`,
       );
     }
     await this.prisma.appointment.update({
-      where: { id },
+      where: { publicId },
       data: { status: AppointmentStatus.NO_SHOW },
     });
-    return this.findOneForOrganiser(organiserId, id);
+    return this.findOneForOrganiser(organiserId, publicId);
   }
 
   // -------------------------------------------------------------------------
@@ -290,7 +299,7 @@ export class AppointmentsService {
     entityId: string,
     slotStart: Date,
     slotEnd: Date,
-    excludeLockId: string,
+    excludeLockId: bigint,
   ): Promise<number> {
     const entityFilter =
       entityType === EntityType.PERSON
@@ -345,11 +354,12 @@ export class AppointmentsService {
 
   private async loadById(
     tx: Prisma.TransactionClient,
-    id: string,
+    id: bigint,
   ): Promise<AppointmentWithRelations> {
     const found = await tx.appointment.findUnique({
       where: { id },
       include: APPOINTMENT_INCLUDE,
+      omit: APPOINTMENT_OMIT,
     });
     if (!found) throw new NotFoundException('Appointment not found');
     return found;

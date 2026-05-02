@@ -12,7 +12,7 @@ const baseQuestion: Omit<
 };
 
 const q = (overrides: Partial<BookingQuestion>): BookingQuestion => ({
-  id: 'q-1',
+  id: 1n,
   questionType: QuestionType.TEXT,
   options: null,
   isRequired: false,
@@ -24,22 +24,22 @@ describe('validateAnswers', () => {
   it('throws when a required question is unanswered', () => {
     expect(() =>
       validateAnswers(
-        [q({ id: 'q-1', isRequired: true, questionText: 'name' })],
+        [q({ id: 1n, isRequired: true, questionText: 'name' })],
         [],
       ),
     ).toThrow(BadRequestException);
   });
 
   it('returns a null answer for an optional unanswered question', () => {
-    const result = validateAnswers([q({ id: 'q-1' })], []);
-    expect(result).toEqual([{ questionId: 'q-1', answerText: null }]);
+    const result = validateAnswers([q({ id: 1n })], []);
+    expect(result).toEqual([{ questionId: '1', answerText: null }]);
   });
 
   it('rejects non-numeric answers for NUMBER questions', () => {
     expect(() =>
       validateAnswers(
-        [q({ id: 'q-1', questionType: QuestionType.NUMBER })],
-        [{ questionId: 'q-1', answerText: 'twelve' }],
+        [q({ id: 1n, questionType: QuestionType.NUMBER })],
+        [{ questionId: '1', answerText: 'twelve' }],
       ),
     ).toThrow(BadRequestException);
   });
@@ -49,12 +49,12 @@ describe('validateAnswers', () => {
       validateAnswers(
         [
           q({
-            id: 'q-1',
+            id: 1n,
             questionType: QuestionType.SINGLE_CHOICE,
             options: ['yes', 'no'],
           }),
         ],
-        [{ questionId: 'q-1', answerText: 'maybe' }],
+        [{ questionId: '1', answerText: 'maybe' }],
       ),
     ).toThrow(BadRequestException);
   });
@@ -63,12 +63,12 @@ describe('validateAnswers', () => {
     const result = validateAnswers(
       [
         q({
-          id: 'q-1',
+          id: 1n,
           questionType: QuestionType.MULTIPLE_CHOICE,
           options: ['football', 'cricket', 'casual'],
         }),
       ],
-      [{ questionId: 'q-1', answerText: 'football,  cricket  ' }],
+      [{ questionId: '1', answerText: 'football,  cricket  ' }],
     );
     expect(result[0].answerText).toBe('football,cricket');
   });
@@ -76,8 +76,8 @@ describe('validateAnswers', () => {
   it('rejects answers referencing unknown question ids', () => {
     expect(() =>
       validateAnswers(
-        [q({ id: 'q-1' })],
-        [{ questionId: 'q-9', answerText: 'oops' }],
+        [q({ id: 1n })],
+        [{ questionId: '9', answerText: 'oops' }],
       ),
     ).toThrow(BadRequestException);
   });
