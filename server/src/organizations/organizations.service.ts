@@ -97,6 +97,19 @@ export class OrganizationsService {
   }
 
   /**
+   * Resolve the organization for an organiser or throw. Use in feature
+   * services that need a guaranteed-present organization context.
+   * The OrganizationApprovedGuard already enforces approval status.
+   */
+  async requireForOrganiser(organiserId: string): Promise<Organization> {
+    const org = await this.findByOrganiserId(organiserId);
+    if (!org) {
+      throw new NotFoundException('Organization not found for current user');
+    }
+    return org;
+  }
+
+  /**
    * Admin listing. If status is undefined, returns ALL organizations.
    */
   list(

@@ -12,7 +12,7 @@ interface IssueOptions {
 
 interface VerifyResult {
   userId: string;
-  resetId: string;
+  resetId: bigint;
 }
 
 function hashResetToken(token: string): string {
