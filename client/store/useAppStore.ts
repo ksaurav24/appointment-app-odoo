@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { AuthUser, OrgSetupFormValues, UserRole } from "@/types";
 
 interface AppStore {
-  // \u2500\u2500 Auth state \u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014
+  // Auth state 
   user: AuthUser | null;
   token: string | null;
   role: UserRole | null;    // set when user selects role on /signup-role
@@ -10,7 +10,7 @@ interface AppStore {
   setRole: (role: UserRole) => void;
   clearAuth: () => void;
 
-  // \u2500\u2500 Organiser onboarding draft \u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014
+  // Organiser onboarding draft 
   // WHY Zustand and not URL params: step 1 data (name + slug) should not be
   // exposed in the browser URL bar. Zustand keeps it in memory only.
   // This draft is populated at end of step 1 and cleared after step 2 submits.
