@@ -628,7 +628,7 @@ export type CreateAppointmentTypeInput = {
   durationStepMins?: number;
   scheduleType: ScheduleType;
   timezone?: string;
-  scheduleRules: ScheduleRule[];
+  scheduleRules: ScheduleRuleInput[];
   maxBookingsPerSlot?: number;
   manageCapacity?: boolean;
   manualConfirmation?: boolean;
@@ -639,7 +639,7 @@ export type CreateAppointmentTypeInput = {
   rescheduleAllowed?: boolean;
   rescheduleWindowHours?: number;
   maxReschedulesAllowed?: number;
-  bookingQuestions?: BookingQuestion[];
+  bookingQuestions?: BookingQuestionInput[];
 };
 
 export type UpdateAppointmentTypeInput = Partial<
@@ -649,13 +649,29 @@ export type UpdateAppointmentTypeInput = Partial<
   >
 >;
 
+export type ScheduleRuleInput = {
+  dayOfWeek?: number | null;
+  specificDate?: string | null;
+  startTime: string;
+  endTime: string;
+  isAvailable?: boolean;
+};
+
+export type BookingQuestionInput = {
+  questionText: string;
+  questionType: QuestionType;
+  isRequired?: boolean;
+  options?: string[];
+  displayOrder?: number;
+};
+
 export type SetEntitiesInput = { entityIds: string[] };
 export type SetScheduleInput = {
   scheduleType: ScheduleType;
   timezone?: string;
-  rules: ScheduleRule[];
+  rules: ScheduleRuleInput[];
 };
-export type SetBookingQuestionsInput = { questions: BookingQuestion[] };
+export type SetBookingQuestionsInput = { questions: BookingQuestionInput[] };
 export type ListAppointmentTypesQuery = { published?: boolean };
 
 // ─── Organizer appointments ────────────────────────────────────
