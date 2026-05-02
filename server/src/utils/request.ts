@@ -16,3 +16,16 @@ export function requestMeta(req: Request): RequestMeta {
     ipAddress: req.ip,
   };
 }
+
+export interface AuditRequestMeta {
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+/** Same shape as `requestMeta`, but with field names matching the AuditLog model. */
+export function auditRequestMeta(req: Request): AuditRequestMeta {
+  return {
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent']?.toString().slice(0, 200),
+  };
+}

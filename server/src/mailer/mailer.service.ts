@@ -16,7 +16,7 @@ import {
   welcomeEmail,
 } from './templates';
 
-export interface SentEmailRecord extends MailJobPayload {}
+export type SentEmailRecord = MailJobPayload;
 
 @Injectable()
 export class MailerService {
@@ -62,6 +62,19 @@ export class MailerService {
     await this.enqueue(email, organizerRejectedEmail(fullName, reason));
   }
 
+  /**
+   * Generic enqueue. Used by the notifications service which has already
+   * rendered the template and recorded the Notification row. Pass
+   * `notificationId` so the worker can flip the row to SENT/FAILED.
+   */
+  enqueueRendered(
+    to: string,
+    rendered: RenderedEmail,
+    notificationId?: bigint,
+  ): Promise<void> {
+    return this.enqueue(to, rendered, notificationId);
+  }
+
   getLastMessage(): SentEmailRecord | null {
     return this.lastMessage;
   }
@@ -70,12 +83,19 @@ export class MailerService {
     this.lastMessage = null;
   }
 
-  private async enqueue(to: string, rendered: RenderedEmail): Promise<void> {
+  private async enqueue(
+    to: string,
+    rendered: RenderedEmail,
+    notificationId?: bigint,
+  ): Promise<void> {
     const payload: MailJobPayload = {
       to,
       subject: rendered.subject,
       text: rendered.text,
       html: rendered.html,
+      ...(notificationId != null
+        ? { notificationId: notificationId.toString() }
+        : {}),
     };
     this.lastMessage = payload;
 

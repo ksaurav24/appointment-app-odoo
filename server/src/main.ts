@@ -16,7 +16,9 @@ import { setupSwagger } from './swagger';
 };
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  // rawBody is captured on every request so the Razorpay webhook controller
+  // can verify HMAC signatures against the byte-exact request body.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   const config = app.get(ConfigService<EnvVars, true>);
   const corsOrigins = config

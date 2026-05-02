@@ -5,13 +5,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  AppointmentStatus,
-  AssignmentMode,
-  EntityType,
-  Prisma,
-  SlotLock,
-} from '@prisma/client';
+import { AssignmentMode, EntityType, Prisma, SlotLock } from '@prisma/client';
+import { countConsumedCapacity } from '../appointments/helpers/capacity';
 import { PrismaService } from '../prisma/prisma.service';
 
 const APPOINTMENT_TYPE_INCLUDE = {
@@ -66,13 +61,10 @@ export class SlotLocksService {
 
     return this.prisma.$transaction(async (tx) => {
       // Re-check inside the transaction (PRD §12.2 — defense against races).
-      const consumed = await this.countConsumedCapacity(
-        tx,
-        at,
-        entityId,
-        slotStart,
-        slotEnd,
-      );
+      const consumed = await countConsumedCapacity(tx, at, entityId, {
+        start: slotStart,
+        end: slotEnd,
+      });
       if (consumed >= at.maxBookingsPerSlot) {
         throw new ConflictException('Slot is no longer available');
       }
@@ -228,13 +220,10 @@ export class SlotLocksService {
     }
 
     for (const candidate of linkedIds) {
-      const consumed = await this.countConsumedCapacity(
-        this.prisma,
-        at,
-        candidate,
-        slotStart,
-        slotEnd,
-      );
+      const consumed = await countConsumedCapacity(this.prisma, at, candidate, {
+        start: slotStart,
+        end: slotEnd,
+      });
       if (consumed < at.maxBookingsPerSlot) {
         return candidate;
       }
@@ -242,45 +231,5 @@ export class SlotLocksService {
     throw new ConflictException(
       'No entity is available for the requested slot',
     );
-  }
-
-  /**
-   * Sum of capacity consumed by overlapping (non-cancelled) appointments and
-   * still-active slot locks for the given entity. Used to gate against
-   * `maxBookingsPerSlot` for both single- and multi-capacity types.
-   */
-  private async countConsumedCapacity(
-    client: Prisma.TransactionClient | PrismaService,
-    at: LoadedAppointmentType,
-    entityId: string,
-    slotStart: Date,
-    slotEnd: Date,
-  ): Promise<number> {
-    const entityFilter =
-      at.entityType === EntityType.PERSON
-        ? { bookablePersonId: entityId }
-        : { bookableResourceId: entityId };
-    const [appointments, locks] = await Promise.all([
-      client.appointment.aggregate({
-        _sum: { capacityBooked: true },
-        where: {
-          appointmentTypeId: at.id,
-          ...entityFilter,
-          status: { not: AppointmentStatus.CANCELLED },
-          startTime: { lt: slotEnd },
-          endTime: { gt: slotStart },
-        },
-      }),
-      client.slotLock.count({
-        where: {
-          appointmentTypeId: at.id,
-          ...entityFilter,
-          expiresAt: { gt: new Date() },
-          slotStart: { lt: slotEnd },
-          slotEnd: { gt: slotStart },
-        },
-      }),
-    ]);
-    return (appointments._sum.capacityBooked ?? 0) + locks;
   }
 }

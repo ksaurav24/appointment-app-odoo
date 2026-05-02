@@ -22,9 +22,7 @@ import { MailerService } from './mailer.service';
     }),
     BullModule.registerQueueAsync({
       name: MAIL_QUEUE_NAME,
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (_config: ConfigService<EnvVars, true>) => ({
+      useFactory: () => ({
         defaultJobOptions: {
           attempts: 5,
           backoff: { type: 'exponential', delay: 5_000 },

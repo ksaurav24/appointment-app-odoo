@@ -87,6 +87,25 @@ export class EnvVars {
 
   @IsString()
   ADMIN_BOOTSTRAP_NAME: string = 'Administrator';
+
+  // -------------------------------------------------------------------------
+  // Payments (Razorpay)
+  // -------------------------------------------------------------------------
+
+  @IsOptional()
+  @IsString()
+  RAZORPAY_KEY_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  RAZORPAY_KEY_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  RAZORPAY_WEBHOOK_SECRET?: string;
+
+  @IsString()
+  PAYMENT_CURRENCY: string = 'INR';
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvVars {
