@@ -10,10 +10,10 @@ import { useAppStore } from "@/store/useAppStore";
 export function UserWelcomeBanner() {
   const user = useAppStore((state) => state.user);
 
-  // Derive the avatar initial from the first letter of the user's name.
+  // Derive the avatar initial from the first letter of the user's full name.
   // Fallback to "U" if Zustand hasn't hydrated yet (very brief flash).
-  const initial = user?.name?.charAt(0).toUpperCase() ?? "U";
-  const name = user?.name ?? "Customer";
+  const initial = user?.fullName?.charAt(0).toUpperCase() ?? "U";
+  const name = user?.fullName ?? "Customer";
 
   return (
     <div className="flex items-center gap-5 rounded-xl border border-blue-100 bg-blue-50 p-6">

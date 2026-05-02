@@ -9,6 +9,7 @@ export const ROUTES = {
   login: "/login",
   signup: "/signup",
   forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
   otpVerification: "/otp-verification",
   signupRole: "/signup-role",
 
@@ -21,11 +22,20 @@ export const ROUTES = {
   dashboardUser: "/dashboard/user",
 
   // Routes linked from the customer dashboard quick-action cards.
-  // These pages will be built separately; cards are non-functional until then.
   findAppointments: "/appointments",
   myBookings: "/bookings",
   myProfile: "/profile",
+
+  // Organisation public profile — slug is dynamic.
+  // Use orgProfilePath(slug) to build this URL.
+  organisations: "/organisations",
 } as const;
+
+// Builds the public profile URL for an organisation.
+// WHY a function (not in ROUTES): ROUTES is "as const" — it can only hold
+// static strings. Dynamic paths with parameters must be plain functions.
+// Usage: orgProfilePath("acme-clinic") → "/organisations/acme-clinic"
+export const orgProfilePath = (slug: string) => `/organisations/${slug}`;
 
 // IANA timezone identifiers shown in the timezone dropdown on Step 2.
 // Kept here as a constant to avoid importing a heavy library just for a list.

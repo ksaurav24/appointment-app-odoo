@@ -7,13 +7,15 @@ export const loginSchema = z.object({
 });
 
 // Validates signup details with strict password quality rules.
+// Field: fullName (matches backend RegisterDto.fullName)
 export const signupSchema = z
   .object({
-    name: z.string().min(2, "Name must be at least 2 characters."),
+    fullName: z.string().min(2, "Name must be at least 2 characters.").max(120),
     email: z.email("Enter a valid email address."),
     password: z
       .string()
       .min(8, "Password must be at least 8 characters.")
+      .max(72, "Password cannot exceed 72 characters.")
       .regex(/[a-z]/, "Password must include a lowercase letter.")
       .regex(/[A-Z]/, "Password must include an uppercase letter.")
       .regex(/[^A-Za-z0-9]/, "Password must include a special character."),
@@ -24,12 +26,13 @@ export const signupSchema = z
     path: ["confirmPassword"],
   });
 
-// Validates forgot-password input before sending reset OTP.
+// Validates forgot-password input before sending reset email.
 export const forgotPasswordSchema = z.object({
   email: z.email("Enter a valid email address."),
 });
 
 // Validates OTP code and destination email.
+// Matches backend VerifyEmailDto: email + 6-digit code.
 export const otpVerificationSchema = z.object({
   email: z.email("Enter a valid email address."),
   code: z
@@ -37,9 +40,27 @@ export const otpVerificationSchema = z.object({
     .regex(/^\d{6}$/, "OTP must be a 6-digit code."),
 });
 
-// \u2500\u2500\u2500 Organiser Onboarding Schemas \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Validates password reset form (token comes from URL, not from form).
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(1, "Reset token is required."),
+    newPassword: z
+      .string()
+      .min(8, "Password must be at least 8 characters.")
+      .max(72, "Password cannot exceed 72 characters.")
+      .regex(/[a-z]/, "Password must include a lowercase letter.")
+      .regex(/[A-Z]/, "Password must include an uppercase letter.")
+      .regex(/[^A-Za-z0-9]/, "Password must include a special character."),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
 
-// Step 1: Set up your organisation \u2014 name + URL slug.
+// ─── Organiser Onboarding Schemas ─────────────────────────────────────────────
+
+// Step 1: Set up your organisation — name + URL slug.
 // The slug must be URL-safe: lowercase, numbers, hyphens only.
 // This will be the public URL path (e.g. app.com/acme-clinic).
 export const orgSetupSchema = z.object({
@@ -55,7 +76,7 @@ export const orgSetupSchema = z.object({
 });
 
 // Step 2: Organisation profile details.
-// logoFile is optional \u2014 organiser can add a logo later.
+// logoFile is optional — organiser can add a logo later.
 // File size and type are validated here so the user gets instant feedback
 // before any upload attempt is made to the server.
 export const orgDetailsSchema = z.object({
@@ -68,7 +89,7 @@ export const orgDetailsSchema = z.object({
     .regex(/^[+]?[0-9\s\-().]{7,20}$/, "Enter a valid phone number."),
   address: z.string().min(5, "Address must be at least 5 characters."),
   timezone: z.string().min(1, "Please select a timezone."),
-  // File validated only if the user picks one \u2014 optional field.
+  // File validated only if the user picks one — optional field.
   logoFile: z
     .instanceof(File)
     .refine((f) => f.size <= 2 * 1024 * 1024, "Logo must be under 2 MB.")
