@@ -29,13 +29,13 @@ import { UsersModule } from './users/users.module';
     }),
     ThrottlerModule.forRoot({
       throttlers: [
-        { name: 'default', limit: 120, ttl: 60_000 },
-        { name: 'login', limit: 5, ttl: 900_000 },
-        { name: 'register', limit: 3, ttl: 3_600_000 },
-        { name: 'otpSend', limit: 5, ttl: 3_600_000 },
-        { name: 'otpSubmit', limit: 10, ttl: 600_000 },
-        { name: 'passwordReset', limit: 3, ttl: 3_600_000 },
-        { name: 'refresh', limit: 30, ttl: 60_000 },
+        { name: 'default', limit: 1200, ttl: 60_000 },
+        { name: 'login', limit: 50, ttl: 900_000 },
+        { name: 'register', limit: 30, ttl: 3_600_000 },
+        { name: 'otpSend', limit: 50, ttl: 3_600_000 },
+        { name: 'otpSubmit', limit: 100, ttl: 600_000 },
+        { name: 'passwordReset', limit: 30, ttl: 3_600_000 },
+        { name: 'refresh', limit: 300, ttl: 60_000 },
       ],
     }),
     PrismaModule,
@@ -60,4 +60,4 @@ import { UsersModule } from './users/users.module';
     { provide: APP_GUARD, useClass: OrganizationApprovedGuard },
   ],
 })
-export class AppModule {}
+export class AppModule { }

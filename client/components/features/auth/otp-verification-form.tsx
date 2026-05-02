@@ -2,16 +2,20 @@
 
 // OTP verification form — verifies the 6-digit code sent to the user's email.
 //
-// Flow after successful verification:
-//   flow=signup + role=organiser  → /onboarding/setup (3-step org setup)
-//   flow=signup + role=customer   → /dashboard/user
-//   flow=signup + no role in store → /signup-role (fallback — shouldn't normally happen)
-//   flow=reset (any)              → /login (password was reset, user must log in fresh)
+// Routing after successful verification (driven by URL query params):
 //
-// WHY no session after verify-email:
-//   The backend /auth/verify-email only marks the user as verified — it does NOT
-//   issue auth cookies. For the signup flow, the user is redirected to login after
-//   verification. Cookies are set only by /auth/login.
+//   flow=signup, role=customer  → /login
+//     (Email verified. Now the user must log in to get their session cookies.)
+//
+//   flow=signup, role=organiser → /onboarding/submitted
+//     (Org + user created. Email verified. Account is PENDING admin approval.
+//      No login needed — the submitted page explains what happens next.)
+//
+//   anything else               → /login (safe fallback)
+//
+// WHY we go to /login after customer verification (not directly to dashboard):
+//   POST /auth/verify-email does NOT issue auth cookies — it only marks
+//   emailVerified=true. The session starts only after POST /auth/login.
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,7 +25,6 @@ import { toast } from "sonner";
 import { ROUTES } from "@/constants";
 import { useAuth } from "@/hooks/useAuth";
 import { otpVerificationSchema } from "@/lib/validations";
-import { useAppStore } from "@/store/useAppStore";
 import type { OtpVerificationFormValues } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,11 +33,12 @@ import { Label } from "@/components/ui/label";
 export function OtpVerificationForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const emailFromQuery = searchParams.get("email") ?? "";
-  const flow = searchParams.get("flow");
+  const flow = searchParams.get("flow");            // "signup" | null
+  const role = searchParams.get("role");            // "customer" | "organiser" | null
 
   const { verifyEmailMutation, resendOtpMutation } = useAuth();
-  const role = useAppStore((state) => state.role);
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const { register, handleSubmit, formState } =
@@ -45,22 +49,22 @@ export function OtpVerificationForm() {
 
   async function onSubmit(values: OtpVerificationFormValues) {
     try {
-      const result = await verifyEmailMutation.mutateAsync(values);
-      toast.success(result.message);
+      await verifyEmailMutation.mutateAsync(values);
+      toast.success("Email verified successfully!");
 
       if (flow === "signup") {
-        // Signup flow: email is now verified. Route by role for next step.
         if (role === "organiser") {
-          router.push(ROUTES.onboardingSetup);
+          // Organizer: account is PENDING. Show the submitted/waiting page.
+          router.push(ROUTES.onboardingSubmitted);
         } else {
-          // Customer or no role: go to login to get session cookies.
-          toast.info("Email verified! Please sign in to continue.");
+          // Customer: verified. Now log in to get session cookies.
+          toast.info("Please sign in to access your account.");
           router.push(ROUTES.login);
         }
         return;
       }
 
-      // Non-signup flows (password reset OTP, etc.) go back to login.
+      // Fallback for all other flows (e.g. future 2FA OTP reuse, etc.)
       router.push(ROUTES.login);
     } catch (error) {
       const message =
@@ -81,7 +85,10 @@ export function OtpVerificationForm() {
       setResendCooldown(60);
       const interval = setInterval(() => {
         setResendCooldown((prev) => {
-          if (prev <= 1) { clearInterval(interval); return 0; }
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
           return prev - 1;
         });
       }, 1000);
@@ -95,10 +102,12 @@ export function OtpVerificationForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {emailFromQuery && (
-        <p className="text-center text-xs text-gray-500">
-          Code sent to <span className="font-medium text-gray-900">{emailFromQuery}</span>
+        <p className="rounded-lg bg-blue-50 px-4 py-3 text-center text-xs text-blue-700">
+          A 6-digit code was sent to{" "}
+          <span className="font-semibold">{emailFromQuery}</span>
         </p>
       )}
+
       <div className="space-y-1">
         <Label htmlFor="code">Verification Code</Label>
         <Input
@@ -108,10 +117,12 @@ export function OtpVerificationForm() {
           maxLength={6}
           placeholder="123456"
           autoComplete="one-time-code"
+          className="tracking-[0.5em] text-center text-lg font-semibold"
           {...register("code")}
         />
         <p className="text-xs text-red-600">{formState.errors.code?.message}</p>
       </div>
+
       <Button
         type="submit"
         disabled={verifyEmailMutation.isPending}
@@ -119,6 +130,7 @@ export function OtpVerificationForm() {
       >
         {verifyEmailMutation.isPending ? "Verifying..." : "Verify Code"}
       </Button>
+
       <div className="text-center">
         <button
           type="button"

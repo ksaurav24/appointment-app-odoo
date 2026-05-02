@@ -2,9 +2,22 @@
 
 // Step 2 of organiser onboarding: organisation profile details + logo upload.
 //
-// This component reads the Step-1 draft (name + slug) from Zustand.
-// If that data is missing (e.g. user typed this URL directly), we redirect
-// them back to step 1. This protects the flow from being entered mid-way.
+// THIS IS WHERE THE BACKEND REGISTRATION HAPPENS FOR ORGANIZERS.
+//
+// Flow:
+//   1. User filled signup form (/signup) → credentials saved in Zustand
+//   2. User chose "Organiser" on /signup-role → name+slug saved in Zustand (orgDraft)
+//   3. THIS form collects description, phone, address, timezone, logo
+//   4. On submit: calls POST /auth/register WITH organization data
+//      → Backend atomically creates User (role=ORGANIZER) + Organization (status=PENDING)
+//      → OTP email sent to user's email
+//   5. Redirects to /otp-verification?email=...&flow=signup&role=organiser
+//   6. After OTP verify: user directed to /onboarding/submitted
+//
+// WHY registration happens here (not at role selection):
+//   The backend RegisterOrganizationDto requires name, slug, contactEmail,
+//   and optionally description/phone/address/timezone. We need ALL of step 1 + step 2
+//   data to build this payload, so the API call must wait until both steps are done.
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -12,7 +25,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { ROUTES, TIMEZONES } from "@/constants";
-import { useOrganization } from "@/hooks/useOrganization";
+import { useAuth } from "@/hooks/useAuth";
 import { orgDetailsSchema } from "@/lib/validations";
 import { useAppStore } from "@/store/useAppStore";
 import type { OrgDetailsFormValues } from "@/types";
@@ -22,13 +35,15 @@ import { Label } from "@/components/ui/label";
 
 export function OrgDetailsForm() {
   const router = useRouter();
-  const { createOrgMutation } = useOrganization();
+  const { registerOrgMutation } = useAuth();
 
   const orgDraft = useAppStore((state) => state.orgDraft);
+  const signupCredentials = useAppStore((state) => state.signupCredentials);
   const clearOrgDraft = useAppStore((state) => state.clearOrgDraft);
+  const clearSignupCredentials = useAppStore((state) => state.clearSignupCredentials);
 
-  // Logo preview \u2014 local state only. File objects are not serializable,
-  // so they must not live in RHF state or Zustand. We manage preview separately.
+  // Logo preview — local state only. File objects are not serializable,
+  // so they must not live in Zustand. We manage preview separately.
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -44,27 +59,23 @@ export function OrgDetailsForm() {
       },
     });
 
-  // Guard: redirect to step 1 if the user landed here without completing step 1.
-  // WHY useEffect (not inline): calling router.replace() during render is a React
-  // violation — side effects must live in useEffect, not the render body.
+  // Guard: redirect if step-1 data is missing (user navigated here directly).
   useEffect(() => {
     if (!orgDraft) {
       router.replace(ROUTES.onboardingSetup);
+    } else if (!signupCredentials) {
+      // Credentials expired (e.g. browser was restarted mid-flow)
+      toast.error("Session expired. Please start signup again.");
+      router.replace(ROUTES.signup);
     }
-  }, [orgDraft, router]);
+  }, [orgDraft, signupCredentials, router]);
 
-  // Render nothing while the redirect is in flight.
-  if (!orgDraft) return null;
+  if (!orgDraft || !signupCredentials) return null;
 
   function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
-    // Manually register the file into RHF.
-    // <input type="file"> is write-once in the DOM \u2014 can't be controlled via register().
     setValue("logoFile", file, { shouldValidate: true });
-
     if (file) {
-      // createObjectURL gives instant preview without uploading anything.
-      // The URL is local to the browser tab and costs no network.
       setLogoPreview(URL.createObjectURL(file));
     } else {
       setLogoPreview(null);
@@ -72,26 +83,35 @@ export function OrgDetailsForm() {
   }
 
   async function onSubmit(values: OrgDetailsFormValues) {
-    // TypeScript can't carry the render-time null check into this closure,
-    // so we guard again here. In practice the render guard above prevents
-    // this function from ever being called when orgDraft is null.
-    if (!orgDraft) return;
+    if (!orgDraft || !signupCredentials) return;
 
     try {
-      // Merge step-1 draft + step-2 values into the full org payload.
-      await createOrgMutation.mutateAsync({
-        name: orgDraft.name,
-        slug: orgDraft.slug,
-        description: values.description,
-        contactPhone: values.contactPhone,
-        address: values.address,
-        timezone: values.timezone,
-        logoFile: values.logoFile ?? null,
+      // Single atomic call: creates User (ORGANIZER) + Organization (PENDING) together.
+      // Logo is NOT sent here — it can be uploaded later from the org dashboard.
+      // (Backend RegisterOrganizationDto doesn't accept a file; that's a separate upload.)
+      await registerOrgMutation.mutateAsync({
+        user: signupCredentials,
+        org: {
+          name: orgDraft.name,
+          slug: orgDraft.slug,
+          description: values.description,
+          contactPhone: values.contactPhone,
+          address: values.address,
+          timezone: values.timezone,
+        },
       });
 
-      clearOrgDraft(); // draft no longer needed after successful submission
-      toast.success("Organisation submitted for approval.");
-      router.push(ROUTES.onboardingSubmitted);
+      // Clean up store — credentials and org draft no longer needed.
+      clearSignupCredentials();
+      clearOrgDraft();
+
+      toast.success("Organisation submitted! Check your email to verify your account.");
+
+      // Redirect to OTP page. After verification → /onboarding/submitted.
+      const emailQuery = encodeURIComponent(signupCredentials.email);
+      router.push(
+        `${ROUTES.otpVerification}?email=${emailQuery}&flow=signup&role=organiser`,
+      );
     } catch (error) {
       const message =
         error instanceof Error
@@ -111,14 +131,14 @@ export function OrgDetailsForm() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  const isPending = createOrgMutation.isPending;
+  const isPending = registerOrgMutation.isPending;
 
   return (
     <form
       onSubmit={handleSubmit(onSubmit, onInvalidSubmit)}
       className="space-y-5"
     >
-      {/* Description \u2014 textarea for multi-line text */}
+      {/* Description — textarea for multi-line text */}
       <div className="space-y-1.5">
         <Label htmlFor="description">About Your Organisation</Label>
         <textarea
@@ -168,7 +188,7 @@ export function OrgDetailsForm() {
         )}
       </div>
 
-      {/* Timezone \u2014 native <select> is accessible with no extra library */}
+      {/* Timezone — native <select> is accessible with no extra library */}
       <div className="space-y-1.5">
         <Label htmlFor="timezone">Timezone</Label>
         <select
@@ -193,9 +213,12 @@ export function OrgDetailsForm() {
         )}
       </div>
 
-      {/* Logo Upload \u2014 styled drop zone, hidden native file input */}
+      {/* Logo Upload — styled drop zone, hidden native file input */}
       <div className="space-y-1.5">
-        <Label>Organisation Logo</Label>
+        <Label>
+          Organisation Logo{" "}
+          <span className="text-xs font-normal text-gray-400">(optional — can add later)</span>
+        </Label>
         <div
           role="button"
           tabIndex={0}
@@ -237,7 +260,7 @@ export function OrgDetailsForm() {
           )}
         </div>
 
-        {/* Hidden real file input \u2014 triggered by the styled div above */}
+        {/* Hidden real file input — triggered by the styled div above */}
         <input
           ref={fileInputRef}
           type="file"
@@ -263,7 +286,7 @@ export function OrgDetailsForm() {
       </div>
 
       <Button type="submit" disabled={isPending} className="w-full">
-        {isPending ? "Submitting..." : "Send for Approval"}
+        {isPending ? "Submitting..." : "Submit for Approval →"}
       </Button>
     </form>
   );
