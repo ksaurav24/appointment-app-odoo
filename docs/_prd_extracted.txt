@@ -1,0 +1,1201 @@
+
+
+Product Requirements Document
+
+Appointment App — The Perfect Booking System
+
+Version 1.0 — Hackathon Spec
+
+Last updated: May 2026
+
+
+
+1. Executive Summary
+
+The Appointment App is a multi-tenant scheduling and booking platform that allows customers to discover services and book appointments with providers based on real-time availability. The system supports two distinct booking models — fixed-duration appointments (such as a doctor consultation or salon visit) and variable-duration appointments (such as a turf rental or meeting room booking) — within a single unified architecture.
+
+The platform is designed around three login-capable human roles (Admin, Organiser, Customer) and two non-login bookable entity types (Bookable Person, Bookable Resource). This separation lets organizations represent both staff members and physical assets without forcing every entity to maintain credentials.
+
+Core capabilities include flexible scheduling rules, capacity control, configurable cancellation and reschedule policies, advance payments, and end-to-end appointment lifecycle management.
+
+
+1.1 Goals &amp; Success Criteria
+
+
+Customers can complete a booking in under 60 seconds from landing on the appointment page.
+
+
+The system never permits double-booking of the same person or resource for overlapping time ranges.
+
+
+Real-time availability is calculated and displayed without page reload.
+
+
+Organisers can configure both fixed-slot and variable-duration appointment types using the same creation flow.
+
+
+All cancellation and reschedule policies are enforced server-side based on rules set during appointment type creation.
+
+
+1.2 Out of Scope (V1)
+
+
+Multi-organization ownership by a single Organiser (one Organiser owns exactly one Organization).
+
+
+Customer-to-customer messaging or chat.
+
+
+Recurring or subscription bookings.
+
+
+Native mobile applications (web responsive only).
+
+
+Multi-currency pricing logic (single currency per organization in V1).
+
+
+
+2. User Roles &amp; Entity Model
+
+The system has a fundamental distinction between humans who can log in and entities that can only be booked. Conflating the two is the most common source of confusion in scheduling systems, so this section sets the boundary explicitly.
+
+
+2.1 Login-Capable Roles
+
+
+2.1.1 Admin
+
+The Admin is the platform operator. There is a small, fixed number of Admins (typically just one or a handful for the platform owner). The Admin does not own appointment types or bookings directly, and does not create Organisers — Organisers self-register. The Admin&apos;s role is supervisory: monitoring platform-wide health, moderating bad actors, resolving cross-organization issues, and intervening when accounts need to be suspended.
+
+Admin permissions: view all users across the platform, view all Organizations, activate or deactivate any user or Organization account, change roles when needed (e.g., promoting a support agent), view a global dashboard showing total users, total Organisers, total appointments, view all bookings across every Organization in the system, and access platform-wide audit logs.
+
+What the Admin cannot do: create Organiser accounts (Organisers self-register), edit appointment types or bookings on behalf of an Organiser, or send messages to Customers as an Organiser. Admin actions are infrastructure-level, not operational.
+
+
+2.1.2 Organiser
+
+The Organiser is a service provider who owns and operates an Organization. Organisers self-register through the public signup flow — there is no Admin gatekeeping or invitation requirement. After registering and verifying their email via OTP, the Organiser is prompted to create their Organization as a one-time onboarding step. The hard rule is unchanged: one Organiser account maps to exactly one Organization.
+
+Organiser permissions: self-register, create their Organization (once, during onboarding), create and manage Bookable Persons, create and manage Bookable Resources, create appointment types, define schedules and rules, set cancellation and reschedule policies, configure booking questions, publish or unpublish appointment types, share unpublished appointments via private links, view all bookings within their Organization, view reports and insights for their Organization, and confirm or reject bookings when manual confirmation is enabled.
+
+Account lifecycle: an Organiser account is active immediately after email verification. The Admin can deactivate an Organiser if abuse is detected, which also takes their Organization offline (all published appointment types become invisible to Customers, and existing bookings are flagged for the Customer to be notified).
+
+
+2.1.3 Customer
+
+The Customer is the end user who books appointments. Customers self-register with email, password, and OTP verification. A single Customer account can book across any Organization on the platform — there is no per-organization customer profile.
+
+Customer permissions: browse published appointment types, view real-time slot availability, book appointments, view upcoming and past bookings, reschedule (within rules), cancel (within rules), update personal profile details, and receive booking notifications.
+
+
+2.2 Non-Login Bookable Entities
+
+These entities never sign up, never log in, and have no app access. They exist purely as schedulable items inside an Organization.
+
+
+2.2.1 Bookable Person
+
+Represents a real human service provider (doctor, stylist, consultant, tutor) who is part of the Organization but does not need their own login. The Organiser captures the person&apos;s name, contact email, phone, and role/designation. Whenever a Customer books a Bookable Person, an email notification is sent to the person&apos;s contact email — this is the only channel through which they interact with the system.
+
+Why no login: forcing every staff member to maintain credentials creates onboarding friction, support burden, and security surface area for what is often a low-touch use case. Email notifications are sufficient when the Organiser holds operational responsibility for the booking calendar.
+
+
+2.2.2 Bookable Resource
+
+Represents a physical asset that can be reserved — a turf, meeting room, equipment unit, vehicle, studio. Resources have no email and never receive notifications. They exist as named objects with a type, optional capacity, and location.
+
+Resources are typically the entity type for variable-duration bookings, where the Customer chooses the booking length. Persons are typically used for fixed-duration bookings.
+
+
+2.3 Hierarchy Summary
+
+Layer
+
+Entity
+
+Created by
+
+Logs in?
+
+Receives email?
+
+Platform
+
+Admin
+
+System (seeded)
+
+Yes
+
+Yes
+
+Tenant
+
+Organiser
+
+Self-registers
+
+Yes
+
+Yes
+
+Tenant
+
+Organization
+
+Organiser (1:1)
+
+N/A (not a user)
+
+N/A
+
+Resource
+
+Bookable Person
+
+Organiser
+
+No
+
+Yes
+
+Resource
+
+Bookable Resource
+
+Organiser
+
+No
+
+No
+
+Consumer
+
+Customer
+
+Self-registers
+
+Yes
+
+Yes
+
+
+
+3. Authentication &amp; Onboarding
+
+
+3.1 Authentication Strategy — JWT
+
+The platform uses JSON Web Tokens (JWT) for stateless authentication, paired with refresh tokens for long-lived sessions and a token blacklist for immediate revocation.
+
+
+3.1.1 Token Types
+
+
+Access Token: Short-lived (15 minutes). Carries userId, role, and a unique jti. Sent on every authenticated request in the Authorization header. Stateless — verified by signature only.
+
+
+Refresh Token: Long-lived (7 days for web, 30 days for trusted mobile clients). Stored hashed in the refresh_tokens table. Tied to a device and IP for anomaly detection. Used only to mint new access tokens.
+
+
+Token Blacklist (jti): When a token must be invalidated before its natural expiry (logout, force-revoke, suspected compromise), its jti is added to the blacklist with a TTL matching the original token&apos;s expiry. Auth middleware checks this list on every request.
+
+
+3.1.2 Token Refresh Rotation
+
+On every refresh, the old refresh token is invalidated and a new one is issued. This limits the window in which a stolen refresh token can be reused. If a refresh attempt presents a token that has already been used, the entire token family for that user is revoked and the user is forced to log in again — this is the standard reuse-detection pattern.
+
+
+3.2 Signup Flow (Customer &amp; Organiser)
+
+Note: Admins are seeded directly into the database and do not use the public signup flow. Both Customers and Organisers self-register through the same public signup form — they pick their role (Customer or Organiser) at the start of signup. The flow is identical except for what happens after email verification, where Organisers are routed into Organization onboarding.
+
+
+User opens the signup page and selects their role: &apos;Book appointments&apos; (Customer) or &apos;Offer appointments&apos; (Organiser).
+
+
+User submits full name, email, and password on the signup form.
+
+
+System validates email format, password strength (minimum 8 chars, at least one number, at least one letter), and uniqueness.
+
+
+Password is hashed with bcrypt (cost factor 12) and stored in users.passwordHash. The selected role is stored in users.role.
+
+
+System generates a 6-digit OTP, stores its hash in otp_verifications with purpose=&apos;signup&apos; and 10-minute expiry.
+
+
+OTP is emailed to the user&apos;s address.
+
+
+User submits the OTP on the verification screen.
+
+
+System validates the OTP against the stored hash. If valid and unexpired, otp_verifications.consumedAt is set and users.emailVerified is flipped to true.
+
+
+System mints an access token and refresh token, returns them to the client.
+
+
+Client stores tokens (access in memory, refresh in httpOnly cookie or secure storage) and routes the user based on role: Customers go to the home page, Organisers are routed into the Organization onboarding flow (see 3.3).
+
+
+3.3 Organiser Onboarding (Organization Creation)
+
+Immediately after a freshly-signed-up Organiser verifies their OTP, they land on the Organization creation form. This is a one-time setup gate — until they complete it, they cannot access any other part of the dashboard. The platform enforces the one-Organiser-one-Organization rule at this step.
+
+
+System checks: does an Organization already exist with organiserId = currentUser.id? If yes, redirect to the dashboard. If no, show the creation form.
+
+
+Organiser fills the form: Organization name (required), slug (auto-generated, editable), description (optional), logo (optional, uploaded to object storage), contact email (defaults to Organiser&apos;s email, editable), contact phone (optional), address (optional), and timezone (required, defaults to browser-detected).
+
+
+System validates: slug uniqueness across the platform, name length, timezone validity.
+
+
+System inserts a row into organizations with organiserId = currentUser.id. The unique constraint on organiserId guarantees a second Organization can never be created by the same user.
+
+
+Organiser is redirected to the empty dashboard with onboarding hints (create a Bookable Person/Resource first, then an appointment type).
+
+If an Organiser logs out before completing onboarding, the next login lands them right back on the Organization creation form. There is no way to bypass this step.
+
+
+3.4 Login Flow
+
+
+User submits email and password.
+
+
+System looks up the user by email. If not found OR account is inactive OR email not verified, return generic &apos;invalid credentials&apos; error (do not leak which condition failed).
+
+
+System compares the password against passwordHash using bcrypt.
+
+
+On success, a new access token and refresh token are minted. Refresh token metadata (deviceInfo, ipAddress) is recorded.
+
+
+Client receives tokens and proceeds.
+
+
+3.5 Forgot Password Flow
+
+
+User submits their email on the forgot password screen.
+
+
+System always responds with a generic success message regardless of whether the email exists (prevents account enumeration).
+
+
+If the user exists, a secure random token is generated, hashed, and stored in password_resets with 30-minute expiry.
+
+
+A reset link containing the unhashed token is emailed to the user.
+
+
+User clicks the link, lands on the reset password page, submits a new password.
+
+
+System validates the token by hashing the supplied value and matching, checks expiry and consumed status.
+
+
+Password is updated, password_resets.consumedAt is set, and all existing refresh tokens for that user are revoked (forcing fresh logins everywhere).
+
+
+
+4. Appointment Type Configuration
+
+The appointment type is the central configuration unit. Every booking happens against an appointment type, and every operational rule (duration, scheduling, capacity, cancellation, payment) is defined here.
+
+
+4.1 Creation Flow
+
+The Organiser navigates to their Organization dashboard and clicks &apos;Create Appointment Type&apos;. The creation form is multi-step:
+
+
+Step 1: Basic Information
+
+
+Name (e.g., &apos;General Consultation&apos;, &apos;Turf Booking — 1 hour&apos;)
+
+
+Description (rich text, shown to customers on the booking page)
+
+
+Slug (URL-safe identifier, auto-generated from name, editable)
+
+
+Step 2: Entity Type Selection
+
+The Organiser chooses whether this appointment type is for a Person or a Resource. This selection is locked once any bookings exist against the appointment type.
+
+
+Step 3: Duration Configuration
+
+The Organiser selects a duration mode:
+
+
+Fixed: a single duration value (e.g., 30 minutes). All bookings of this appointment type are exactly this length. Slots are pre-generated and discrete.
+
+
+Variable: the Organiser provides minimum duration, maximum duration, and a step (increment) value. Customers choose their booking length within these constraints. Common configuration for resources: min 60 min, max 240 min, step 60 min.
+
+
+Step 4: Entity Assignment
+
+The Organiser selects one or more Bookable Persons (or Resources, depending on Step 2) to associate with this appointment type. They also pick the assignment mode:
+
+
+Auto: the Customer does not see individual entities. The system picks the first available one when the Customer selects a slot. Useful for interchangeable providers (e.g., any general doctor at a clinic).
+
+
+Manual: the Customer explicitly chooses which Person or Resource they want. Useful when entities are differentiated (specialist doctors, specific turfs, named consultants).
+
+
+Step 5: Schedule Configuration
+
+
+Weekly schedule: recurring rules per day of the week (Monday 09:00–17:00, Tuesday 10:00–14:00, etc.). Best for steady availability patterns.
+
+
+Flexible schedule: specific calendar dates with custom hours. Best for irregular availability — a doctor visiting only on certain dates, a turf with seasonal closures, an event-style appointment.
+
+
+Step 6: Booking Rules
+
+
+Maximum bookings per slot — defaults to 1; raise for group sessions or shared resources.
+
+
+Manage capacity — boolean. When enabled with maxBookingsPerSlot &gt; 1, customers can specify how many seats/slots they&apos;re booking.
+
+
+Manual confirmation — boolean. When true, bookings land in &apos;pending&apos; status and require Organiser approval before becoming &apos;confirmed&apos;.
+
+
+Advance payment — boolean. When true, the Customer must complete payment before the booking is confirmed.
+
+
+Advance payment amount — required if advance payment is enabled.
+
+
+Step 7: Cancellation &amp; Reschedule Policy
+
+This is a critical policy section that governs post-booking modifications. Each setting lives on the appointment type and is enforced at the moment a Customer attempts to cancel or reschedule.
+
+
+Cancellation allowed: boolean. When false, Customers cannot cancel at all — they must contact the Organiser directly. The cancellation window field is ignored.
+
+
+Cancellation window (hours): the minimum number of hours before the appointment that a Customer can still cancel. A value of 24 means cancellations are blocked once the appointment is less than 24 hours away. A value of 0 means cancellations are allowed up until the appointment start time. Null means no time restriction.
+
+
+Reschedule allowed: boolean. Same gating logic as cancellation.
+
+
+Reschedule window (hours): hours-before-appointment cutoff for reschedule requests.
+
+
+Maximum reschedules allowed: integer cap on how many times a single appointment can be rescheduled. Tracked via appointments.rescheduleCount, which increments on every successful reschedule. Null means unlimited.
+
+
+Step 8: Booking Questions
+
+The Organiser can add a set of questions the Customer must answer during booking. Each question has a type (text, single choice, multiple choice, number, date), a required flag, optional choices for the choice types, and a display order. Answers are stored in appointment_answers, linked to both the booking and the question.
+
+
+Step 9: Preview &amp; Publish
+
+The Organiser previews the appointment type as it will appear to Customers. They can save as draft (isPublished = false) and share the unpublished version via a private share link generated from a unique shareToken — useful for soft-launching with select customers before full publish.
+
+
+
+5. Scheduling Engine — Fixed vs Variable
+
+The scheduling engine has two completely different modes depending on the appointment type&apos;s durationMode. Both modes ultimately produce identical database records (a startTime and endTime on the appointments table), but the path to get there is different.
+
+
+5.1 Fixed-Duration Slot Generation
+
+Used when durationMode = fixed. The Organiser sets a duration (e.g., 30 minutes) and the system pre-generates discrete slots inside the schedule windows.
+
+
+Algorithm
+
+
+Resolve the schedule rules for the requested date. For weekly schedules, look up the rules where dayOfWeek matches. For flexible schedules, look up the rule where specificDate matches.
+
+
+For each (startTime, endTime) window in the rules, generate slots in increments of durationMinutes.
+
+
+For each generated slot, query existing appointments and slot_locks for that entity (or any associated entity if assignmentMode = auto) and the same time range.
+
+
+If maxBookingsPerSlot &gt; 1, count active bookings against the slot. If count &lt; max, the slot is still available with remaining capacity.
+
+
+Return the array of available slots with capacity info to the client.
+
+
+Example
+
+A &apos;General Consultation&apos; appointment type with duration 30 minutes, schedule Mon–Fri 09:00–13:00 and 14:00–17:00, generates the following slots for a Tuesday: 09:00, 09:30, 10:00, 10:30, 11:00, 11:30, 12:00, 12:30, 14:00, 14:30, 15:00, 15:30, 16:00, 16:30. The 13:00–14:00 break is excluded automatically because no rule covers it.
+
+
+5.2 Variable-Duration Booking
+
+Used when durationMode = variable. There are no pre-generated slots. Instead, the Customer picks a start time from open availability windows, and then chooses a duration in valid increments.
+
+
+Algorithm
+
+
+Resolve the schedule windows for the requested date (same as fixed mode).
+
+
+For the chosen entity, fetch all existing appointments and active slot_locks for that date.
+
+
+Compute the open ranges by subtracting booked ranges from the schedule windows.
+
+
+Customer picks a start time within an open range.
+
+
+System computes the maximum continuous available duration from that start time, capped by maxDurationMins.
+
+
+System enumerates valid duration options: minDurationMins, minDurationMins + step, minDurationMins + 2*step, … up to the cap.
+
+
+For each candidate duration, check that the entire range is unbooked. Return enabled/disabled state for each option.
+
+
+Customer picks a duration, system creates a slot lock for the chosen range with 5-minute TTL, then proceeds to confirmation.
+
+
+Overlap Check Query
+
+The core check that prevents double-booking on variable durations:
+
+SELECT 1 FROM appointments WHERE entityId = ? AND status NOT IN (&apos;cancelled&apos;) AND startTime &lt; :requestedEnd AND endTime &gt; :requestedStart
+
+If this returns any row, the requested range is unavailable. The same logic applies against active slot_locks.
+
+
+5.3 Slot Locking — Preventing Double Bookings
+
+When a Customer selects a slot and proceeds to fill the booking form, the system inserts a row into slot_locks with a 5-minute TTL. Other Customers querying availability during this window see the slot as taken. If the booking confirms, the lock is consumed and an appointment row is created. If the lock expires (Customer abandoned the flow), background cleanup releases it.
+
+This solves the classic race condition: two Customers seeing the same slot, both clicking &apos;Book&apos;, and both attempting to confirm. Without locks, you risk overbooking. With locks, the second Customer sees the slot disappear the moment the first one starts the form.
+
+
+5.4 Capacity Management
+
+When manageCapacity = true and maxBookingsPerSlot &gt; 1, a single slot can hold multiple bookings. Use cases: group yoga class with 10 spots, shared coworking desk with 4 seats, group consultation.
+
+In this mode, the Customer selects how many spots they want (capacityBooked). The slot remains available until the sum of capacityBooked across all confirmed bookings reaches maxBookingsPerSlot. Slot locks reserve their capacity portion during checkout.
+
+
+
+6. Booking Flow
+
+This is the end-to-end flow a Customer goes through to make a booking. The flow is intentionally designed so that login is required only at the point of confirmation — Customers can browse and select without friction, which dramatically reduces drop-off.
+
+
+6.1 Step-by-Step Flow
+
+
+Step 1: Discovery (no login required)
+
+Customer lands on the home page. They see published appointment types from Organizations across the platform — this is the public discovery layer. They can search, filter by category, or click an appointment type directly.
+
+
+Step 2: Appointment Type Detail (no login required)
+
+Customer views the appointment type page. It shows the name, description, duration (or duration range), price (if applicable), and the Organiser&apos;s information. They click &apos;Book Appointment&apos;.
+
+
+Step 3: Entity Selection (no login required)
+
+If assignmentMode = manual, the Customer picks which Bookable Person or Resource they want. If auto, this step is skipped and the system selects automatically at slot pick time.
+
+
+Step 4: Date &amp; Slot Selection (no login required)
+
+The Customer picks a date from a calendar. The system queries availability and renders:
+
+
+For fixed duration: a list of available time slots with remaining capacity badges.
+
+
+For variable duration: a start-time picker, followed by a duration selector with valid increments grayed out where unavailable.
+
+
+Step 5: Slot Lock Creation (no login required)
+
+When the Customer clicks &apos;Continue&apos;, a slot_lock row is inserted with the Customer&apos;s session ID (or null if unauthenticated, identified by lock token cookie). The lock has a 5-minute expiry. The slot is now hidden from other Customers.
+
+
+Step 6: Login or Sign Up (login required)
+
+This is the only friction point. The Customer must authenticate before continuing. If they&apos;re already logged in, this step is skipped. If not, they see a tabbed login/signup widget. The slot lock continues to hold while they authenticate. After signup, they go through OTP verification before proceeding.
+
+
+Step 7: Question Form
+
+If the appointment type has booking questions, the Customer fills them out. Validation runs client and server side. Required questions block submission.
+
+
+Step 8: Payment (if advance payment is enabled)
+
+Customer is redirected to the payment gateway. On successful payment, the gateway webhook updates payments.status to &apos;paid&apos; and the booking proceeds. On failure, the slot lock remains and the Customer can retry.
+
+
+Step 9: Booking Confirmation
+
+System validates one final time that the slot is still available (re-runs availability check, in case the lock somehow expired or there&apos;s a race), then:
+
+
+Inserts a row into appointments with all booking details. Status is &apos;confirmed&apos; if no manual confirmation, &apos;pending&apos; if manual confirmation is required.
+
+
+Inserts answers into appointment_answers.
+
+
+Releases the slot lock.
+
+
+Generates a unique confirmationCode for the Customer.
+
+
+Queues notifications: confirmation email to Customer, booking notification email to the Bookable Person (if entityType = person), and an in-app notification to the Organiser.
+
+
+Step 10: Confirmation Page
+
+The Customer sees a summary: appointment type, date, time, provider, status, venue (if applicable), confirmation code, and a confirmation message. From here they can navigate to their profile or back to the home page. If the appointment was cancelled at any point during this flow, the Customer is redirected back to the booking page with the slot unlocked.
+
+
+6.2 Why Login Is Deferred
+
+Forcing login before slot selection costs roughly 30–40% of bookings due to drop-off. By letting Customers see real availability and pick a slot first, the perceived investment is high enough that they&apos;re motivated to complete signup. This pattern is used by Calendly, OpenTable, and most modern booking platforms.
+
+The slot lock token (a short-lived random ID stored in a session cookie) lets us bind the lock to an unauthenticated session and then transfer ownership to the Customer once they log in.
+
+
+
+7. Cancellation Flow
+
+
+7.1 Customer-Initiated Cancellation
+
+
+Customer navigates to their profile and selects an upcoming appointment.
+
+
+They click &apos;Cancel&apos; and are shown a confirmation dialog with policy info.
+
+
+Server validates: appointment.status is &apos;confirmed&apos; or &apos;pending&apos;, appointment.customerId matches the authenticated user, appointmentType.cancellationAllowed is true.
+
+
+Server checks the cancellation window: hoursUntilAppointment = (appointment.startTime − now) / 3600. If hoursUntilAppointment &lt; appointmentType.cancellationWindowHours, reject with a clear error message explaining the policy.
+
+
+If allowed, server updates appointment.status = &apos;cancelled&apos;, sets cancelledAt = now, stores cancellationReason if provided.
+
+
+If a payment exists and refund policy permits, queue a refund request to the payment gateway. payments.status will move to &apos;refunded&apos; on gateway confirmation.
+
+
+Notifications: cancellation email to Customer, cancellation notification to Bookable Person (if person-type), in-app notification to Organiser.
+
+
+The slot is freed immediately and becomes available to other Customers.
+
+
+7.2 Organiser-Initiated Cancellation
+
+Organisers can cancel any booking in their Organization regardless of policy windows. This is a manual override (e.g., the doctor is unavailable, the turf is flooded). The flow is the same except: actorRole = &apos;organiser&apos;, no policy check, an audit_log entry is mandatory, and a higher-priority notification is sent to the Customer with the reason.
+
+
+7.3 Policy Examples
+
+Configuration
+
+Behavior
+
+Use Case
+
+cancellationAllowed = false
+
+Customer cannot cancel; must contact Organiser
+
+High-stakes bookings (specialist consultations, paid sessions)
+
+cancellationWindowHours = 0
+
+Cancel anytime up to start time
+
+Casual bookings, free consultations
+
+cancellationWindowHours = 24
+
+Must cancel at least 24h before
+
+Standard professional services
+
+cancellationWindowHours = 48
+
+Must cancel at least 48h before
+
+High-demand turfs or premium slots
+
+
+
+8. Rescheduling Flow
+
+Rescheduling lets a Customer change the date and time of an existing booking without cancelling and rebooking. The entity (person/resource) stays the same; only the time changes. This is intentionally simpler than full re-booking — it preserves the Customer&apos;s questions, payment, and confirmation code.
+
+
+8.1 Customer-Initiated Reschedule
+
+
+Customer opens an upcoming appointment and clicks &apos;Reschedule&apos;.
+
+
+Server validates: appointment.status is &apos;confirmed&apos; or &apos;pending&apos;, appointmentType.rescheduleAllowed is true, appointment.rescheduleCount &lt; appointmentType.maxReschedulesAllowed (or max is null).
+
+
+Server checks the reschedule window: same logic as cancellation — hoursUntilAppointment must be &gt;= rescheduleWindowHours.
+
+
+If allowed, the Customer is shown the same date/slot picker as during initial booking, with the original entity preselected.
+
+
+Customer picks a new slot. A new slot_lock is created for the new time.
+
+
+On confirmation, the system performs an atomic update:
+
+
+Insert a row into appointment_reschedules capturing previousStartTime, previousEndTime, newStartTime, newEndTime, rescheduledByUserId, and reason.
+
+
+Update appointment.startTime and appointment.endTime to the new values.
+
+
+Update appointment.durationMins if it changed (only possible in variable mode if duration was reselected).
+
+
+Increment appointment.rescheduleCount.
+
+
+Release the slot_lock.
+
+
+Notifications: reschedule confirmation email to Customer, reschedule notification email to Bookable Person, in-app notification to Organiser.
+
+
+8.2 Why Reschedules Are Tracked Separately
+
+Rather than mutating the appointment row in place and losing history, every reschedule creates an immutable row in appointment_reschedules. This gives us:
+
+
+Full audit trail per appointment — Organisers can see how many times and when each booking was modified.
+
+
+Behavioral analytics — identify customers who reschedule frequently (potential support flag).
+
+
+Dispute resolution — if a Customer claims they never moved their appointment, the timeline is queryable.
+
+
+Reporting — operational metrics like &apos;average lead time before reschedule&apos; or &apos;reschedule rate by appointment type&apos;.
+
+The denormalized rescheduleCount on appointments avoids running a COUNT query on every reschedule attempt — it&apos;s incremented in the same transaction as the reschedule itself.
+
+
+8.3 Reschedule Constraints Recap
+
+
+Customer can only change time/date — not the appointment type, not the entity (in V1).
+
+
+Booking questions and answers are preserved as-is.
+
+
+Payment is preserved — no refund/recharge cycle.
+
+
+If the Customer hits maxReschedulesAllowed, further reschedules are blocked. They must cancel and rebook (which loses the original payment if non-refundable).
+
+
+
+9. Notifications
+
+The notifications table is a unified log of all outbound communications. Every notification is queued, processed asynchronously, and tracked for retries.
+
+
+9.1 Notification Triggers
+
+Trigger Event
+
+Recipients
+
+Channel
+
+Signup OTP
+
+Customer, Organiser
+
+Email
+
+Password reset
+
+Any user
+
+Email
+
+Booking confirmed
+
+Customer, Bookable Person, Organiser
+
+Email + in-app
+
+Booking pending approval
+
+Customer (pending), Organiser (action needed)
+
+Email + in-app
+
+Booking approved/rejected
+
+Customer, Bookable Person
+
+Email + in-app
+
+Cancellation
+
+Customer, Bookable Person, Organiser
+
+Email + in-app
+
+Reschedule
+
+Customer, Bookable Person, Organiser
+
+Email + in-app
+
+Reminder (24h before)
+
+Customer
+
+Email
+
+Payment success/failure
+
+Customer
+
+Email
+
+
+9.2 Bookable Person Notifications
+
+Bookable Persons receive emails at their stored contactEmail. They have no in-app channel — email is their only window into the system. Templates include all booking details (date, time, customer name, customer-provided answers to questions) so the person can prepare without needing to log into anything.
+
+
+9.3 Bookable Resource Notifications
+
+Resources receive zero notifications. They have no email. The Organiser is the operational owner and receives all relevant alerts about resource bookings via their dashboard and email digest.
+
+
+
+10. Use Case Scenarios
+
+
+10.1 Scenario 1 — Hospital with Multiple Doctors
+
+A hospital owner (Organiser) operates a clinic with five doctors of varying specializations. Each doctor has different working hours and consultation durations.
+
+
+Setup
+
+
+Hospital owner visits the platform&apos;s signup page, selects &apos;Offer appointments&apos; (Organiser role), submits name, email, and password.
+
+
+They verify their email via the OTP sent to their inbox.
+
+
+They are routed into Organization onboarding and create &apos;City Care Hospital&apos; with address, contact email, logo, and timezone (Asia/Kolkata).
+
+
+They navigate to &apos;Bookable Persons&apos; and create one entry per doctor: Dr. Rao (Cardiologist, rao@citycare.com), Dr. Mehta (General, mehta@citycare.com), Dr. Iyer (Dermatologist, iyer@citycare.com), and so on.
+
+
+They create the &apos;Cardiology Consultation&apos; appointment type: entityType=person, durationMode=fixed, durationMinutes=30, scheduleType=weekly with rules Mon/Wed/Fri 10:00–16:00, linked entities=[Dr. Rao only], assignmentMode=manual, manageCapacity=false, manualConfirmation=false, advancePaymentEnabled=true, advancePaymentAmount=500, cancellationAllowed=true, cancellationWindowHours=24, rescheduleAllowed=true, rescheduleWindowHours=24, maxReschedulesAllowed=2.
+
+
+They add booking questions: &apos;Describe your symptoms&apos; (text, required), &apos;Have you consulted a cardiologist before?&apos; (single choice: yes/no, required), &apos;Upload existing reports&apos; (text/URL, optional).
+
+
+They create &apos;General Consultation&apos;: duration 20 min, linked entities=[Dr. Mehta + 2 others], assignmentMode=auto. Customers don&apos;t pick a specific GP — the system rotates.
+
+
+They publish both appointment types.
+
+
+Customer Booking Flow
+
+
+Customer opens the home page, finds &apos;City Care Hospital&apos;, clicks &apos;Cardiology Consultation&apos;.
+
+
+They click &apos;Book&apos; and see Dr. Rao preselected (only one entity linked).
+
+
+They pick a date — say next Wednesday — and see 30-minute slots from 10:00 to 15:30.
+
+
+They pick 11:00, slot lock created.
+
+
+Login prompt — they sign up, verify OTP, return to flow.
+
+
+They fill the symptom questions.
+
+
+Payment screen — they pay ₹500.
+
+
+Booking confirmed. They see confirmation code CC-A4F2X9. Dr. Rao receives an email at rao@citycare.com with all booking details. The hospital Organiser sees the booking on their dashboard.
+
+
+Day Of
+
+24 hours before the appointment, the Customer gets a reminder email. If they want to reschedule, they can — they have 2 reschedule allowances, and they&apos;re still outside the 24-hour reschedule window. After the appointment, the Organiser marks it &apos;completed&apos; from their dashboard.
+
+
+10.2 Scenario 2 — Turf Owner
+
+A turf owner operates GreenField Sports with two turfs — Turf A (football, capacity 22 players) and Turf B (cricket, capacity 11). Open daily 06:00–23:00. Bookings are by the hour, minimum 1 hour, maximum 4 hours.
+
+
+Setup
+
+
+Turf owner visits the platform, signs up as an Organiser, verifies email via OTP.
+
+
+During onboarding they create the Organization &apos;GreenField Sports&apos;.
+
+
+Under &apos;Bookable Resources&apos; they create Turf A (resourceType=football_ground, capacity=22, location=&apos;North Wing&apos;) and Turf B (resourceType=cricket_pitch, capacity=11, location=&apos;South Wing&apos;). No email field — resources don&apos;t have one.
+
+
+They create one appointment type &apos;Turf Booking&apos;: entityType=resource, durationMode=variable, minDurationMins=60, maxDurationMins=240, durationStepMins=60, scheduleType=weekly with rules Sun–Sat 06:00–23:00, linked entities=[Turf A, Turf B], assignmentMode=manual, manageCapacity=false (the whole turf is booked as a unit), manualConfirmation=false, advancePaymentEnabled=true, advancePaymentAmount=1000, cancellationAllowed=true, cancellationWindowHours=4, rescheduleAllowed=true, rescheduleWindowHours=4, maxReschedulesAllowed=1.
+
+
+They add booking question: &apos;Number of players&apos; (number, required) and &apos;Sport type&apos; (single choice: football, cricket, casual, required).
+
+
+They publish.
+
+
+Customer Booking Flow
+
+
+Customer finds &apos;GreenField Sports&apos;, selects &apos;Turf Booking&apos;.
+
+
+They pick Turf A from the entity selector.
+
+
+They pick this Saturday from the calendar.
+
+
+They see the available start times — say someone has booked Turf A from 09:00–12:00 already, so available start times are 06:00, 07:00, 08:00, 12:00, 13:00, ..., 22:00.
+
+
+They pick 19:00 (7 PM).
+
+
+Duration selector appears: 1 hour (available — 19:00–20:00), 2 hours (available — 19:00–21:00), 3 hours (available — 19:00–22:00), 4 hours (available — 19:00–23:00 fits within closing hour). All four options are enabled because nothing else is booked after 19:00.
+
+
+They pick 2 hours. Slot lock created for Turf A from 19:00 to 21:00.
+
+
+They sign up, verify OTP, fill question form (10 players, football).
+
+
+Payment ₹1,000.
+
+
+Booking confirmed. Customer gets confirmation. The Organiser sees the booking on their dashboard — the turf has no email so no notification is sent to the resource itself.
+
+
+Edge Case — Booked Slot Restricting Duration
+
+If another Customer had already booked Turf A from 21:30–22:30, the duration selector at 19:00 would show: 1 hour (available — 19:00–20:00), 2 hours (available — 19:00–21:00), 3 hours (disabled — 19:00–22:00 overlaps existing booking), 4 hours (disabled). The Customer would either pick 1 or 2 hours, or pick a different start time.
+
+
+
+11. Data Model — Core Tables
+
+The schema is normalized into 18 tables across five concern groups: authentication, organization, configuration, booking lifecycle, and operations. Foreign keys enforce referential integrity. The full ERD is referenced in the appendix.
+
+
+11.1 Authentication Group
+
+
+users — credentials, role, active state, email verification status. Single source of truth for all login-capable entities.
+
+
+otp_verifications — short-lived codes for signup, login, and password reset. purpose enum scopes their use.
+
+
+password_resets — secure tokens for password recovery.
+
+
+refresh_tokens — long-lived tokens with device/IP metadata, supporting rotation and per-device revocation.
+
+
+token_blacklist — jti values for forcibly invalidated access tokens.
+
+
+11.2 Organization Group
+
+
+organizations — one per Organiser (enforced by unique organiserId). Holds branding and metadata.
+
+
+bookable_persons — non-login persons with contactEmail.
+
+
+bookable_resources — non-login physical assets, no email.
+
+
+11.3 Configuration Group
+
+
+appointment_types — central config: entityType, durationMode, schedule type, booking rules, cancellation/reschedule policy, publishing state.
+
+
+appointment_type_entities — many-to-many between appointment types and bookable persons or resources.
+
+
+schedules — schedule container for an appointment type.
+
+
+schedule_rules — individual time windows (weekly or date-specific).
+
+
+booking_questions — custom questions tied to an appointment type.
+
+
+11.4 Booking Lifecycle Group
+
+
+appointments — the booking record. Holds startTime, endTime, durationMins, status, rescheduleCount, payment fields, confirmation code.
+
+
+appointment_answers — Customer responses to booking questions.
+
+
+appointment_reschedules — immutable history of every reschedule with previous and new times.
+
+
+payments — payment transactions tied to appointments.
+
+
+slot_locks — short-lived holds that prevent double-booking during checkout.
+
+
+11.5 Operations Group
+
+
+notifications — log of every email/in-app notification with status tracking.
+
+
+audit_logs — actor-action log for compliance and debugging.
+
+
+11.6 Critical Indexing Strategy
+
+For the platform to scale, the following indexes are required:
+
+
+appointments(appointmentTypeId, startTime) — availability queries.
+
+
+appointments(bookablePersonId, startTime), appointments(bookableResourceId, startTime) — entity-specific availability.
+
+
+appointments(customerId, startTime DESC) — customer history.
+
+
+slot_locks(appointmentTypeId, slotStart, expiresAt) — lock check on every availability call.
+
+
+refresh_tokens(tokenHash) — auth on every refresh.
+
+
+token_blacklist(jti) — JWT validation middleware.
+
+
+audit_logs(actorId, createdAt DESC) — actor activity timeline.
+
+
+
+12. Key Technical Challenges
+
+
+12.1 Real-Time Availability
+
+Availability must reflect the current state of bookings AND active slot locks within hundreds of milliseconds. The challenge is doing this without overwhelming the database. Strategy: precompute schedule windows server-side, query bookings + locks in a single round trip, compute availability in application memory, return the result. For high-traffic appointment types, cache availability per (appointmentType, date) for 30 seconds — the slot lock mechanism guarantees correctness even with stale cache.
+
+
+12.2 Preventing Double Bookings
+
+The combination of slot_locks (with TTL) and a final availability re-check inside the booking transaction prevents double-booking under concurrent load. The booking insertion happens inside a serializable transaction or with explicit row-level locking on the entity, ensuring that two simultaneous confirmations cannot both succeed.
+
+
+12.3 Flexible Slot &amp; Capacity Rules
+
+Supporting fixed and variable durations, single and multi-capacity slots, and weekly + flexible schedules in one engine requires the duration mode and entity type fields to be the central pivot. The codebase splits the availability calculator into two clear paths early in the call chain — slotEngine.fixed.compute and slotEngine.variable.compute — both producing the same response shape so the API contract stays uniform.
+
+
+12.4 Clean &amp; Intuitive Booking UX
+
+Customers should never see an unavailable slot, never lose their selection on login, and never pay before knowing their booking is locked. The slot lock + deferred login pattern is the foundation of this UX. On the frontend, optimistic UI updates with server reconciliation give instant feedback while preserving correctness.
+
+
+12.5 Timezone Handling
+
+All times stored in UTC. The Organization has a default timezone. Customers see times in their local timezone (browser-detected). This separation is critical — bugs in this area are common in scheduling systems and lead to off-by-an-hour errors that destroy trust.
+
+
+
+13. Appendix
+
+
+13.1 Enum Reference
+
+Field
+
+Values
+
+Purpose
+
+users.role
+
+admin | organiser | customer
+
+Permission gate for every request
+
+appointment_types.entityType
+
+person | resource
+
+Switches scheduling engine and notification behavior
+
+appointment_types.scheduleType
+
+weekly | flexible
+
+Recurring rules vs date-specific rules
+
+appointment_types.durationMode
+
+fixed | variable
+
+Slot generation strategy
+
+appointment_types.assignmentMode
+
+auto | manual
+
+Whether Customer picks the entity
+
+appointments.status
+
+pending | confirmed | cancelled | completed | no_show
+
+Booking lifecycle state
+
+payments.status
+
+pending | paid | failed | refunded
+
+Payment state machine
+
+otp_verifications.purpose
+
+signup | login | password_reset
+
+Scopes OTP rules per use case
+
+booking_questions.questionType
+
+text | single_choice | multiple_choice | number | date
+
+Form field rendering and validation
+
+notifications.recipientType
+
+customer | organiser | bookable_person
+
+Routing and template selection
+
+notifications.channel
+
+email | in_app | sms (future)
+
+Delivery mechanism
+
+notifications.status
+
+queued | sent | failed | bounced
+
+Delivery state for retry/alerting
+
+
+13.2 Glossary
+
+
+Appointment Type: the configuration template — name, duration, schedule, rules — that customers book against.
+
+
+Bookable Entity: a Person or Resource that can be reserved. Has no login.
+
+
+Slot: a discrete time window available for booking. Pre-generated for fixed-duration appointment types, computed on the fly for variable.
+
+
+Slot Lock: a temporary hold (5-minute TTL) on a slot during the booking flow, preventing double booking.
+
+
+Cancellation Window: the minimum hours before an appointment that a Customer is still permitted to cancel.
+
+
+Reschedule Window: the minimum hours before an appointment that a Customer is still permitted to reschedule.
+
+
+Manage Capacity: a flag enabling multiple bookings per slot, with each booking specifying its capacity portion.
+
+
+Assignment Mode: auto means the system picks the entity; manual means the Customer picks.
+
+
+JTI: a unique identifier embedded in a JWT used for blacklist-based revocation.
+
+

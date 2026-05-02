@@ -6,7 +6,9 @@ import { AdminModule } from './admin/admin.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppointmentTypesModule } from './appointment-types/appointment-types.module';
+import { AppointmentsModule } from './appointments/appointments.module';
 import { AuthModule } from './auth/auth.module';
+import { AvailabilityModule } from './availability/availability.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { BookablePersonsModule } from './bookable-persons/bookable-persons.module';
@@ -16,6 +18,7 @@ import { MailerModule } from './mailer/mailer.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { OrganizationApprovedGuard } from './organizations/guards/organization-approved.guard';
 import { PrismaModule } from './prisma/prisma.module';
+import { SlotLocksModule } from './slot-locks/slot-locks.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -44,6 +47,9 @@ import { UsersModule } from './users/users.module';
     BookablePersonsModule,
     BookableResourcesModule,
     AppointmentTypesModule,
+    AvailabilityModule,
+    SlotLocksModule,
+    AppointmentsModule,
   ],
   controllers: [AppController],
   providers: [
