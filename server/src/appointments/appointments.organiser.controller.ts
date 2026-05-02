@@ -7,18 +7,23 @@ import {
   Param,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import type { Request } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { JwtUserPayload } from '../auth/token.service';
+import { auditRequestMeta } from '../utils/request';
 import {
   AppointmentsService,
   AppointmentWithRelations,
 } from './appointments.service';
+import { CancelAppointmentDto } from './dto/cancel-appointment.dto';
 import { ListAppointmentsQuery } from './dto/list-appointments.query';
 import { RejectAppointmentDto } from './dto/reject-appointment.dto';
+import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 
 @ApiTags('organiser-appointments')
 @ApiCookieAuth('access')
@@ -88,5 +93,45 @@ export class AppointmentsOrganiserController {
     @Param('publicId') publicId: string,
   ): Promise<AppointmentWithRelations> {
     return this.appointments.markNoShow(user.sub, publicId);
+  }
+
+  @Post(':publicId/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Organiser-initiated cancellation (manual override; bypasses customer policy)',
+  })
+  cancel(
+    @CurrentUser() user: JwtUserPayload,
+    @Param('publicId') publicId: string,
+    @Body() body: CancelAppointmentDto,
+    @Req() req: Request,
+  ): Promise<AppointmentWithRelations> {
+    return this.appointments.cancelByOrganiser(
+      user.sub,
+      publicId,
+      body,
+      auditRequestMeta(req),
+    );
+  }
+
+  @Post(':publicId/reschedule')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Organiser-initiated reschedule (manual override; bypasses customer policy)',
+  })
+  reschedule(
+    @CurrentUser() user: JwtUserPayload,
+    @Param('publicId') publicId: string,
+    @Body() body: RescheduleAppointmentDto,
+    @Req() req: Request,
+  ): Promise<AppointmentWithRelations> {
+    return this.appointments.rescheduleByOrganiser(
+      user.sub,
+      publicId,
+      body,
+      auditRequestMeta(req),
+    );
   }
 }
