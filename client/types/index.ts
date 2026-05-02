@@ -76,3 +76,32 @@ export interface CreateOrgPayload {
   timezone: string;
   logoFile?: File | null;
 }
+
+// Lightweight shape used for org cards on the public browse/search page.
+export interface OrgListing {
+  id: string;
+  name: string;
+  slug: string;
+  address: string;
+  description: string;
+  appointmentCount: number;
+  workingHours: string;
+  logoUrl: string | null;
+}
+
+// Full organisation detail shown on the public profile page (/organisations/[slug]).
+// Extends OrgListing with contact + timezone fields that are too detailed for cards.
+// BACKEND NOTE: GET /organizations/public/:slug must return this shape.
+export interface OrgDetail extends OrgListing {
+  contactPhone: string;
+  contactEmail: string | null;
+  timezone: string;
+}
+
+// Data collected during the multi-step appointment booking wizard.
+export interface BookingData {
+  date: string | null;
+  timeSlot: string | null;
+  concern: string;
+  notes: string;
+}
