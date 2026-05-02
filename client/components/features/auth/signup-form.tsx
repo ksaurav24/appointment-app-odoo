@@ -1,13 +1,26 @@
 "use client";
 
+// Signup form — collects name, email, password.
+//
+// IMPORTANT: This form does NOT call the backend.
+// Why? Because the backend's POST /auth/register requires knowing the role
+// (customer = no org, organizer = with org object). The user picks their role
+// on the NEXT screen (/signup-role), so we save the credentials to sessionStorage
+// via Zustand and send them only when the role is known.
+//
+// Flow:
+//   /signup → (save credentials to store) → /signup-role
+//     → CUSTOMER: POST /auth/register  → /otp-verification → login → dashboard
+//     → ORGANIZER: /onboarding/setup → (3 steps) → POST /auth/register with org → /otp-verification
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { ROUTES } from "@/constants";
-import { useAuth } from "@/hooks/useAuth";
 import { signupSchema } from "@/lib/validations";
+import { useAppStore } from "@/store/useAppStore";
 import type { SignupFormValues } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,24 +28,21 @@ import { Label } from "@/components/ui/label";
 
 export function SignupForm() {
   const router = useRouter();
-  const { registerMutation } = useAuth();
-  const { register, handleSubmit, formState, reset } = useForm<SignupFormValues>({
+  const setSignupCredentials = useAppStore((s) => s.setSignupCredentials);
+
+  const { register, handleSubmit, formState } = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
   });
 
-  async function onSubmit(values: SignupFormValues) {
-    try {
-      const result = await registerMutation.mutateAsync(values);
-      toast.success(result.message);
-      reset();
-      // Pass email to OTP page so the user doesn't have to retype it.
-      const emailQuery = encodeURIComponent(values.email);
-      router.push(`${ROUTES.otpVerification}?email=${emailQuery}&flow=signup`);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to complete signup.";
-      toast.error(message);
-    }
+  function onSubmit(values: SignupFormValues) {
+    // Save credentials to sessionStorage-backed Zustand so /signup-role can use them.
+    setSignupCredentials({
+      fullName: values.fullName,
+      email: values.email,
+      password: values.password,
+    });
+    toast.success("Details saved! Now choose your role.");
+    router.push(ROUTES.signupRole);
   }
 
   return (
@@ -81,12 +91,8 @@ export function SignupForm() {
           {formState.errors.confirmPassword?.message}
         </p>
       </div>
-      <Button
-        type="submit"
-        disabled={registerMutation.isPending}
-        className="w-full"
-      >
-        {registerMutation.isPending ? "Creating account..." : "Create Account"}
+      <Button type="submit" className="w-full">
+        Continue →
       </Button>
       <p className="text-center text-xs text-gray-600">
         Already have an account?{" "}
