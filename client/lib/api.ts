@@ -13,20 +13,29 @@ import type {
   AuditLog,
   AvailabilityQuery,
   AvailabilityResponse,
+  BookablePerson,
+  BookableResource,
   CancelAppointmentInput,
   ChangePasswordInput,
   ChangeRoleInput,
   CreateAppointmentInput,
+  CreateAppointmentTypeInput,
+  CreateBookablePersonInput,
+  CreateBookableResourceInput,
   CreateOrganizationInput,
   CreatePaymentIntentInput,
   CreatePaymentIntentResult,
+  DeleteResult,
   DisableTwoFactorInput,
   DurationOptionsQuery,
   DurationOptionsResponse,
   ForgotPasswordInput,
   GenericMessage,
   ListAdminAppointmentsQuery,
+  ListAppointmentTypesQuery,
   ListAuditLogsQuery,
+  ListMyAppointmentsQuery,
+  ListOrgAppointmentsQuery,
   ListUsersQuery,
   LoginInput,
   LoginResponse,
@@ -39,14 +48,22 @@ import type {
   PaginatedResult,
   RegisterInput,
   RegisterResponse,
+  RejectAppointmentInput,
   RejectOrganizationInput,
   ResendOtpInput,
+  RescheduleAppointmentInput,
   ResetPasswordInput,
   SafeUser,
+  SetBookingQuestionsInput,
+  SetEntitiesInput,
+  SetScheduleInput,
   SlotLock,
   TimeBucket,
   TopOrganization,
   TopOrganizationsQuery,
+  UpdateAppointmentTypeInput,
+  UpdateBookablePersonInput,
+  UpdateBookableResourceInput,
   VerifyEmailInput,
   VerifyPaymentInput,
   VerifyPaymentResult,
@@ -739,6 +756,426 @@ export async function verifyPayment(
   try {
     const { data } = await api.post<VerifyPaymentResult>(
       "/payments/verify",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Bookable persons ──────────────────────────────────────────
+
+export async function listBookablePersons(
+  includeInactive = false,
+): Promise<BookablePerson[]> {
+  try {
+    const { data } = await api.get<BookablePerson[]>("/bookable-persons", {
+      params: { includeInactive },
+    });
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getBookablePerson(id: string): Promise<BookablePerson> {
+  try {
+    const { data } = await api.get<BookablePerson>(`/bookable-persons/${id}`);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function createBookablePerson(
+  body: CreateBookablePersonInput,
+): Promise<BookablePerson> {
+  try {
+    const { data } = await api.post<BookablePerson>("/bookable-persons", body);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function updateBookablePerson(
+  id: string,
+  body: UpdateBookablePersonInput,
+): Promise<BookablePerson> {
+  try {
+    const { data } = await api.patch<BookablePerson>(
+      `/bookable-persons/${id}`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function deleteBookablePerson(id: string): Promise<DeleteResult> {
+  try {
+    const { data } = await api.delete<DeleteResult>(`/bookable-persons/${id}`);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Bookable resources ────────────────────────────────────────
+
+export async function listBookableResources(
+  includeInactive = false,
+): Promise<BookableResource[]> {
+  try {
+    const { data } = await api.get<BookableResource[]>("/bookable-resources", {
+      params: { includeInactive },
+    });
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getBookableResource(
+  id: string,
+): Promise<BookableResource> {
+  try {
+    const { data } = await api.get<BookableResource>(
+      `/bookable-resources/${id}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function createBookableResource(
+  body: CreateBookableResourceInput,
+): Promise<BookableResource> {
+  try {
+    const { data } = await api.post<BookableResource>(
+      "/bookable-resources",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function updateBookableResource(
+  id: string,
+  body: UpdateBookableResourceInput,
+): Promise<BookableResource> {
+  try {
+    const { data } = await api.patch<BookableResource>(
+      `/bookable-resources/${id}`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function deleteBookableResource(
+  id: string,
+): Promise<DeleteResult> {
+  try {
+    const { data } = await api.delete<DeleteResult>(
+      `/bookable-resources/${id}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Appointment types ─────────────────────────────────────────
+
+export async function listAppointmentTypes(
+  query: ListAppointmentTypesQuery = {},
+): Promise<AppointmentType[]> {
+  try {
+    const { data } = await api.get<AppointmentType[]>("/appointment-types", {
+      params: query,
+    });
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getAppointmentType(
+  id: string,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.get<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function createAppointmentType(
+  body: CreateAppointmentTypeInput,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentTypeWithRelations>(
+      "/appointment-types",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function updateAppointmentType(
+  id: string,
+  body: UpdateAppointmentTypeInput,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.patch<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function deleteAppointmentType(id: string): Promise<void> {
+  try {
+    await api.delete(`/appointment-types/${id}`);
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function setAppointmentTypeEntities(
+  id: string,
+  body: SetEntitiesInput,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.put<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}/entities`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function setAppointmentTypeSchedule(
+  id: string,
+  body: SetScheduleInput,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.put<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}/schedule`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function setAppointmentTypeQuestions(
+  id: string,
+  body: SetBookingQuestionsInput,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.put<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}/questions`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function publishAppointmentType(
+  id: string,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}/publish`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function unpublishAppointmentType(
+  id: string,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}/unpublish`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function regenerateShareToken(
+  id: string,
+): Promise<{ shareToken: string }> {
+  try {
+    const { data } = await api.post<{ shareToken: string }>(
+      `/appointment-types/${id}/share-token`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Organizer appointments ────────────────────────────────────
+
+export async function listOrgAppointments(
+  query: ListOrgAppointmentsQuery = {},
+): Promise<AppointmentWithRelations[]> {
+  try {
+    const { data } = await api.get<AppointmentWithRelations[]>(
+      "/organizations/me/appointments",
+      { params: query },
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getOrgAppointment(
+  publicId: string,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.get<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function approveOrgAppointment(
+  publicId: string,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}/approve`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function rejectOrgAppointment(
+  publicId: string,
+  body: RejectAppointmentInput = {},
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}/reject`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function completeOrgAppointment(
+  publicId: string,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}/complete`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function noShowOrgAppointment(
+  publicId: string,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}/no-show`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function cancelOrgAppointment(
+  publicId: string,
+  body: CancelAppointmentInput = {},
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}/cancel`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function rescheduleOrgAppointment(
+  publicId: string,
+  body: RescheduleAppointmentInput,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/organizations/me/appointments/${publicId}/reschedule`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function listMyAppointments(
+  query: ListMyAppointmentsQuery = {},
+): Promise<AppointmentWithRelations[]> {
+  try {
+    const { data } = await api.get<AppointmentWithRelations[]>(
+      "/appointments/me",
+      { params: query },
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function rescheduleAppointment(
+  publicId: string,
+  body: RescheduleAppointmentInput,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/appointments/${publicId}/reschedule`,
       body,
     );
     return data;

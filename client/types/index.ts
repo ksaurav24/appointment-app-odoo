@@ -703,3 +703,14 @@ export type RescheduleAppointmentInput = {
 };
 
 export type RejectAppointmentInput = { reason?: string };
+
+// ─── My bookings ─────────────────────────────────────────────────
+
+export type ListMyAppointmentsQuery = {
+  status?: AppointmentStatus;
+  from?: string;
+  to?: string;
+  upcomingOnly?: boolean;
+  appointmentTypeId?: string;
+  entityId?: string;
+};

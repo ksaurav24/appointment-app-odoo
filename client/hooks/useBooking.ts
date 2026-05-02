@@ -10,7 +10,9 @@ import {
   createPaymentIntent,
   extendSlotLock,
   getMyAppointment,
+  listMyAppointments,
   releaseSlotLock,
+  rescheduleAppointment,
   verifyPayment,
 } from "@/lib/api";
 import type {
@@ -20,6 +22,8 @@ import type {
   CreateAppointmentInput,
   CreatePaymentIntentInput,
   CreatePaymentIntentResult,
+  ListMyAppointmentsQuery,
+  RescheduleAppointmentInput,
   SlotLock,
   VerifyPaymentInput,
   VerifyPaymentResult,
@@ -89,5 +93,28 @@ export function useCreatePaymentIntent() {
 export function useVerifyPayment() {
   return useMutation<VerifyPaymentResult, ApiError, VerifyPaymentInput>({
     mutationFn: verifyPayment,
+  });
+}
+
+export function useMyAppointments(query: ListMyAppointmentsQuery = {}) {
+  return useQuery<AppointmentWithRelations[]>({
+    queryKey: ["appointments", "me", "list", query],
+    queryFn: () => listMyAppointments(query),
+    staleTime: 30_000,
+  });
+}
+
+export function useRescheduleAppointment() {
+  const qc = useQueryClient();
+  return useMutation<
+    AppointmentWithRelations,
+    ApiError,
+    { publicId: string; body: RescheduleAppointmentInput }
+  >({
+    mutationFn: ({ publicId, body }) => rescheduleAppointment(publicId, body),
+    onSuccess: (appt) => {
+      qc.setQueryData(appointmentKey(appt.publicId), appt);
+      qc.invalidateQueries({ queryKey: ["appointments", "me", "list"] });
+    },
   });
 }
