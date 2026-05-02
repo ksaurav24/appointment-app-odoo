@@ -14,12 +14,16 @@ export function SiteShell({ children }: SiteShellProps) {
   // Normalize trailing slash so /signup and /signup/ are treated the same.
   const normalizedPath =
     pathname.endsWith("/") && pathname !== "/" ? pathname.slice(0, -1) : pathname;
-  // Auth-focused pages intentionally hide the footer to reduce visual noise.
+  // Auth and onboarding pages hide the footer \u2014 they are focused guided flows
+  // where a footer would distract from completing the task.
   const shouldHideFooter =
     normalizedPath === ROUTES.login ||
     normalizedPath === ROUTES.signup ||
     normalizedPath === ROUTES.forgotPassword ||
-    normalizedPath === ROUTES.signupRole;
+    normalizedPath === ROUTES.signupRole ||
+    normalizedPath === ROUTES.onboardingSetup ||
+    normalizedPath === ROUTES.onboardingDetails ||
+    normalizedPath === ROUTES.onboardingSubmitted;
 
   return (
     <div className="flex min-h-full flex-col">

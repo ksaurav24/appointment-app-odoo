@@ -2,6 +2,8 @@ export const APP_NAME = "BookEase";
 export const DEMO_OTP = "123456";
 
 // Central route constants prevent hardcoded path typos in components.
+// Any time you navigate somewhere, import ROUTES and use it.
+// Never write a path string directly in a component.
 export const ROUTES = {
   home: "/",
   login: "/login",
@@ -9,4 +11,37 @@ export const ROUTES = {
   forgotPassword: "/forgot-password",
   otpVerification: "/otp-verification",
   signupRole: "/signup-role",
+
+  // Organiser onboarding — 3 sequential steps after role selection + OTP.
+  onboardingSetup: "/onboarding/setup",
+  onboardingDetails: "/onboarding/details",
+  onboardingSubmitted: "/onboarding/submitted",
+
+  // Customer dashboard — shown immediately after OTP verification for customers.
+  dashboardUser: "/dashboard/user",
+
+  // Routes linked from the customer dashboard quick-action cards.
+  // These pages will be built separately; cards are non-functional until then.
+  findAppointments: "/appointments",
+  myBookings: "/bookings",
+  myProfile: "/profile",
 } as const;
+
+// IANA timezone identifiers shown in the timezone dropdown on Step 2.
+// Kept here as a constant to avoid importing a heavy library just for a list.
+// Add more as needed when backend supports them.
+export const TIMEZONES = [
+  "Asia/Kolkata",
+  "Asia/Dubai",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "Australia/Sydney",
+  "Pacific/Auckland",
+] as const;
