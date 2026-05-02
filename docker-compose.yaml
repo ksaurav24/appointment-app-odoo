@@ -3,8 +3,7 @@ services:
     image: postgres:13
     environment:
       POSTGRES_USER: odoo
-      POSTGRES_DB: odoo
-      # now the database URI will be: postgresql://odoo:odoo@postgres:5432/odoo?schema=public
+      POSTGRES_DB: odoo 
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:

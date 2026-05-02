@@ -8,8 +8,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-
-const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+import { SLUG_REGEX } from '../../utils/slug';
 
 export class RegisterOrganizationDto {
   @IsString()
