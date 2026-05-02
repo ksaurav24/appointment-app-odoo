@@ -636,9 +636,7 @@ describe('Auth (e2e)', () => {
     }
 
     it('creates a PENDING organization for a verified organizer with no org', async () => {
-      const cookies = await registerVerifiedOrganizerNoOrg(
-        'seq@example.com',
-      );
+      const cookies = await registerVerifiedOrganizerNoOrg('seq@example.com');
 
       const res = await request(app.getHttpServer())
         .post('/organizations')
@@ -660,9 +658,7 @@ describe('Auth (e2e)', () => {
     });
 
     it('rejects a second POST with 409 (organizer already has an org)', async () => {
-      const cookies = await registerVerifiedOrganizerNoOrg(
-        'seq2@example.com',
-      );
+      const cookies = await registerVerifiedOrganizerNoOrg('seq2@example.com');
       await request(app.getHttpServer())
         .post('/organizations')
         .set('Cookie', cookieHeader(cookies))

@@ -8,12 +8,14 @@ interface PrismaMockState {
   appointmentAggregate: jest.Mock;
   slotLockCount: jest.Mock;
   slotLockCreate: jest.Mock;
+  txExecuteRaw: jest.Mock;
 }
 
 function makePrismaMock(state: PrismaMockState): PrismaService {
   const tx = {
     appointment: { aggregate: state.appointmentAggregate },
     slotLock: { count: state.slotLockCount, create: state.slotLockCreate },
+    $executeRaw: state.txExecuteRaw,
   };
   return {
     appointmentType: { findFirst: state.appointmentTypeFindFirst },
@@ -61,6 +63,7 @@ describe('SlotLocksService.acquire', () => {
         .mockResolvedValue({ _sum: { capacityBooked: 0 } }),
       slotLockCount: jest.fn().mockResolvedValue(0),
       slotLockCreate: jest.fn().mockResolvedValue({ id: 1n }),
+      txExecuteRaw: jest.fn().mockResolvedValue(1),
     };
     service = new SlotLocksService(makePrismaMock(state));
   });
@@ -98,6 +101,29 @@ describe('SlotLocksService.acquire', () => {
     await expect(
       service.acquire('cust-1', { ...validRequest, entityId: undefined }),
     ).rejects.toThrow(/entityId is required/);
+  });
+
+  it('takes a per-slot advisory lock inside the transaction before checking capacity', async () => {
+    await service.acquire('cust-1', validRequest);
+
+    expect(state.txExecuteRaw).toHaveBeenCalledTimes(1);
+    const [strings, key] = state.txExecuteRaw.mock.calls[0] as [
+      TemplateStringsArray,
+      string,
+    ];
+    expect(strings.join('')).toMatch(/pg_advisory_xact_lock/);
+    expect(key).toContain('at-1');
+    expect(key).toContain('res-1');
+    expect(key).toContain('2026-05-05T09:00:00');
+
+    // Advisory lock must be acquired BEFORE the capacity recheck — otherwise
+    // it doesn't actually serialise the race.
+    expect(state.txExecuteRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      state.appointmentAggregate.mock.invocationCallOrder[0],
+    );
+    expect(state.txExecuteRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      state.slotLockCount.mock.invocationCallOrder[0],
+    );
   });
 
   it('auto-picks the first available entity in AUTO mode', async () => {
