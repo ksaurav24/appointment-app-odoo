@@ -8,6 +8,7 @@ import {
   QuestionType,
   ScheduleType,
 } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppointmentsService } from './appointments.service';
@@ -105,9 +106,27 @@ function makePrisma(handles: PrismaMockHandles): PrismaService {
   } as unknown as PrismaService;
 }
 
+interface NotificationMocks {
+  service: NotificationsService;
+  dispatch: jest.Mock;
+}
+
+function makeNotifications(): NotificationMocks {
+  const dispatch = jest.fn().mockResolvedValue([]);
+  return {
+    dispatch,
+    service: {
+      dispatch,
+      flush: jest.fn().mockResolvedValue(undefined),
+      dispatchAndFlush: jest.fn().mockResolvedValue(undefined),
+    } as unknown as NotificationsService,
+  };
+}
+
 describe('AppointmentsService.create', () => {
   let handles: PrismaMockHandles;
   let service: AppointmentsService;
+  let notifications: NotificationMocks;
 
   beforeEach(() => {
     handles = {
@@ -130,9 +149,11 @@ describe('AppointmentsService.create', () => {
         confirmationCode: 'CC-XYZ',
       }),
     };
+    notifications = makeNotifications();
     service = new AppointmentsService(
       makePrisma(handles),
       {} as OrganizationsService,
+      notifications.service,
     );
   });
 
@@ -152,6 +173,10 @@ describe('AppointmentsService.create', () => {
     expect(handles.slotLockDelete).toHaveBeenCalledWith({
       where: { id: lockId },
     });
+    expect(notifications.dispatch).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: 'APPOINTMENT_CONFIRMED' }),
+    );
   });
 
   it('marks the appointment PENDING when manualConfirmation is enabled', async () => {
@@ -166,6 +191,10 @@ describe('AppointmentsService.create', () => {
       data: Record<string, unknown>;
     };
     expect(created.data.status).toBe(AppointmentStatus.PENDING);
+    expect(notifications.dispatch).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: 'APPOINTMENT_PENDING_APPROVAL' }),
+    );
   });
 
   it('rejects when slot lock does not belong to the customer', async () => {
@@ -211,7 +240,7 @@ describe('AppointmentsService.create', () => {
     ).rejects.toThrow(/Number of players/);
   });
 
-  it('sets paymentStatus PENDING when advance payment is required', async () => {
+  it('keeps appointment PENDING and paymentStatus PENDING when advance payment is required', async () => {
     handles.appointmentTypeFindUnique.mockResolvedValue(
       makeAppointmentType({
         advancePaymentEnabled: true,
@@ -225,7 +254,14 @@ describe('AppointmentsService.create', () => {
     const created = handles.appointmentCreate.mock.calls[0][0] as {
       data: Record<string, unknown>;
     };
+    // Advance-payment booking stays PENDING until payment succeeds — see
+    // PaymentsService.markPaid which promotes it to CONFIRMED.
+    expect(created.data.status).toBe(AppointmentStatus.PENDING);
     expect(created.data.paymentStatus).toBe(PaymentStatus.PENDING);
     expect(created.data.totalAmount).toBe(1000);
+    expect(notifications.dispatch).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: 'APPOINTMENT_CREATED' }),
+    );
   });
 });

@@ -15,8 +15,10 @@ import { BookablePersonsModule } from './bookable-persons/bookable-persons.modul
 import { BookableResourcesModule } from './bookable-resources/bookable-resources.module';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { OrganizationApprovedGuard } from './organizations/guards/organization-approved.guard';
+import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SlotLocksModule } from './slot-locks/slot-locks.module';
 import { UsersModule } from './users/users.module';
@@ -36,10 +38,15 @@ import { UsersModule } from './users/users.module';
         { name: 'otpSubmit', limit: 10, ttl: 600_000 },
         { name: 'passwordReset', limit: 3, ttl: 3_600_000 },
         { name: 'refresh', limit: 30, ttl: 60_000 },
+        { name: 'cancel', limit: 10, ttl: 600_000 },
+        { name: 'reschedule', limit: 10, ttl: 600_000 },
+        { name: 'paymentIntent', limit: 5, ttl: 600_000 },
+        { name: 'paymentVerify', limit: 10, ttl: 600_000 },
       ],
     }),
     PrismaModule,
     MailerModule,
+    NotificationsModule,
     UsersModule,
     OrganizationsModule,
     AuthModule,
@@ -49,6 +56,7 @@ import { UsersModule } from './users/users.module';
     AppointmentTypesModule,
     AvailabilityModule,
     SlotLocksModule,
+    PaymentsModule,
     AppointmentsModule,
   ],
   controllers: [AppController],
