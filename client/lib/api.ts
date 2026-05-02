@@ -1,5 +1,6 @@
 import axios, { AxiosError, type AxiosRequestConfig } from "axios";
 import type {
+  AcquireSlotLockInput,
   AdminAppointmentItem,
   AdminDashboard,
   AdminOrganizationStatusFilter,
@@ -8,12 +9,17 @@ import type {
   ApiErrorBody,
   AppointmentType,
   AppointmentTypeWithRelations,
+  AppointmentWithRelations,
   AuditLog,
   AvailabilityQuery,
   AvailabilityResponse,
+  CancelAppointmentInput,
   ChangePasswordInput,
   ChangeRoleInput,
+  CreateAppointmentInput,
   CreateOrganizationInput,
+  CreatePaymentIntentInput,
+  CreatePaymentIntentResult,
   DisableTwoFactorInput,
   DurationOptionsQuery,
   DurationOptionsResponse,
@@ -37,10 +43,13 @@ import type {
   ResendOtpInput,
   ResetPasswordInput,
   SafeUser,
+  SlotLock,
   TimeBucket,
   TopOrganization,
   TopOrganizationsQuery,
   VerifyEmailInput,
+  VerifyPaymentInput,
+  VerifyPaymentResult,
   VerifyTwoFactorInput,
 } from "@/types";
 
@@ -611,6 +620,126 @@ export async function getDurationOptions(
     const { data } = await api.get<DurationOptionsResponse>(
       `/public/appointment-types/${appointmentTypeId}/availability/duration-options`,
       { params: query },
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Slot locks ──────────────────────────────────────────────────
+
+export async function acquireSlotLock(
+  body: AcquireSlotLockInput,
+): Promise<SlotLock> {
+  try {
+    const { data } = await api.post<SlotLock>("/slot-locks", body);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function extendSlotLock(id: string): Promise<SlotLock> {
+  try {
+    const { data } = await api.post<SlotLock>(`/slot-locks/${id}/extend`);
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function releaseSlotLock(id: string): Promise<void> {
+  try {
+    await api.delete(`/slot-locks/${id}`);
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// Best-effort release using sendBeacon for tab-close. No-op if unsupported.
+export function releaseSlotLockBeacon(id: string): void {
+  if (typeof navigator === "undefined" || !("sendBeacon" in navigator)) return;
+  const baseURL =
+    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  const url = `${baseURL}/slot-locks/${id}`;
+  // sendBeacon does not support DELETE; we POST a tombstone the server's
+  // existing DELETE handles. For now, we attempt fetch with keepalive as
+  // the most reliable cross-browser option.
+  try {
+    fetch(url, { method: "DELETE", credentials: "include", keepalive: true });
+  } catch {
+    // best-effort only
+  }
+}
+
+// ─── Appointments (customer) ─────────────────────────────────────
+
+export async function createAppointment(
+  body: CreateAppointmentInput,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      "/appointments",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getMyAppointment(
+  publicId: string,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.get<AppointmentWithRelations>(
+      `/appointments/${publicId}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function cancelMyAppointment(
+  publicId: string,
+  body: CancelAppointmentInput = {},
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/appointments/${publicId}/cancel`,
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Payments ────────────────────────────────────────────────────
+
+export async function createPaymentIntent(
+  body: CreatePaymentIntentInput,
+): Promise<CreatePaymentIntentResult> {
+  try {
+    const { data } = await api.post<CreatePaymentIntentResult>(
+      "/payments/intent",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function verifyPayment(
+  body: VerifyPaymentInput,
+): Promise<VerifyPaymentResult> {
+  try {
+    const { data } = await api.post<VerifyPaymentResult>(
+      "/payments/verify",
+      body,
     );
     return data;
   } catch (err) {
