@@ -1,16 +1,11 @@
-import type { Metadata } from "next";
-import { SignupForm } from "@/components/features/auth/signup-form";
-import { AuthShell } from "@/components/shared/auth-shell";
+import { Suspense } from "react";
 
-export const metadata: Metadata = {
-  title: "Sign Up — Appointment App",
-  description: "Create your appointment app account.",
-};
+import { SignupForm } from "@/components/auth/signup-form";
 
 export default function SignupPage() {
   return (
-    <AuthShell title="Sign up" description="Create your account to get started.">
+    <Suspense>
       <SignupForm />
-    </AuthShell>
+    </Suspense>
   );
 }

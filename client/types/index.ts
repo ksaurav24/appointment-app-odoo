@@ -588,3 +588,118 @@ export type VerifyPaymentInput = {
 export type VerifyPaymentResult = {
   paymentPublicId: string;
 };
+
+// ─── Bookable inventory (CRUD inputs) ──────────────────────────
+export type CreateBookablePersonInput = {
+  name: string;
+  contactEmail: string;
+  phone?: string;
+  designation?: string;
+  isActive?: boolean;
+};
+
+export type UpdateBookablePersonInput = Partial<CreateBookablePersonInput>;
+
+export type CreateBookableResourceInput = {
+  name: string;
+  resourceType?: string;
+  description?: string;
+  capacity?: number;
+  location?: string;
+  isActive?: boolean;
+};
+
+export type UpdateBookableResourceInput = Partial<CreateBookableResourceInput>;
+
+export type DeleteResult = { deleted: "soft" | "hard" };
+
+// ─── Appointment types (CRUD inputs + query types) ─────────────
+export type CreateAppointmentTypeInput = {
+  name: string;
+  slug?: string;
+  description?: string;
+  entityType: EntityType;
+  assignmentMode: AssignmentMode;
+  entityIds: string[];
+  durationMode: DurationMode;
+  durationMinutes?: number;
+  minDurationMins?: number;
+  maxDurationMins?: number;
+  durationStepMins?: number;
+  scheduleType: ScheduleType;
+  timezone?: string;
+  scheduleRules: ScheduleRule[];
+  maxBookingsPerSlot?: number;
+  manageCapacity?: boolean;
+  manualConfirmation?: boolean;
+  advancePaymentEnabled?: boolean;
+  advancePaymentAmount?: number;
+  cancellationAllowed?: boolean;
+  cancellationWindowHours?: number;
+  rescheduleAllowed?: boolean;
+  rescheduleWindowHours?: number;
+  maxReschedulesAllowed?: number;
+  bookingQuestions?: BookingQuestion[];
+};
+
+export type UpdateAppointmentTypeInput = Partial<
+  Omit<
+    CreateAppointmentTypeInput,
+    "entityIds" | "scheduleRules" | "bookingQuestions"
+  >
+>;
+
+export type SetEntitiesInput = { entityIds: string[] };
+export type SetScheduleInput = {
+  scheduleType: ScheduleType;
+  timezone?: string;
+  rules: ScheduleRule[];
+};
+export type SetBookingQuestionsInput = { questions: BookingQuestion[] };
+export type ListAppointmentTypesQuery = { published?: boolean };
+
+// ─── Organizer appointments ────────────────────────────────────
+// Cross-check shape against `docs/api/modules/booking-flow.md` (organizer
+// endpoints section). Same shape as AdminAppointmentItem currently.
+export type OrgAppointmentItem = AdminAppointmentItem;
+
+export type AppointmentReschedule = {
+  id: string;
+  previousStartTime: string;
+  previousEndTime: string;
+  rescheduledById: string | null;
+  rescheduledByRole: Role | null;
+  reason: string | null;
+  createdAt: string;
+};
+
+export type OrgAppointmentDetail = OrgAppointmentItem & {
+  answers: AppointmentAnswer[];
+  reschedules: AppointmentReschedule[];
+  payment: {
+    id: string;
+    amount: string;
+    currency: string;
+    status: PaymentStatus;
+    gateway: string | null;
+  } | null;
+};
+
+export type ListOrgAppointmentsQuery = {
+  status?: AppointmentStatus;
+  appointmentTypeId?: string;
+  bookablePersonId?: string;
+  bookableResourceId?: string;
+  from?: string;
+  to?: string;
+  upcomingOnly?: boolean;
+  skip?: number;
+  take?: number;
+};
+
+export type RescheduleAppointmentInput = {
+  slotLockId: string;
+  reason?: string;
+};
+
+export type RejectAppointmentInput = { reason?: string };
