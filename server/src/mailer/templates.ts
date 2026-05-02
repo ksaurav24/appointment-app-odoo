@@ -62,21 +62,6 @@ export function passwordResetEmail(resetUrl: string): RenderedEmail {
   return { subject, text, html };
 }
 
-export function organizerInviteEmail(
-  fullName: string,
-  setupUrl: string,
-): RenderedEmail {
-  const subject = "You've been invited to set up your organizer account";
-  const text = `Hi ${fullName}, set your password and activate your account here (valid for 7 days): ${setupUrl}`;
-  const html = wrap(
-    'Welcome — set up your account',
-    `<p>Hi ${fullName},</p>
-     <p>You've been invited to manage an organization on the platform. Click the button below to set your password and activate your account. This link is valid for 7 days.</p>
-     <p><a href="${setupUrl}" style="display: inline-block; padding: 10px 16px; background: #2563eb; color: #fff; text-decoration: none; border-radius: 6px;">Set up account</a></p>`,
-  );
-  return { subject, text, html };
-}
-
 export function organizerApprovedEmail(
   fullName: string,
   loginUrl: string,

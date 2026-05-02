@@ -2,15 +2,16 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AdminModule } from './admin/admin.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
-import { OrganizationApprovedGuard } from './auth/guards/organization-approved.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { OrganizationApprovedGuard } from './organizations/guards/organization-approved.guard';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 
@@ -36,6 +37,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     OrganizationsModule,
     AuthModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [

@@ -15,8 +15,7 @@ import { SafeUser } from '../users/users.service';
 
 // Any caller serving non-admin requests MUST filter by approvalStatus=APPROVED.
 // Admin-only listings may include PENDING/REJECTED. The OrganizationApprovedGuard
-// enforces this at the request level for organizer-scoped writes; listings are the
-// caller's responsibility.
+// !enforces this at the request level for organizer-scoped writes; listings are the caller's responsibility.
 
 export interface CreateOrganizationInput {
   name: string;
@@ -85,46 +84,6 @@ export class OrganizationsService {
         address: input.address,
         timezone: input.timezone ?? 'UTC',
         approvalStatus: OrganizationApprovalStatus.PENDING,
-      },
-    });
-  }
-
-  /**
-   * Used by admin-create-organizer flow: org is created already approved.
-   */
-  async createApprovedForOrganiser(
-    organiserId: string,
-    approvedById: string,
-    input: CreateOrganizationInput,
-    tx?: PrismaTx,
-  ): Promise<Organization> {
-    const client = tx ?? this.prisma;
-    const slug = input.slug.toLowerCase();
-
-    const slugTaken = await client.organization.findUnique({ where: { slug } });
-    if (slugTaken) {
-      throw new ConflictException('Organization slug is already taken');
-    }
-    const existingForOrganiser = await client.organization.findUnique({
-      where: { organiserId },
-    });
-    if (existingForOrganiser) {
-      throw new ConflictException('Organiser already has an organization');
-    }
-
-    return client.organization.create({
-      data: {
-        organiserId,
-        name: input.name,
-        slug,
-        contactEmail: input.contactEmail.toLowerCase(),
-        description: input.description,
-        contactPhone: input.contactPhone,
-        address: input.address,
-        timezone: input.timezone ?? 'UTC',
-        approvalStatus: OrganizationApprovalStatus.APPROVED,
-        approvedAt: new Date(),
-        approvedById,
       },
     });
   }

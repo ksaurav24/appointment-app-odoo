@@ -1,82 +1,47 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
-  Param,
   Post,
-  Query,
   Req,
   Res,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { Organization, OrganizationApprovalStatus, Role } from '@prisma/client';
 import type { Request, Response } from 'express';
-import {
-  OrganizationsService,
-  OrganizationWithOrganiser,
-} from '../organizations/organizations.service';
+import { EnvVars } from '../config/env.validation';
+import { SkipOrganizationApproval } from '../organizations/decorators/skip-organization-approval.decorator';
+import { UsersService, SafeUser } from '../users/users.service';
 import {
   ACCESS_COOKIE_NAME,
   REFRESH_COOKIE_NAME,
   accessCookieOptions,
   clearCookieOptions,
   refreshCookieOptions,
-} from '../common/cookies';
-import { EnvVars } from '../config/env.validation';
-import { UsersService, SafeUser } from '../users/users.service';
+  type CookieEnv,
+} from '../utils/cookies';
+import { decodeJwtSub } from '../utils/jwt';
+import { readCookie, requestMeta } from '../utils/request';
+import { parseTtlToMs } from '../utils/ttl';
 import { AuthService, AuthTokens } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
-import { Roles } from './decorators/roles.decorator';
-import { SkipOrganizationApproval } from './decorators/skip-organization-approval.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { CreateOrganizerDto } from './dto/create-organizer.dto';
 import { DisableTwoFactorDto } from './dto/disable-2fa.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { RegisterOrganizerDto } from './dto/register-organizer.dto';
-import { RejectOrganizerDto } from './dto/reject-organizer.dto';
 import { ResendOtpDto } from './dto/resend-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { VerifyTwoFactorDto } from './dto/verify-2fa.dto';
 import type { JwtUserPayload } from './token.service';
 
-interface CookieEnv {
-  nodeEnv: string;
-  cookieDomain: string;
-  accessTtlMs: number;
-  refreshTtlMs: number;
-}
-
-function parseTtlToMs(ttl: string): number {
-  const match = /^(\d+)([smhd])$/.exec(ttl);
-  if (!match) {
-    const asNumber = Number(ttl);
-    if (!Number.isFinite(asNumber)) {
-      throw new Error(`Invalid TTL: ${ttl}`);
-    }
-    return asNumber * 1000;
-  }
-  const value = Number(match[1]);
-  const unit = match[2];
-  const multiplier =
-    unit === 's'
-      ? 1000
-      : unit === 'm'
-        ? 60_000
-        : unit === 'h'
-          ? 3_600_000
-          : 86_400_000;
-  return value * multiplier;
-}
-
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   private readonly cookieEnv: CookieEnv;
@@ -84,7 +49,6 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly users: UsersService,
-    private readonly organizations: OrganizationsService,
     config: ConfigService<EnvVars, true>,
   ) {
     this.cookieEnv = {
@@ -99,35 +63,33 @@ export class AuthController {
   @Public()
   @Throttle({ register: { limit: 3, ttl: 3_600_000 } })
   @Post('register')
-  async register(
-    @Body() dto: RegisterDto,
-  ): Promise<{ userId: string; message: string }> {
+  @ApiOperation({
+    summary:
+      'Register a customer or organizer account (include `organization` to register as organizer)',
+  })
+  async register(@Body() dto: RegisterDto): Promise<{
+    userId: string;
+    organizationId?: string;
+    message: string;
+  }> {
     const result = await this.auth.register(dto);
-    return {
-      userId: result.userId,
-      message: 'Account created — check your email for a verification code.',
-    };
-  }
-
-  @Public()
-  @Throttle({ register: { limit: 3, ttl: 3_600_000 } })
-  @Post('register-organizer')
-  async registerOrganizer(
-    @Body() dto: RegisterOrganizerDto,
-  ): Promise<{ userId: string; organizationId: string; message: string }> {
-    const result = await this.auth.registerOrganizer(dto);
-    return {
-      userId: result.userId,
-      organizationId: result.organizationId,
-      message:
-        'Account created — verify your email, then wait for admin approval before managing your organization.',
-    };
+    const message = result.organizationId
+      ? 'Account created — verify your email, then wait for admin approval before managing your organization.'
+      : 'Account created — check your email for a verification code.';
+    return result.organizationId
+      ? {
+          userId: result.userId,
+          organizationId: result.organizationId,
+          message,
+        }
+      : { userId: result.userId, message };
   }
 
   @Public()
   @Throttle({ otpSubmit: { limit: 10, ttl: 600_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('verify-email')
+  @ApiOperation({ summary: 'Verify email address with the OTP sent at signup' })
   async verifyEmail(@Body() dto: VerifyEmailDto): Promise<{ message: string }> {
     await this.auth.verifyEmail(dto.email, dto.code);
     return { message: 'Email verified.' };
@@ -137,6 +99,7 @@ export class AuthController {
   @Throttle({ otpSend: { limit: 5, ttl: 3_600_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('resend-otp')
+  @ApiOperation({ summary: 'Resend an OTP for the given purpose' })
   async resendOtp(@Body() dto: ResendOtpDto): Promise<{ message: string }> {
     await this.auth.resendOtp(dto.email, dto.purpose);
     return { message: 'If an account exists, a code has been sent.' };
@@ -146,6 +109,10 @@ export class AuthController {
   @Throttle({ login: { limit: 5, ttl: 900_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('login')
+  @ApiOperation({
+    summary:
+      'Log in with email/password — returns 2FA challenge or sets auth cookies',
+  })
   async login(
     @Body() dto: LoginDto,
     @Req() req: Request,
@@ -167,6 +134,7 @@ export class AuthController {
   @Throttle({ login: { limit: 5, ttl: 900_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('login/2fa')
+  @ApiOperation({ summary: 'Complete login by submitting the 2FA code' })
   async loginTwoFactor(
     @Body() dto: VerifyTwoFactorDto,
     @Req() req: Request,
@@ -184,6 +152,7 @@ export class AuthController {
   @Throttle({ refresh: { limit: 30, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
+  @ApiOperation({ summary: 'Rotate refresh token and reissue auth cookies' })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -198,6 +167,8 @@ export class AuthController {
   @SkipOrganizationApproval()
   @HttpCode(HttpStatus.OK)
   @Post('logout')
+  @ApiCookieAuth('access')
+  @ApiOperation({ summary: 'Log out the current session' })
   async logout(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -210,6 +181,8 @@ export class AuthController {
   @SkipOrganizationApproval()
   @HttpCode(HttpStatus.OK)
   @Post('logout-all')
+  @ApiCookieAuth('access')
+  @ApiOperation({ summary: 'Log out all sessions for the current user' })
   async logoutAll(
     @CurrentUser() user: JwtUserPayload,
     @Res({ passthrough: true }) res: Response,
@@ -221,37 +194,17 @@ export class AuthController {
 
   @SkipOrganizationApproval()
   @Get('me')
-  async me(@CurrentUser() user: JwtUserPayload): Promise<
-    SafeUser & {
-      organization?: {
-        id: string;
-        name: string;
-        slug: string;
-        approvalStatus: OrganizationApprovalStatus;
-        rejectedReason: string | null;
-      };
-    }
-  > {
-    const safeUser = await this.users.getSafeById(user.sub);
-    if (safeUser.role !== Role.ORGANIZER) return safeUser;
-    const org = await this.organizations.findByOrganiserId(user.sub);
-    if (!org) return safeUser;
-    return {
-      ...safeUser,
-      organization: {
-        id: org.id,
-        name: org.name,
-        slug: org.slug,
-        approvalStatus: org.approvalStatus,
-        rejectedReason: org.rejectedReason,
-      },
-    };
+  @ApiCookieAuth('access')
+  @ApiOperation({ summary: 'Get the currently authenticated user' })
+  async me(@CurrentUser() user: JwtUserPayload): Promise<SafeUser> {
+    return this.users.getSafeById(user.sub);
   }
 
   @Public()
   @Throttle({ passwordReset: { limit: 3, ttl: 3_600_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('forgot-password')
+  @ApiOperation({ summary: 'Request a password reset email' })
   async forgotPassword(
     @Body() dto: ForgotPasswordDto,
   ): Promise<{ message: string }> {
@@ -266,6 +219,9 @@ export class AuthController {
   @Throttle({ passwordReset: { limit: 10, ttl: 3_600_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('reset-password')
+  @ApiOperation({
+    summary: 'Reset password using a token from the reset email',
+  })
   async resetPassword(
     @Body() dto: ResetPasswordDto,
   ): Promise<{ message: string }> {
@@ -276,6 +232,10 @@ export class AuthController {
   @SkipOrganizationApproval()
   @HttpCode(HttpStatus.OK)
   @Post('change-password')
+  @ApiCookieAuth('access')
+  @ApiOperation({
+    summary: 'Change password for the current user (revokes all sessions)',
+  })
   async changePassword(
     @CurrentUser() user: JwtUserPayload,
     @Body() dto: ChangePasswordDto,
@@ -293,6 +253,8 @@ export class AuthController {
   @SkipOrganizationApproval()
   @HttpCode(HttpStatus.OK)
   @Post('2fa/enable')
+  @ApiCookieAuth('access')
+  @ApiOperation({ summary: 'Enable two-factor authentication' })
   async enable2fa(
     @CurrentUser() user: JwtUserPayload,
   ): Promise<{ message: string }> {
@@ -303,72 +265,14 @@ export class AuthController {
   @SkipOrganizationApproval()
   @HttpCode(HttpStatus.OK)
   @Post('2fa/disable')
+  @ApiCookieAuth('access')
+  @ApiOperation({ summary: 'Disable two-factor authentication' })
   async disable2fa(
     @CurrentUser() user: JwtUserPayload,
     @Body() dto: DisableTwoFactorDto,
   ): Promise<{ message: string }> {
     await this.auth.disableTwoFactor(user.sub, dto.currentPassword);
     return { message: 'Two-factor authentication disabled.' };
-  }
-
-  @Roles(Role.ADMIN)
-  @Post('admin/organizers')
-  async createOrganizer(
-    @CurrentUser() admin: JwtUserPayload,
-    @Body() dto: CreateOrganizerDto,
-  ): Promise<SafeUser> {
-    return this.auth.createOrganizer({ ...dto, adminUserId: admin.sub });
-  }
-
-  @Roles(Role.ADMIN)
-  @Get('admin/organizers')
-  async listOrganizers(
-    @Query('status') status?: string,
-  ): Promise<OrganizationWithOrganiser[]> {
-    if (status === undefined || status === '') {
-      return this.organizations.list(OrganizationApprovalStatus.APPROVED);
-    }
-    if (status.toUpperCase() === 'ALL') {
-      return this.organizations.list();
-    }
-    const upper = status.toUpperCase();
-    if (
-      upper !== OrganizationApprovalStatus.PENDING &&
-      upper !== OrganizationApprovalStatus.APPROVED &&
-      upper !== OrganizationApprovalStatus.REJECTED
-    ) {
-      throw new BadRequestException(
-        'status must be one of PENDING, APPROVED, REJECTED, ALL',
-      );
-    }
-    return this.organizations.list(upper);
-  }
-
-  @Roles(Role.ADMIN)
-  @Get('admin/organizers/pending')
-  async listPendingOrganizers(): Promise<OrganizationWithOrganiser[]> {
-    return this.organizations.list(OrganizationApprovalStatus.PENDING);
-  }
-
-  @Roles(Role.ADMIN)
-  @HttpCode(HttpStatus.OK)
-  @Post('admin/organizers/:organizationId/approve')
-  async approveOrganizer(
-    @CurrentUser() admin: JwtUserPayload,
-    @Param('organizationId') organizationId: string,
-  ): Promise<Organization> {
-    return this.auth.approveOrganizer(organizationId, admin.sub);
-  }
-
-  @Roles(Role.ADMIN)
-  @HttpCode(HttpStatus.OK)
-  @Post('admin/organizers/:organizationId/reject')
-  async rejectOrganizer(
-    @CurrentUser() admin: JwtUserPayload,
-    @Param('organizationId') organizationId: string,
-    @Body() dto: RejectOrganizerDto,
-  ): Promise<Organization> {
-    return this.auth.rejectOrganizer(organizationId, admin.sub, dto.reason);
   }
 
   private async completeLogin(
@@ -403,30 +307,4 @@ export class AuthController {
       clearCookieOptions(this.cookieEnv, 'refresh'),
     );
   }
-}
-
-function readCookie(req: Request, name: string): string | undefined {
-  const cookies = (req.cookies ?? {}) as Record<string, string | undefined>;
-  return cookies[name];
-}
-
-function requestMeta(req: Request): {
-  deviceInfo?: string;
-  ipAddress?: string;
-} {
-  return {
-    deviceInfo: req.headers['user-agent']?.toString().slice(0, 200),
-    ipAddress: req.ip,
-  };
-}
-
-function decodeJwtSub(jwt: string): string {
-  const parts = jwt.split('.');
-  if (parts.length !== 3) {
-    throw new Error('Malformed JWT');
-  }
-  const payload = JSON.parse(
-    Buffer.from(parts[1], 'base64url').toString('utf8'),
-  ) as { sub: string };
-  return payload.sub;
 }

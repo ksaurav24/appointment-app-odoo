@@ -5,7 +5,7 @@ export const REFRESH_COOKIE_NAME = 'refresh_token';
 
 const REFRESH_PATH = '/auth';
 
-interface CookieEnv {
+export interface CookieEnv {
   nodeEnv: string;
   cookieDomain: string;
   accessTtlMs: number;

@@ -9,7 +9,6 @@ import {
   RenderedEmail,
   loginOtp,
   organizerApprovedEmail,
-  organizerInviteEmail,
   organizerRejectedEmail,
   passwordResetEmail,
   passwordResetOtp,
@@ -41,14 +40,6 @@ export class MailerService {
 
   async sendPasswordReset(email: string, resetUrl: string): Promise<void> {
     await this.enqueue(email, passwordResetEmail(resetUrl));
-  }
-
-  async sendOrganizerInvite(
-    email: string,
-    fullName: string,
-    setupUrl: string,
-  ): Promise<void> {
-    await this.enqueue(email, organizerInviteEmail(fullName, setupUrl));
   }
 
   async sendWelcome(email: string, fullName: string): Promise<void> {
