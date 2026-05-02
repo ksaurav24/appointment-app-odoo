@@ -1,62 +1,71 @@
-import { ConfigService } from '@nestjs/config';
 import { OtpPurpose } from '@prisma/client';
-import { MailTransport } from '../config/env.validation';
+import type { Queue } from 'bullmq';
+import { MAIL_JOB_SEND, MailJobPayload } from './mail.types';
 import { MailerService } from './mailer.service';
 
-function makeConfig(transport: MailTransport): ConfigService<any, true> {
-  const values: Record<string, unknown> = {
-    MAIL_TRANSPORT: transport,
-    MAIL_FROM: 'Test <test@example.com>',
-    SMTP_USER: 'user@example.com',
-    SMTP_PASS: 'pw',
-  };
-  return {
-    get: (key: string) => values[key],
-  } as unknown as ConfigService<any, true>;
+interface QueuedJob {
+  name: string;
+  data: MailJobPayload;
 }
 
-describe('MailerService', () => {
-  it('records last message under console transport without throwing', async () => {
-    const svc = new MailerService(makeConfig(MailTransport.Console));
-    svc.onModuleInit();
-    await svc.sendOtp(
-      'user@example.com',
-      '123456',
-      OtpPurpose.EMAIL_VERIFICATION,
-    );
+function makeQueue(jobs: QueuedJob[]): Queue<MailJobPayload> {
+  return {
+    add: (name: string, data: MailJobPayload): Promise<void> => {
+      jobs.push({ name, data });
+      return Promise.resolve();
+    },
+  } as unknown as Queue<MailJobPayload>;
+}
+
+describe('MailerService (queue)', () => {
+  it('enqueues a signup OTP and records last message', async () => {
+    const jobs: QueuedJob[] = [];
+    const svc = new MailerService(makeQueue(jobs));
+    await svc.sendOtp('user@example.com', '123456', OtpPurpose.SIGNUP);
+
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].name).toBe(MAIL_JOB_SEND);
+    expect(jobs[0].data.to).toBe('user@example.com');
+    expect(jobs[0].data.text).toContain('123456');
+    expect(jobs[0].data.subject.toLowerCase()).toContain('verify');
+
     const last = svc.getLastMessage();
-    expect(last).not.toBeNull();
-    expect(last?.to).toBe('user@example.com');
-    expect(last?.text).toContain('123456');
     expect(last?.subject.toLowerCase()).toContain('verify');
   });
 
-  it('renders 2FA template differently from email-verification', async () => {
-    const svc = new MailerService(makeConfig(MailTransport.Console));
-    svc.onModuleInit();
-    await svc.sendOtp('a@b.c', '999000', OtpPurpose.LOGIN_2FA);
-    expect(svc.getLastMessage()?.subject.toLowerCase()).toContain('login');
+  it('renders login OTP differently from signup', async () => {
+    const jobs: QueuedJob[] = [];
+    const svc = new MailerService(makeQueue(jobs));
+    await svc.sendOtp('a@b.c', '999000', OtpPurpose.LOGIN);
+    expect(jobs[0].data.subject.toLowerCase()).toContain('login');
   });
 
-  it('sends through json transport for tests', async () => {
-    const svc = new MailerService(makeConfig(MailTransport.Json));
-    svc.onModuleInit();
+  it('renders password-reset OTP', async () => {
+    const jobs: QueuedJob[] = [];
+    const svc = new MailerService(makeQueue(jobs));
+    await svc.sendOtp('a@b.c', '424242', OtpPurpose.PASSWORD_RESET);
+    expect(jobs[0].data.subject.toLowerCase()).toContain('password');
+    expect(jobs[0].data.text).toContain('424242');
+  });
+
+  it('enqueues a password-reset link email', async () => {
+    const jobs: QueuedJob[] = [];
+    const svc = new MailerService(makeQueue(jobs));
     await svc.sendPasswordReset(
       'user@example.com',
       'https://app/reset?token=abc',
     );
-    const last = svc.getLastMessage();
-    expect(last?.text).toContain('https://app/reset?token=abc');
+    expect(jobs[0].data.text).toContain('https://app/reset?token=abc');
   });
 
-  it('renders welcome and organizer invite emails', async () => {
-    const svc = new MailerService(makeConfig(MailTransport.Console));
-    svc.onModuleInit();
+  it('enqueues organizer invite and welcome emails', async () => {
+    const jobs: QueuedJob[] = [];
+    const svc = new MailerService(makeQueue(jobs));
     await svc.sendWelcome('u@x.com', 'Alice');
-    expect(svc.getLastMessage()?.text).toContain('Alice');
+    expect(jobs[jobs.length - 1].data.text).toContain('Alice');
+
     await svc.sendOrganizerInvite('o@x.com', 'Bob', 'https://app/setup?t=z');
-    const last = svc.getLastMessage();
-    expect(last?.text).toContain('Bob');
-    expect(last?.text).toContain('https://app/setup?t=z');
+    expect(jobs[jobs.length - 1].data.text).toContain('Bob');
+    expect(jobs[jobs.length - 1].data.text).toContain('https://app/setup?t=z');
   });
 });

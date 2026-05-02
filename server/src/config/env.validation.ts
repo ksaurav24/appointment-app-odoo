@@ -40,6 +40,14 @@ export class EnvVars {
   DATABASE_URL!: string;
 
   @IsString()
+  REDIS_URL: string = 'redis://localhost:6379';
+
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  MAIL_QUEUE_CONCURRENCY: number = 5;
+
+  @IsString()
   JWT_ACCESS_SECRET!: string;
 
   @IsString()

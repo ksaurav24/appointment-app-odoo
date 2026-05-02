@@ -17,7 +17,7 @@ const wrap = (title: string, body: string): string => `
   </body>
 </html>`;
 
-export function emailVerificationOtp(code: string): RenderedEmail {
+export function signupOtp(code: string): RenderedEmail {
   const subject = 'Verify your email';
   const text = `Your verification code is ${code}. It expires in 10 minutes.`;
   const html = wrap(
@@ -28,12 +28,23 @@ export function emailVerificationOtp(code: string): RenderedEmail {
   return { subject, text, html };
 }
 
-export function loginTwoFactorOtp(code: string): RenderedEmail {
+export function loginOtp(code: string): RenderedEmail {
   const subject = 'Your login verification code';
-  const text = `Your login verification code is ${code}. It expires in 5 minutes.`;
+  const text = `Your login verification code is ${code}. It expires in 2 minutes.`;
   const html = wrap(
     'Login verification',
-    `<p>Use this code to complete your sign-in. It expires in 5 minutes.</p>
+    `<p>Use this code to complete your sign-in. It expires in 2 minutes.</p>
+     <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px;">${code}</p>`,
+  );
+  return { subject, text, html };
+}
+
+export function passwordResetOtp(code: string): RenderedEmail {
+  const subject = 'Your password reset code';
+  const text = `Your password reset code is ${code}. It expires in 5 minutes.`;
+  const html = wrap(
+    'Password reset code',
+    `<p>Use this code to reset your password. It expires in 5 minutes.</p>
      <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px;">${code}</p>`,
   );
   return { subject, text, html };

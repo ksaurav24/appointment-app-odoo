@@ -109,11 +109,8 @@ export class AuthService {
       },
     );
 
-    const { code } = await this.otp.issue(
-      user.id,
-      OtpPurpose.EMAIL_VERIFICATION,
-    );
-    await this.mailer.sendOtp(user.email, code, OtpPurpose.EMAIL_VERIFICATION);
+    const { code } = await this.otp.issue(user.id, OtpPurpose.SIGNUP);
+    await this.mailer.sendOtp(user.email, code, OtpPurpose.SIGNUP);
 
     return { userId: user.id, organizationId: organization.id };
   }
@@ -179,11 +176,8 @@ export class AuthService {
       role: Role.CUSTOMER,
     });
 
-    const { code } = await this.otp.issue(
-      user.id,
-      OtpPurpose.EMAIL_VERIFICATION,
-    );
-    await this.mailer.sendOtp(user.email, code, OtpPurpose.EMAIL_VERIFICATION);
+    const { code } = await this.otp.issue(user.id, OtpPurpose.SIGNUP);
+    await this.mailer.sendOtp(user.email, code, OtpPurpose.SIGNUP);
 
     return { userId: user.id };
   }
@@ -195,11 +189,7 @@ export class AuthService {
     }
     if (user.emailVerified) return;
 
-    const ok = await this.otp.verify(
-      user.id,
-      OtpPurpose.EMAIL_VERIFICATION,
-      code,
-    );
+    const ok = await this.otp.verify(user.id, OtpPurpose.SIGNUP, code);
     if (!ok) {
       throw new BadRequestException('Invalid or expired code');
     }
@@ -215,8 +205,8 @@ export class AuthService {
   async resendOtp(email: string, purpose: OtpPurpose): Promise<void> {
     const user = await this.users.findByEmail(email);
     if (!user) return;
-    if (purpose === OtpPurpose.EMAIL_VERIFICATION && user.emailVerified) return;
-    if (purpose === OtpPurpose.LOGIN_2FA && !user.twoFactorEnabled) return;
+    if (purpose === OtpPurpose.SIGNUP && user.emailVerified) return;
+    if (purpose === OtpPurpose.LOGIN && !user.twoFactorEnabled) return;
 
     const { code } = await this.otp.issue(user.id, purpose);
     await this.mailer.sendOtp(user.email, code, purpose);
@@ -243,8 +233,8 @@ export class AuthService {
     }
 
     if (user.twoFactorEnabled) {
-      const { code } = await this.otp.issue(user.id, OtpPurpose.LOGIN_2FA);
-      await this.mailer.sendOtp(user.email, code, OtpPurpose.LOGIN_2FA);
+      const { code } = await this.otp.issue(user.id, OtpPurpose.LOGIN);
+      await this.mailer.sendOtp(user.email, code, OtpPurpose.LOGIN);
       return { twoFactorRequired: true };
     }
 
@@ -261,7 +251,7 @@ export class AuthService {
     if (!user || !user.twoFactorEnabled) {
       throw new UnauthorizedException('Invalid or expired code');
     }
-    const ok = await this.otp.verify(user.id, OtpPurpose.LOGIN_2FA, code);
+    const ok = await this.otp.verify(user.id, OtpPurpose.LOGIN, code);
     if (!ok) {
       throw new UnauthorizedException('Invalid or expired code');
     }

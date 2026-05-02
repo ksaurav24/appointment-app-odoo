@@ -9,8 +9,9 @@ import { PrismaService } from '../prisma/prisma.service';
 const OTP_LENGTH = 6;
 
 const TTL_MINUTES_BY_PURPOSE: Record<OtpPurpose, number> = {
-  EMAIL_VERIFICATION: 10,
-  LOGIN_2FA: 5,
+  SIGNUP: 10,
+  LOGIN: 2,
+  PASSWORD_RESET: 5,
 };
 
 export interface OtpIssueResult {
