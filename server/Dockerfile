@@ -45,4 +45,4 @@ COPY --from=build --chown=nestjs:nodejs /app/package.json ./package.json
 USER nestjs
 EXPOSE 8000
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
