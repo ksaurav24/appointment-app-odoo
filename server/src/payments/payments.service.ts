@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppointmentStatus, PaymentStatus, Prisma } from '@prisma/client';
@@ -12,6 +13,7 @@ import { AnalyticsCacheService } from '../analytics/cache/analytics-cache.servic
 import { writeAuditLog } from '../common/audit/audit-log.helper';
 import { RefundHandler } from '../common/refund-handler.token';
 import { EnvVars } from '../config/env.validation';
+import { MeetingGateway } from '../meeting/meeting.gateway';
 import {
   NotificationsService,
   PendingMailJob,
@@ -53,6 +55,8 @@ export class PaymentsService implements RefundHandler {
     private readonly availabilityEmitter: AvailabilityEmitter,
     @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway,
     config: ConfigService<EnvVars, true>,
+    @Optional()
+    private readonly meetingGateway: MeetingGateway | null = null,
   ) {
     this.currency = config.get('PAYMENT_CURRENCY', { infer: true });
     this.keyId = config.get('RAZORPAY_KEY_ID', { infer: true });
@@ -333,6 +337,7 @@ export class PaymentsService implements RefundHandler {
   async markFailed(paymentId: bigint): Promise<void> {
     const mailJobs: PendingMailJob[] = [];
     let organizationId: string | null = null;
+    let cancelledAppointmentPublicId: string | null = null;
     let emitTarget: {
       appointmentTypeId: string;
       entityId: string;
@@ -383,6 +388,7 @@ export class PaymentsService implements RefundHandler {
             cancelledAt: new Date(),
           },
         });
+        cancelledAppointmentPublicId = payment.appointment.publicId;
 
         await writeAuditLog(tx, {
           actorId: null,
@@ -410,6 +416,9 @@ export class PaymentsService implements RefundHandler {
     await this.notifications.flush(mailJobs);
     if (organizationId) await this.invalidateAnalyticsCache(organizationId);
     if (emitTarget) await this.availabilityEmitter.emitForSlot(emitTarget);
+    if (cancelledAppointmentPublicId && this.meetingGateway) {
+      await this.meetingGateway.disconnectRoom(cancelledAppointmentPublicId);
+    }
   }
 
   // -------------------------------------------------------------------------

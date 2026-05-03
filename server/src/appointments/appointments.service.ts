@@ -19,6 +19,7 @@ import { Queue } from 'bullmq';
 import { AnalyticsCacheService } from '../analytics/cache/analytics-cache.service';
 import { writeAuditLog } from '../common/audit/audit-log.helper';
 import { REFUND_HANDLER, RefundHandler } from '../common/refund-handler.token';
+import { MeetingGateway } from '../meeting/meeting.gateway';
 import {
   NotificationsService,
   PendingMailJob,
@@ -84,7 +85,19 @@ export class AppointmentsService {
     @Optional()
     @Inject(REFUND_HANDLER)
     private readonly refundHandler: RefundHandler | null = null,
+    @Optional()
+    private readonly meetingGateway: MeetingGateway | null = null,
   ) {}
+
+  /**
+   * Forcibly drop any live meeting sockets for an appointment that just
+   * transitioned to a non-joinable status. No-op when the gateway isn't
+   * wired (unit-test contexts) or if the appointment was never online.
+   */
+  private async closeMeetingRoom(publicId: string): Promise<void> {
+    if (!this.meetingGateway) return;
+    await this.meetingGateway.disconnectRoom(publicId);
+  }
 
   /**
    * Returns the entity id from an appointment row regardless of whether it
@@ -531,6 +544,7 @@ export class AppointmentsService {
 
     let mailJobs: PendingMailJob[] = [];
     let autoRejectedIds: bigint[] = [];
+    let autoRejectedPublicIds: string[] = [];
 
     const result = await this.prisma.$transaction(async (tx) => {
       // Serialise against concurrent approves and submitRequest()s for the
@@ -579,6 +593,7 @@ export class AppointmentsService {
         });
         if (losers.length > 0) {
           autoRejectedIds = losers.map((l) => l.id);
+          autoRejectedPublicIds = losers.map((l) => l.publicId);
           await tx.appointment.updateMany({
             where: { id: { in: autoRejectedIds } },
             data: {
@@ -617,6 +632,10 @@ export class AppointmentsService {
         appointmentIds: autoRejectedIds.map((id) => id.toString()),
         reason: AUTO_REJECT_REASON,
       });
+      // Drop any live meeting sockets the now-cancelled losers might still hold.
+      for (const loserPublicId of autoRejectedPublicIds) {
+        await this.closeMeetingRoom(loserPublicId);
+      }
     }
 
     await this.invalidateAnalyticsCache(result.organizationId);
@@ -669,6 +688,7 @@ export class AppointmentsService {
       slotStart: existing.startTime,
       slotEnd: existing.endTime,
     });
+    await this.closeMeetingRoom(existing.publicId);
     return result;
   }
 
@@ -687,6 +707,7 @@ export class AppointmentsService {
       data: { status: AppointmentStatus.COMPLETED },
     });
     await this.invalidateAnalyticsCache(existing.organizationId);
+    await this.closeMeetingRoom(existing.publicId);
     return this.findOneForOrganiser(organiserId, publicId);
   }
 
@@ -705,6 +726,7 @@ export class AppointmentsService {
       data: { status: AppointmentStatus.NO_SHOW },
     });
     await this.invalidateAnalyticsCache(existing.organizationId);
+    await this.closeMeetingRoom(existing.publicId);
     return this.findOneForOrganiser(organiserId, publicId);
   }
 
@@ -848,6 +870,7 @@ export class AppointmentsService {
       slotStart: existing.startTime,
       slotEnd: existing.endTime,
     });
+    await this.closeMeetingRoom(existing.publicId);
     return result;
   }
 

@@ -178,9 +178,112 @@ describe('MeetingService', () => {
       await expect(
         svc.assertJoinable(APPT_PUBLIC_ID, {
           role: 'GUEST',
-          confirmationCode: 'WRONG',
+          confirmationCode: 'WRONG-LEN-CODE-X',
         }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toMatchObject({
+        message: 'Invalid appointment or confirmation code',
+      });
+    });
+
+    // GUEST failure paths must all surface the same opaque error to prevent
+    // unauthenticated enumeration of appointment existence / status / window.
+    describe('GUEST opaque failure responses', () => {
+      const GUEST_MSG = 'Invalid appointment or confirmation code';
+      const guest = {
+        role: 'GUEST' as const,
+        confirmationCode: CONFIRMATION_CODE,
+      };
+
+      it('collapses missing appointment to the generic message', async () => {
+        const { svc } = makeService({ appointment: null });
+        await expect(svc.assertJoinable(APPT_PUBLIC_ID, guest)).rejects.toEqual(
+          expect.objectContaining({ message: GUEST_MSG }),
+        );
+        await expect(
+          svc.assertJoinable(APPT_PUBLIC_ID, guest),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      });
+
+      it('collapses non-online appointment type to the generic message', async () => {
+        const { svc } = makeService({
+          appointment: makeAppointment({
+            appointmentType: { isOnline: false },
+          }),
+        });
+        await expect(svc.assertJoinable(APPT_PUBLIC_ID, guest)).rejects.toEqual(
+          expect.objectContaining({ message: GUEST_MSG }),
+        );
+      });
+
+      it.each([
+        AppointmentStatus.CANCELLED,
+        AppointmentStatus.COMPLETED,
+        AppointmentStatus.NO_SHOW,
+      ])(
+        'collapses non-joinable status %s to the generic message',
+        async (status) => {
+          const { svc } = makeService({
+            appointment: makeAppointment({ status }),
+          });
+          await expect(
+            svc.assertJoinable(APPT_PUBLIC_ID, guest),
+          ).rejects.toEqual(expect.objectContaining({ message: GUEST_MSG }));
+        },
+      );
+
+      it('collapses outside-window (early) to the generic message', async () => {
+        const { svc } = makeService({
+          appointment: makeAppointment({
+            startTime: new Date(NOW.getTime() + 60 * 60_000),
+            endTime: new Date(NOW.getTime() + 90 * 60_000),
+          }),
+        });
+        await expect(svc.assertJoinable(APPT_PUBLIC_ID, guest)).rejects.toEqual(
+          expect.objectContaining({ message: GUEST_MSG }),
+        );
+      });
+
+      it('collapses outside-window (late) to the generic message', async () => {
+        const { svc } = makeService({
+          appointment: makeAppointment({
+            startTime: new Date(NOW.getTime() - 90 * 60_000),
+            endTime: new Date(NOW.getTime() - 60 * 60_000),
+          }),
+        });
+        await expect(svc.assertJoinable(APPT_PUBLIC_ID, guest)).rejects.toEqual(
+          expect.objectContaining({ message: GUEST_MSG }),
+        );
+      });
+    });
+
+    describe('confirmation-code constant-time compare', () => {
+      it('rejects same-length but different content without throwing TypeError', async () => {
+        const { svc } = makeService({});
+        const wrongSameLen = CONFIRMATION_CODE.split('').reverse().join('');
+        expect(wrongSameLen.length).toBe(CONFIRMATION_CODE.length);
+        await expect(
+          svc.assertJoinable(APPT_PUBLIC_ID, {
+            role: 'GUEST',
+            confirmationCode: wrongSameLen,
+          }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      });
+
+      it('rejects different-length input without throwing TypeError', async () => {
+        const { svc } = makeService({});
+        await expect(
+          svc.assertJoinable(APPT_PUBLIC_ID, {
+            role: 'GUEST',
+            confirmationCode: 'short',
+          }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(
+          svc.assertJoinable(APPT_PUBLIC_ID, {
+            role: 'GUEST',
+            confirmationCode: CONFIRMATION_CODE + 'extra-suffix',
+          }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+      });
     });
 
     it('returns the appointment for a HOST happy path', async () => {

@@ -16,7 +16,7 @@ export interface RTCIceServer {
 }
 
 export interface MeetingTokenPayload {
-  /** Stringified `Appointment.id` (BigInt). */
+  /** Public-facing `Appointment.publicId` (cuid). */
   appointmentId: string;
   role: MeetingRole;
   /** Present when role === 'HOST' — the organiser user id. */
@@ -32,7 +32,7 @@ export interface MeetingTokenResponse {
   token: string;
   iceServers: RTCIceServer[];
   role: MeetingRole;
-  /** Stringified `Appointment.id` (BigInt). */
+  /** Public-facing `Appointment.publicId` (cuid). */
   appointmentId: string;
   /** ISO-8601 expiry timestamp matching the token's `exp` claim. */
   expiresAt: string;

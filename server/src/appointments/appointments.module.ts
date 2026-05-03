@@ -1,5 +1,6 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
+import { MeetingModule } from '../meeting/meeting.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { AppointmentsController } from './appointments.controller';
@@ -13,6 +14,7 @@ import { APPOINTMENTS_QUEUE_NAME } from './queue/appointments.queue';
   imports: [
     OrganizationsModule,
     PaymentsModule,
+    MeetingModule,
     BullModule.registerQueueAsync({
       name: APPOINTMENTS_QUEUE_NAME,
       useFactory: () => ({

@@ -13,6 +13,20 @@ import type { Server, Socket } from 'socket.io';
 import { MeetingTokenService } from './meeting-token.service';
 import { MeetingRole } from './types';
 
+/**
+ * Read the configured CORS allow-list at class-definition time. Socket.IO
+ * gateway CORS is captured statically by the `@WebSocketGateway` decorator,
+ * so we resolve from `process.env` directly rather than `ConfigService` (which
+ * isn't constructed yet). Empty / unset → empty array (deny by default).
+ */
+function meetingCorsOrigins(): string[] {
+  const raw = process.env.CORS_ORIGINS ?? '';
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 interface MeetingSocketData {
   appointmentId: string;
   role: MeetingRole;
@@ -55,7 +69,7 @@ const roomFor = (appointmentId: string): string => `appt:${appointmentId}`;
  */
 @WebSocketGateway({
   namespace: '/meeting',
-  cors: { origin: true, credentials: true },
+  cors: { origin: meetingCorsOrigins(), credentials: true },
 })
 export class MeetingGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
@@ -207,6 +221,27 @@ export class MeetingGateway
     } catch (err) {
       this.logger.warn(
         `Failed to disconnect rejected guest ${data.guestSocketId}: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * Force-close all live sockets for an appointment. Called from the
+   * appointments / payments services when status transitions to a
+   * non-joinable state (CANCELLED / COMPLETED / NO_SHOW) so an active call
+   * does not outlive the appointment until the 5-min token TTL expires.
+   */
+  async disconnectRoom(publicId: string): Promise<void> {
+    const room = roomFor(publicId);
+    try {
+      const sockets = await this.server.in(room).fetchSockets();
+      for (const s of sockets) {
+        s.emit('room:closed', { reason: 'appointment_cancelled' });
+        s.disconnect(true);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Failed to disconnect room ${room}: ${(err as Error).message}`,
       );
     }
   }

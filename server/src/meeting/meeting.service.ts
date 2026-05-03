@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppointmentStatus, Prisma } from '@prisma/client';
+import * as crypto from 'crypto';
 import { EnvVars } from '../config/env.validation';
 import { PrismaService } from '../prisma/prisma.service';
 import { MeetingTokenService } from './meeting-token.service';
@@ -14,6 +15,29 @@ import {
   MeetingTokenResponse,
   RTCIceServer,
 } from './types';
+
+/**
+ * Single opaque error surfaced to unauthenticated GUEST callers — collapses
+ * not-found / wrong-status / outside-window / bad-code into one response so
+ * an attacker with a guessed publicId cannot enumerate appointment state.
+ */
+const GUEST_GENERIC_ERROR = 'Invalid appointment or confirmation code';
+
+/**
+ * Constant-time string compare that tolerates length mismatches without
+ * throwing — `crypto.timingSafeEqual` requires equal-length buffers, so we
+ * short-circuit on length and treat any internal throw as a mismatch.
+ */
+function safeEqual(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a, 'utf8');
+  const bBuf = Buffer.from(b, 'utf8');
+  if (aBuf.length !== bBuf.length) return false;
+  try {
+    return crypto.timingSafeEqual(aBuf, bBuf);
+  } catch {
+    return false;
+  }
+}
 
 const APPOINTMENT_INCLUDE = {
   appointmentType: true,
@@ -46,19 +70,24 @@ export class MeetingService {
     appointmentId: string,
     principal: MeetingPrincipal,
   ): Promise<AppointmentWithRelations> {
+    const isGuest = principal.role === 'GUEST';
+    function fail(hostMessage: string, asNotFound = false): never {
+      if (isGuest) throw new ForbiddenException(GUEST_GENERIC_ERROR);
+      if (asNotFound) throw new NotFoundException(hostMessage);
+      throw new ForbiddenException(hostMessage);
+    }
+
     const appointment = await this.prisma.appointment.findUnique({
       where: { publicId: appointmentId },
       include: APPOINTMENT_INCLUDE,
     });
-    if (!appointment) throw new NotFoundException('Appointment not found');
+    if (!appointment) fail('Appointment not found', true);
 
     if (!appointment.appointmentType.isOnline) {
-      throw new ForbiddenException(
-        'This appointment is not configured as an online meeting',
-      );
+      fail('This appointment is not configured as an online meeting');
     }
     if (!JOINABLE_STATUSES.includes(appointment.status)) {
-      throw new ForbiddenException(
+      fail(
         `Cannot join meeting for appointment in status ${appointment.status}`,
       );
     }
@@ -73,21 +102,21 @@ export class MeetingService {
     const earliest = appointment.startTime.getTime() - beforeMins * 60_000;
     const latest = appointment.endTime.getTime() + afterMins * 60_000;
     if (now < earliest) {
-      throw new ForbiddenException('Meeting room is not open yet');
+      fail('Meeting room is not open yet');
     }
     if (now > latest) {
-      throw new ForbiddenException('Meeting room has closed');
+      fail('Meeting room has closed');
     }
 
     if (principal.role === 'HOST') {
       if (principal.userId !== appointment.organization.organiserId) {
-        throw new ForbiddenException(
-          'Only the organiser may host this meeting',
-        );
+        fail('Only the organiser may host this meeting');
       }
     } else {
-      if (principal.confirmationCode !== appointment.confirmationCode) {
-        throw new ForbiddenException('Invalid confirmation code');
+      if (
+        !safeEqual(principal.confirmationCode, appointment.confirmationCode)
+      ) {
+        throw new ForbiddenException(GUEST_GENERIC_ERROR);
       }
     }
 

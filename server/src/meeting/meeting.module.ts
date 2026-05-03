@@ -16,6 +16,6 @@ import { MeetingService } from './meeting.service';
   imports: [JwtModule.register({})],
   controllers: [MeetingController],
   providers: [MeetingService, MeetingTokenService, MeetingGateway],
-  exports: [MeetingService, MeetingTokenService],
+  exports: [MeetingService, MeetingTokenService, MeetingGateway],
 })
 export class MeetingModule {}

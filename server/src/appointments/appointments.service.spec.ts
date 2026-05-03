@@ -832,3 +832,86 @@ describe('AppointmentsService.rescheduleByCustomer', () => {
     expect(slotLockDelete).toHaveBeenCalled();
   });
 });
+
+// MeetingGateway integration: any path that transitions an appointment to a
+// non-joinable status must drop live meeting sockets so a cancelled call ends
+// promptly rather than running until the 5-min token TTL expires.
+describe('AppointmentsService closes meeting room on terminal status changes', () => {
+  const apptId = 700n;
+  const apptPublicId = 'apt-public-700';
+
+  function makeServiceWithGateway(opts: { status: AppointmentStatus }) {
+    const disconnectRoom = jest.fn().mockResolvedValue(undefined);
+    const meetingGateway = { disconnectRoom } as unknown as Parameters<
+      typeof Object
+    >[0];
+    const existing = {
+      id: apptId,
+      publicId: apptPublicId,
+      organizationId: 'org-1',
+      status: opts.status,
+    };
+    const appointmentUpdate = jest.fn().mockResolvedValue({
+      id: apptId,
+      publicId: apptPublicId,
+    });
+    const findFirst = jest.fn().mockResolvedValue(existing);
+    const findOneForOrganiserResult = {
+      id: apptId,
+      publicId: apptPublicId,
+      organizationId: 'org-1',
+      status: opts.status,
+    };
+    const prisma = {
+      appointment: {
+        findFirst,
+        update: appointmentUpdate,
+      },
+    } as unknown as PrismaService;
+    const orgs = {
+      requireForOrganiser: jest.fn().mockResolvedValue({ id: 'org-1' }),
+    } as unknown as OrganizationsService;
+    const notifications = makeNotifications();
+    const cacheStub = {
+      invalidateOrgScope: jest.fn().mockResolvedValue(undefined),
+      invalidateAdminScope: jest.fn().mockResolvedValue(undefined),
+      invalidatePrefix: jest.fn().mockResolvedValue(undefined),
+      getOrSet: jest.fn(),
+    } as unknown as ConstructorParameters<typeof AppointmentsService>[3];
+    const service = new AppointmentsService(
+      prisma,
+      orgs,
+      notifications.service,
+      cacheStub,
+      makeQueueStub().queue,
+      makeEmitterStub(),
+      null,
+
+      meetingGateway,
+    );
+    // Stub the private-but-readable findOneForOrganiser path that
+    // markCompleted/markNoShow call after the update.
+    (
+      service as unknown as { findOneForOrganiser: jest.Mock }
+    ).findOneForOrganiser = jest
+      .fn()
+      .mockResolvedValue(findOneForOrganiserResult);
+    return { service, disconnectRoom };
+  }
+
+  it('calls MeetingGateway.disconnectRoom on markCompleted', async () => {
+    const { service, disconnectRoom } = makeServiceWithGateway({
+      status: AppointmentStatus.CONFIRMED,
+    });
+    await service.markCompleted('organiser-1', apptPublicId);
+    expect(disconnectRoom).toHaveBeenCalledWith(apptPublicId);
+  });
+
+  it('calls MeetingGateway.disconnectRoom on markNoShow', async () => {
+    const { service, disconnectRoom } = makeServiceWithGateway({
+      status: AppointmentStatus.CONFIRMED,
+    });
+    await service.markNoShow('organiser-1', apptPublicId);
+    expect(disconnectRoom).toHaveBeenCalledWith(apptPublicId);
+  });
+});

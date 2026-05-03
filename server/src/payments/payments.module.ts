@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { REFUND_HANDLER } from '../common/refund-handler.token';
+import { MeetingModule } from '../meeting/meeting.module';
 import { PaymentGateway } from './gateways/payment-gateway.interface';
 import { PAYMENT_GATEWAY } from './gateways/payment-gateway.token';
 import { RazorpayGateway } from './gateways/razorpay.gateway';
@@ -8,6 +9,7 @@ import { PaymentsService } from './payments.service';
 import { PaymentsWebhooksController } from './payments.webhooks.controller';
 
 @Module({
+  imports: [MeetingModule],
   controllers: [PaymentsController, PaymentsWebhooksController],
   providers: [
     PaymentsService,
