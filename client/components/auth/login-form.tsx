@@ -9,6 +9,7 @@ import { AuthError } from "@/components/auth/auth-error";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   InputOTP,
   InputOTPGroup,
@@ -178,6 +179,7 @@ export function LoginForm() {
             id="email"
             type="email"
             autoComplete="email"
+            autoFocus
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -192,12 +194,11 @@ export function LoginForm() {
               href={safeNext ? `/forgot-password?next=${encodeURIComponent(safeNext)}` : "/forgot-password"}
               className="text-xs text-muted-foreground hover:text-foreground"
             >
-              Forgot?
+              Forgot password?
             </Link>
           </div>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="current-password"
             required
             minLength={8}
@@ -213,7 +214,7 @@ export function LoginForm() {
           type="submit"
           size="lg"
           className="w-full"
-          disabled={loginMutation.isPending}
+          disabled={loginMutation.isPending || !email || password.length < 8}
         >
           {loginMutation.isPending ? <Spinner /> : null}
           Sign in
