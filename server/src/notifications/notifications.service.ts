@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   EntityType,
   NotificationChannel,
@@ -8,6 +9,7 @@ import {
   NotificationType,
   Prisma,
 } from '@prisma/client';
+import { EnvVars } from '../config/env.validation';
 import { MailerService } from '../mailer/mailer.service';
 import {
   RenderedEmail,
@@ -61,6 +63,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailer: MailerService,
+    private readonly config: ConfigService<EnvVars, true>,
   ) {}
 
   /**
@@ -204,6 +207,7 @@ export class NotificationsService {
         break;
       }
       case 'APPOINTMENT_CONFIRMED': {
+        const meetingUrls = this.buildMeetingUrls(appointment);
         await email(
           NotificationRecipientType.USER,
           appointment.customerId,
@@ -212,6 +216,7 @@ export class NotificationsService {
           bookingConfirmedCustomerEmail({
             ...ctx,
             recipientName: customerName,
+            meetingUrl: meetingUrls.customer,
           }),
         );
         await inApp(
@@ -230,6 +235,7 @@ export class NotificationsService {
               recipientName: bookablePerson.name,
               customerName,
               eventLabel: 'confirmed',
+              meetingUrl: meetingUrls.host,
             }),
           );
         }
@@ -590,6 +596,27 @@ export class NotificationsService {
       where: { id },
       include: PAYMENT_INCLUDE,
     });
+  }
+
+  /**
+   * Returns the customer + host meeting URLs for an online appointment, or
+   * `{ customer: undefined, host: undefined }` for in-person appointments. The
+   * customer URL embeds the confirmation code so the booking email is a
+   * one-click join; the host uses their session cookie.
+   */
+  private buildMeetingUrls(appointment: AppointmentContext): {
+    customer: string | undefined;
+    host: string | undefined;
+  } {
+    if (!appointment.appointmentType.isOnline) {
+      return { customer: undefined, host: undefined };
+    }
+    const baseUrl = this.config.get('APP_BASE_URL', { infer: true });
+    const id = appointment.id.toString();
+    return {
+      customer: `${baseUrl}/meeting/${id}?code=${encodeURIComponent(appointment.confirmationCode)}`,
+      host: `${baseUrl}/meeting/${id}`,
+    };
   }
 
   private buildAppointmentEmailContext(appointment: AppointmentContext) {

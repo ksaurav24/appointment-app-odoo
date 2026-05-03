@@ -16,6 +16,7 @@ import { BookablePersonsModule } from './bookable-persons/bookable-persons.modul
 import { BookableResourcesModule } from './bookable-resources/bookable-resources.module';
 import { validateEnv } from './config/env.validation';
 import { MailerModule } from './mailer/mailer.module';
+import { MeetingModule } from './meeting/meeting.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { OrganizationApprovedGuard } from './organizations/guards/organization-approved.guard';
@@ -62,6 +63,7 @@ import { UsersModule } from './users/users.module';
     SlotLocksModule,
     PaymentsModule,
     AppointmentsModule,
+    MeetingModule,
   ],
   controllers: [AppController],
   providers: [

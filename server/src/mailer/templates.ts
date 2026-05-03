@@ -125,6 +125,28 @@ export interface BookingEmailContext {
   confirmationCode: string;
   /** Optional, e.g. "Dr. Rao" for PERSON-type appointments. */
   providerName?: string;
+  /**
+   * When set (online appointments only), templates render a "Join meeting"
+   * call-to-action linking to the meeting room. Customer URLs embed the
+   * confirmation code; host URLs rely on the session cookie.
+   */
+  meetingUrl?: string;
+}
+
+/**
+ * HTML "Join meeting" CTA, rendered only when `meetingUrl` is provided.
+ * Kept as a helper so customer + bookable-person templates stay in lock-step.
+ */
+function meetingCtaHtml(meetingUrl: string | undefined): string {
+  if (!meetingUrl) return '';
+  return `<p style="margin: 24px 0;"><a href="${meetingUrl}" style="background: #111; color: #fff; padding: 12px 18px; border-radius: 6px; text-decoration: none; display: inline-block;">Join meeting</a></p>
+     <p style="color: #555; font-size: 13px;">The meeting room opens 10 minutes before your appointment.</p>`;
+}
+
+/** Plain-text equivalent of {@link meetingCtaHtml}. */
+function meetingCtaText(meetingUrl: string | undefined): string {
+  if (!meetingUrl) return '';
+  return `\nJoin here: ${meetingUrl}\n`;
 }
 
 function formatRange(ctx: BookingEmailContext): string {
@@ -159,12 +181,13 @@ export function bookingConfirmedCustomerEmail(
   ctx: BookingEmailContext,
 ): RenderedEmail {
   const subject = `Your booking is confirmed — ${ctx.appointmentTypeName}`;
-  const text = `Hi ${ctx.recipientName}, your booking for ${ctx.appointmentTypeName} with ${ctx.organizationName} on ${formatRange(ctx)} is confirmed. Confirmation code: ${ctx.confirmationCode}.`;
+  const text = `Hi ${ctx.recipientName}, your booking for ${ctx.appointmentTypeName} with ${ctx.organizationName} on ${formatRange(ctx)} is confirmed. Confirmation code: ${ctx.confirmationCode}.${meetingCtaText(ctx.meetingUrl)}`;
   const html = wrap(
     'Your booking is confirmed',
     `<p>Hi ${ctx.recipientName},</p>
      <p>Your booking is confirmed.</p>
-     ${bookingDetailsBlock(ctx)}`,
+     ${bookingDetailsBlock(ctx)}
+     ${meetingCtaHtml(ctx.meetingUrl)}`,
   );
   return { subject, text, html };
 }
@@ -322,7 +345,7 @@ export function bookingNoticeForBookablePersonEmail(
   },
 ): RenderedEmail {
   const subject = `Booking ${ctx.eventLabel} — ${ctx.appointmentTypeName}`;
-  const text = `Hi ${ctx.recipientName}, a booking has been ${ctx.eventLabel}. Customer: ${ctx.customerName}. When: ${formatRange(ctx)}. Service: ${ctx.appointmentTypeName} (${ctx.organizationName}).`;
+  const text = `Hi ${ctx.recipientName}, a booking has been ${ctx.eventLabel}. Customer: ${ctx.customerName}. When: ${formatRange(ctx)}. Service: ${ctx.appointmentTypeName} (${ctx.organizationName}).${meetingCtaText(ctx.meetingUrl)}`;
   const html = wrap(
     `Booking ${ctx.eventLabel}`,
     `<p>Hi ${ctx.recipientName},</p>
@@ -332,7 +355,8 @@ export function bookingNoticeForBookablePersonEmail(
        <li>Service: ${ctx.appointmentTypeName}</li>
        <li>When: ${formatRange(ctx)}</li>
        <li>Confirmation code: ${ctx.confirmationCode}</li>
-     </ul>`,
+     </ul>
+     ${meetingCtaHtml(ctx.meetingUrl)}`,
   );
   return { subject, text, html };
 }

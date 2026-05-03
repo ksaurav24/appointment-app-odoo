@@ -146,4 +146,13 @@ export class UpdateAppointmentTypeDto {
   @IsInt()
   @Min(0)
   maxReschedulesAllowed?: number;
+
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'When true, the appointment is conducted online; the booking flow surfaces a video meeting room.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isOnline?: boolean;
 }

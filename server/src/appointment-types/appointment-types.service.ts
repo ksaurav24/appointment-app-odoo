@@ -139,6 +139,7 @@ export class AppointmentTypesService {
           rescheduleAllowed: policy.rescheduleAllowed,
           rescheduleWindowHours: policy.rescheduleWindowHours,
           maxReschedulesAllowed: policy.maxReschedulesAllowed,
+          ...(input.isOnline !== undefined ? { isOnline: input.isOnline } : {}),
         },
       });
 
@@ -284,6 +285,7 @@ export class AppointmentTypesService {
         rescheduleAllowed: policy.rescheduleAllowed,
         rescheduleWindowHours: policy.rescheduleWindowHours,
         maxReschedulesAllowed: policy.maxReschedulesAllowed,
+        ...(input.isOnline !== undefined ? { isOnline: input.isOnline } : {}),
       },
     });
 

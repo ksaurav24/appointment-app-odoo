@@ -6,6 +6,7 @@ import {
   IsString,
   Max,
   Min,
+  MinLength,
   validateSync,
 } from 'class-validator';
 
@@ -106,6 +107,34 @@ export class EnvVars {
 
   @IsString()
   PAYMENT_CURRENCY: string = 'INR';
+
+  // -------------------------------------------------------------------------
+  // Meeting (WebRTC signaling) — short-lived JWTs + ICE config
+  // -------------------------------------------------------------------------
+
+  @IsString()
+  @MinLength(16)
+  MEETING_JWT_SECRET!: string;
+
+  @IsInt()
+  @Min(0)
+  MEETING_JOIN_BEFORE_MINS: number = 10;
+
+  @IsInt()
+  @Min(0)
+  MEETING_JOIN_AFTER_MINS: number = 30;
+
+  @IsOptional()
+  @IsString()
+  TURN_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  TURN_USERNAME?: string;
+
+  @IsOptional()
+  @IsString()
+  TURN_CREDENTIAL?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvVars {

@@ -254,6 +254,15 @@ export class CreateAppointmentTypeDto {
   @Min(0)
   maxReschedulesAllowed?: number;
 
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'When true, the appointment is conducted online; the booking flow surfaces a video meeting room.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isOnline?: boolean;
+
   // Step 8: booking questions (optional set)
   @ApiPropertyOptional({
     type: () => BookingQuestionDto,
