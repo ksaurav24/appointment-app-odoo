@@ -17,51 +17,14 @@ import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-// ---------------------------------------------------------------------------
-// Bootstrap admin (preserved behaviour: requires ADMIN_BOOTSTRAP_* env vars)
-// ---------------------------------------------------------------------------
-
-async function bootstrapAdmin(): Promise<{ id: string; email: string } | null> {
-  const email = process.env.ADMIN_BOOTSTRAP_EMAIL;
-  const password = process.env.ADMIN_BOOTSTRAP_PASSWORD;
-  const fullName = process.env.ADMIN_BOOTSTRAP_NAME ?? 'Administrator';
-  const cost = Number(process.env.BCRYPT_COST ?? '12');
-
-  if (!email || !password) {
-    console.log(
-      'ADMIN_BOOTSTRAP_EMAIL/ADMIN_BOOTSTRAP_PASSWORD not set; skipping admin bootstrap',
-    );
-    return null;
-  }
-
-  const existing = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
-  });
-  if (existing) {
-    console.log(`Admin user already exists (${email}); skipping`);
-    return { id: existing.id, email: existing.email };
-  }
-
-  const passwordHash = await bcrypt.hash(password, cost);
-  const user = await prisma.user.create({
-    data: {
-      email: email.toLowerCase(),
-      passwordHash,
-      fullName,
-      role: Role.ADMIN,
-      emailVerified: true,
-    },
-  });
-  console.log(`Created admin user ${user.email} (id=${user.id})`);
-  return { id: user.id, email: user.email };
-}
+// Hardcoded demo password used for every seeded account.
+const DEMO_PASSWORD = 'Demo@12345';
+// Lower bcrypt cost so seeding is fast — this is a test-only seed.
+const BCRYPT_COST = 10;
 
 // ---------------------------------------------------------------------------
-// Demo seed
+// Helpers
 // ---------------------------------------------------------------------------
-
-const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD ?? 'Demo@12345';
-const BCRYPT_COST = Number(process.env.BCRYPT_COST ?? '12');
 
 type SeedUserInput = {
   email: string;
@@ -106,13 +69,9 @@ type OrgSeed = {
 async function upsertOrganization(
   org: OrgSeed,
   passwordHash: string,
-  approvedById: string | null,
 ): Promise<string> {
   const organiserId = await upsertUser(org.organiser, passwordHash);
 
-  // The organiser-user → organization link is 1:1. If the user is already
-  // attached to a different organisation, we leave it alone — but for the
-  // demo seed we keep the mapping stable via the slug uniqueness.
   const result = await prisma.organization.upsert({
     where: { slug: org.slug },
     update: {
@@ -124,7 +83,6 @@ async function upsertOrganization(
       timezone: org.timezone,
       approvalStatus: OrganizationApprovalStatus.APPROVED,
       approvedAt: new Date(),
-      approvedById: approvedById ?? undefined,
       isActive: true,
     },
     create: {
@@ -138,7 +96,6 @@ async function upsertOrganization(
       organiserId,
       approvalStatus: OrganizationApprovalStatus.APPROVED,
       approvedAt: new Date(),
-      approvedById: approvedById ?? undefined,
     },
     select: { id: true },
   });
@@ -278,7 +235,7 @@ async function upsertAppointmentType(
   });
   const appointmentTypeId = result.id;
 
-  // Wipe + recreate the entity links so re-runs reflect current seed.
+  // Reset entity links each run so the seed is the source of truth.
   await prisma.appointmentTypeEntity.deleteMany({
     where: { appointmentTypeId },
   });
@@ -293,7 +250,6 @@ async function upsertAppointmentType(
     });
   }
 
-  // Schedule + rules (reset to keep idempotent).
   await prisma.schedule.deleteMany({ where: { appointmentTypeId } });
   await prisma.schedule.create({
     data: {
@@ -312,7 +268,6 @@ async function upsertAppointmentType(
     },
   });
 
-  // Booking questions (reset to keep idempotent).
   await prisma.bookingQuestion.deleteMany({ where: { appointmentTypeId } });
   if (seed.questions?.length) {
     await prisma.bookingQuestion.createMany({
@@ -357,8 +312,6 @@ async function createSampleAppointment(args: {
 }): Promise<void> {
   const end = new Date(args.start.getTime() + args.durationMins * 60_000);
 
-  // Idempotency: skip if an appointment already exists for this customer +
-  // type at this start time.
   const existing = await prisma.appointment.findFirst({
     where: {
       appointmentTypeId: args.appointmentTypeId,
@@ -395,17 +348,10 @@ async function createSampleAppointment(args: {
 }
 
 // ---------------------------------------------------------------------------
-// Concrete demo data
+// Demo data
 // ---------------------------------------------------------------------------
 
-async function seedDemoData(adminId: string | null): Promise<void> {
-  const enabled =
-    process.env.SEED_DEMO === 'true' || process.env.SEED_DEMO === '1';
-  if (!enabled) {
-    console.log('SEED_DEMO is not set; skipping demo data seed');
-    return;
-  }
-
+async function seedDemoData(): Promise<void> {
   console.log(`Seeding demo data (default password: ${DEMO_PASSWORD})`);
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_COST);
 
@@ -417,14 +363,12 @@ async function seedDemoData(adminId: string | null): Promise<void> {
       { email: 'rohit.malhotra@example.com', fullName: 'Rohit Malhotra' },
       { email: 'maya.thomas@example.com', fullName: 'Maya Thomas' },
       { email: 'ishaan.khan@example.com', fullName: 'Ishaan Khan' },
-    ].map((c) =>
-      upsertUser({ ...c, role: Role.CUSTOMER }, passwordHash),
-    ),
+    ].map((c) => upsertUser({ ...c, role: Role.CUSTOMER }, passwordHash)),
   );
   const [aarav, priya, rohit, maya, ishaan] = customers;
 
   // ====================================================================
-  // 1. Glow Aesthetic Clinic — skin & hair
+  // 1. Glow Aesthetic — clinical management for skin & hair
   // ====================================================================
   const glowOrgId = await upsertOrganization(
     {
@@ -443,7 +387,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
       },
     },
     passwordHash,
-    adminId,
   );
 
   const glowDrNeha = await upsertBookablePerson(glowOrgId, {
@@ -509,8 +452,7 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     ],
   });
 
-  // (b) PERSON / WEEKLY / FIXED / MANUAL assignment + manual confirmation —
-  //     hair transplant consult requires organiser approval
+  // (b) PERSON / WEEKLY / FIXED / MANUAL assignment + manual confirmation
   const glowHairConsultAppt = await upsertAppointmentType(glowOrgId, {
     slug: 'hair-transplant-consultation',
     name: 'Hair Transplant Consultation',
@@ -634,7 +576,7 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     ],
   });
 
-  // (f) RESOURCE-typed booking demonstrating room hire alongside the staff
+  // (f) RESOURCE-typed booking — direct laser bay hire
   await upsertAppointmentType(glowOrgId, {
     slug: 'private-laser-bay-hire',
     name: 'Private Laser Bay (resource hire)',
@@ -657,7 +599,7 @@ async function seedDemoData(adminId: string | null): Promise<void> {
   });
 
   // ====================================================================
-  // 2. TurfPro Sports — turf / court bookings
+  // 2. TurfPro — sports turf & cricket pitch management
   // ====================================================================
   const turfOrgId = await upsertOrganization(
     {
@@ -676,7 +618,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
       },
     },
     passwordHash,
-    adminId,
   );
 
   const turfCoachKabir = await upsertBookablePerson(turfOrgId, {
@@ -780,7 +721,7 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     resourceIds: [turfTennisCourt],
     schedule: {
       timezone: 'Asia/Kolkata',
-      rules: [1, 2, 3, 4, 5, 6, 0].map((d) => ({
+      rules: [0, 1, 2, 3, 4, 5, 6].map((d) => ({
         dayOfWeek: d,
         startTime: '07:00',
         endTime: '22:00',
@@ -844,7 +785,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
       },
     },
     passwordHash,
-    adminId,
   );
 
   const modelCastingDir = await upsertBookablePerson(modelOrgId, {
@@ -928,16 +868,8 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     schedule: {
       timezone: 'Asia/Kolkata',
       rules: [
-        {
-          specificDate: atTime(7, 0),
-          startTime: '10:00',
-          endTime: '17:00',
-        },
-        {
-          specificDate: atTime(8, 0),
-          startTime: '10:00',
-          endTime: '17:00',
-        },
+        { specificDate: atTime(7, 0), startTime: '10:00', endTime: '17:00' },
+        { specificDate: atTime(8, 0), startTime: '10:00', endTime: '17:00' },
       ],
     },
     questions: [
@@ -1014,7 +946,7 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     },
   });
 
-  // (e) PERSON / WEEKLY / FIXED — full-day photoshoot booking with photographer
+  // (e) PERSON / WEEKLY / FIXED — full-day photographer booking
   await upsertAppointmentType(modelOrgId, {
     slug: 'photographer-full-day',
     name: 'Photographer Full-Day Booking',
@@ -1043,7 +975,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
   // ====================================================================
   console.log('Creating sample appointments...');
 
-  // Glow: confirmed dermatology consult tomorrow
   await createSampleAppointment({
     organizationId: glowOrgId,
     appointmentTypeId: glowDermAppt,
@@ -1054,7 +985,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     status: AppointmentStatus.CONFIRMED,
   });
 
-  // Glow: pending hair-transplant consult (manual confirmation)
   await createSampleAppointment({
     organizationId: glowOrgId,
     appointmentTypeId: glowHairConsultAppt,
@@ -1065,7 +995,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     status: AppointmentStatus.PENDING,
   });
 
-  // Glow: completed laser session with payment
   await createSampleAppointment({
     organizationId: glowOrgId,
     appointmentTypeId: glowLaserAppt,
@@ -1078,7 +1007,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     totalAmount: 1500,
   });
 
-  // Glow: cancelled workshop
   await createSampleAppointment({
     organizationId: glowOrgId,
     appointmentTypeId: glowWorkshopAppt,
@@ -1091,7 +1019,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     capacityBooked: 2,
   });
 
-  // Glow: confirmed online consult
   await createSampleAppointment({
     organizationId: glowOrgId,
     appointmentTypeId: glowOnlineAppt,
@@ -1104,7 +1031,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     totalAmount: 800,
   });
 
-  // Turf: confirmed football booking with payment
   await createSampleAppointment({
     organizationId: turfOrgId,
     appointmentTypeId: turfFootballAppt,
@@ -1117,7 +1043,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     totalAmount: 1500,
   });
 
-  // Turf: no-show coaching
   await createSampleAppointment({
     organizationId: turfOrgId,
     appointmentTypeId: turfCoachingAppt,
@@ -1130,7 +1055,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     totalAmount: 400,
   });
 
-  // Lumiere: pending casting (manual confirm)
   await createSampleAppointment({
     organizationId: modelOrgId,
     appointmentTypeId: modelCastingAppt,
@@ -1141,7 +1065,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     status: AppointmentStatus.PENDING,
   });
 
-  // Lumiere: confirmed studio hire with payment
   await createSampleAppointment({
     organizationId: modelOrgId,
     appointmentTypeId: modelStudioAppt,
@@ -1154,7 +1077,6 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     totalAmount: 5000,
   });
 
-  // Lumiere: refunded studio hire (cancelled within window)
   await createSampleAppointment({
     organizationId: modelOrgId,
     appointmentTypeId: modelStudioAppt,
@@ -1168,13 +1090,14 @@ async function seedDemoData(adminId: string | null): Promise<void> {
     cancellationReason: 'Shoot moved to next month',
   });
 
-  console.log('Demo seed complete.');
   console.log('---------------------------------------------------------');
-  console.log('Demo accounts (all share password):', DEMO_PASSWORD);
+  console.log(
+    `Demo seed complete. All accounts share password: ${DEMO_PASSWORD}`,
+  );
   console.log('  Organisers:');
-  console.log('    organiser@glowaesthetic.example.com');
-  console.log('    organiser@turfpro.example.com');
-  console.log('    organiser@lumieremodels.example.com');
+  console.log('    organiser@glowaesthetic.example.com   (Glow Aesthetic)');
+  console.log('    organiser@turfpro.example.com         (TurfPro Sports)');
+  console.log('    organiser@lumieremodels.example.com   (Lumiere Models)');
   console.log('  Customers:');
   console.log('    aarav.sharma@example.com');
   console.log('    priya.iyer@example.com');
@@ -1187,8 +1110,7 @@ async function seedDemoData(adminId: string | null): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
-  const admin = await bootstrapAdmin();
-  await seedDemoData(admin?.id ?? null);
+  await seedDemoData();
 }
 
 main()
