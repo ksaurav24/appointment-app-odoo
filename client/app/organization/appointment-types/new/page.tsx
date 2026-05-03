@@ -23,6 +23,7 @@ import {
   RadioGroup,
   RadioGroupItem,
 } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -103,6 +104,7 @@ export default function NewAppointmentTypePage() {
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [description, setDescription] = useState("");
+  const [isOnline, setIsOnline] = useState(false);
   const [entityType, setEntityType] = useState<EntityType>("PERSON");
   const [assignmentMode, setAssignmentMode] =
     useState<AssignmentMode>("AUTO");
@@ -244,6 +246,7 @@ export default function NewAppointmentTypePage() {
       name: name.trim(),
       slug: effectiveSlug || undefined,
       description: description.trim() || undefined,
+      isOnline,
       entityType,
       assignmentMode,
       entityIds,
@@ -361,6 +364,16 @@ export default function NewAppointmentTypePage() {
                 maxLength={4000}
                 rows={3}
               />
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <Switch
+                id="at-is-online"
+                checked={isOnline}
+                onCheckedChange={setIsOnline}
+              />
+              <Label htmlFor="at-is-online">
+                Online (video) appointment
+              </Label>
             </div>
           </CardContent>
         </Card>

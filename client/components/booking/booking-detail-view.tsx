@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { useJoinWindow } from "@/hooks/use-join-window";
 import {
   formatDateTimeInZone,
   formatDuration,
@@ -67,6 +68,16 @@ export function BookingDetailView({ appointment }: Props) {
   const tz = appointment.appointmentType.organization.timezone;
   const canCancel = isCancellable(appointment);
   const canReschedule = isReschedulable(appointment);
+  const isOnline = appointment.appointmentType.isOnline;
+  const joinWindow = useJoinWindow({
+    startTime: appointment.startTime,
+    endTime: appointment.endTime,
+  });
+  const showJoin =
+    isOnline &&
+    appointment.status !== "CANCELLED" &&
+    appointment.status !== "COMPLETED" &&
+    appointment.status !== "NO_SHOW";
 
   const paymentLine = (() => {
     if (!appointment.appointmentType.advancePaymentEnabled) return "Free";
@@ -167,6 +178,30 @@ export function BookingDetailView({ appointment }: Props) {
               </ul>
             </CardContent>
           </Card>
+        ) : null}
+
+        {showJoin ? (
+          <>
+            <Separator />
+            <div className="flex flex-wrap items-center gap-3">
+              {joinWindow.canJoin ? (
+                <Button
+                  render={
+                    <Link
+                      href={`/meeting/${appointment.publicId}?code=${appointment.confirmationCode}`}
+                    />
+                  }
+                >
+                  Join meeting
+                </Button>
+              ) : (
+                <Button disabled>Join meeting</Button>
+              )}
+              <span className="text-xs text-muted-foreground">
+                {joinWindow.label}
+              </span>
+            </div>
+          </>
         ) : null}
 
         {canCancel || canReschedule ? (

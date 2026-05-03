@@ -33,6 +33,7 @@ export function SectionBasics({ type }: Props) {
   const [manualConfirmation, setManualConfirmation] = useState(
     type.manualConfirmation,
   );
+  const [isOnline, setIsOnline] = useState(type.isOnline);
   const [advancePaymentEnabled, setAdvancePaymentEnabled] = useState(
     type.advancePaymentEnabled,
   );
@@ -45,6 +46,7 @@ export function SectionBasics({ type }: Props) {
     setSlug(type.slug);
     setDescription(type.description ?? "");
     setManualConfirmation(type.manualConfirmation);
+    setIsOnline(type.isOnline);
     setAdvancePaymentEnabled(type.advancePaymentEnabled);
     setAdvancePaymentAmount(type.advancePaymentAmount ?? "");
     setEditing(true);
@@ -62,6 +64,7 @@ export function SectionBasics({ type }: Props) {
           slug: slug.trim(),
           description: description.trim() || undefined,
           manualConfirmation,
+          isOnline,
           advancePaymentEnabled,
           advancePaymentAmount: advancePaymentEnabled
             ? Number(advancePaymentAmount)
@@ -103,6 +106,8 @@ export function SectionBasics({ type }: Props) {
             <dd>{type.description ?? <span className="text-muted-foreground">—</span>}</dd>
             <dt className="text-muted-foreground">Manual confirmation</dt>
             <dd>{type.manualConfirmation ? "Yes" : "No"}</dd>
+            <dt className="text-muted-foreground">Online (video)</dt>
+            <dd>{type.isOnline ? "Yes" : "No"}</dd>
             <dt className="text-muted-foreground">Advance payment</dt>
             <dd>
               {type.advancePaymentEnabled
@@ -160,6 +165,17 @@ export function SectionBasics({ type }: Props) {
             />
             <Label htmlFor="basics-manual-confirm">
               Require manual confirmation
+            </Label>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Switch
+              id="basics-is-online"
+              checked={isOnline}
+              onCheckedChange={setIsOnline}
+            />
+            <Label htmlFor="basics-is-online">
+              Online (video) appointment
             </Label>
           </div>
 

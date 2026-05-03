@@ -1,15 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { useAdminAppointments } from "@/hooks/useAdminAppointments";
 import type {
+  AdminAppointmentItem,
   AppointmentStatus,
   ListAdminAppointmentsQuery,
 } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useJoinWindow } from "@/hooks/use-join-window";
 import {
   Card,
   CardContent,
@@ -163,13 +166,14 @@ export default function AdminAppointmentsPage() {
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Payment</TableHead>
+                <TableHead className="w-[1%]" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {appointmentsQuery.isPending ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((__, j) => (
+                    {Array.from({ length: 8 }).map((__, j) => (
                       <TableCell key={j}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -179,7 +183,7 @@ export default function AdminAppointmentsPage() {
               ) : items.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="py-10 text-center text-sm text-muted-foreground"
                   >
                     No appointments match these filters.
@@ -219,6 +223,11 @@ export default function AdminAppointmentsPage() {
                     <TableCell>
                       <PaymentBadge status={appt.paymentStatus} />
                     </TableCell>
+                    <TableCell>
+                      {appt.appointmentType.isOnline ? (
+                        <JoinMeetingAction appt={appt} />
+                      ) : null}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -234,6 +243,35 @@ export default function AdminAppointmentsPage() {
         onChange={setSkip}
       />
     </div>
+  );
+}
+
+function JoinMeetingAction({ appt }: { appt: AdminAppointmentItem }) {
+  const join = useJoinWindow({
+    startTime: appt.startTime,
+    endTime: appt.endTime,
+  });
+  const inactiveStatus =
+    appt.status === "CANCELLED" ||
+    appt.status === "COMPLETED" ||
+    appt.status === "NO_SHOW";
+  const enabled = join.canJoin && !inactiveStatus;
+
+  if (enabled) {
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        render={<Link href={`/meeting/${appt.publicId}`} />}
+      >
+        Join meeting
+      </Button>
+    );
+  }
+  return (
+    <Button size="sm" variant="outline" disabled title={join.label}>
+      {inactiveStatus ? "—" : join.label}
+    </Button>
   );
 }
 

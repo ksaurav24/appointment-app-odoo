@@ -273,7 +273,7 @@ export type AdminAppointmentItem = {
   confirmationCode: string;
   createdAt: string;
   updatedAt: string;
-  appointmentType: { id: string; name: string; slug: string };
+  appointmentType: { id: string; name: string; slug: string; isOnline: boolean };
   customer: { id: string; email: string; fullName: string };
   organization: { id: string; name: string; slug: string };
   bookablePerson: { id: string; name: string } | null;
@@ -387,6 +387,7 @@ export type AppointmentType = {
   rescheduleAllowed: boolean;
   rescheduleWindowHours: number | null;
   maxReschedulesAllowed: number | null;
+  isOnline: boolean;
   isPublished: boolean;
   shareToken: string | null;
   createdAt: string;
@@ -672,6 +673,7 @@ export type CreateAppointmentTypeInput = {
   rescheduleAllowed?: boolean;
   rescheduleWindowHours?: number;
   maxReschedulesAllowed?: number;
+  isOnline?: boolean;
   bookingQuestions?: BookingQuestionInput[];
 };
 
@@ -762,4 +764,33 @@ export type ListMyAppointmentsQuery = {
   upcomingOnly?: boolean;
   appointmentTypeId?: string;
   entityId?: string;
+};
+
+// ─── Meeting (WebRTC) ────────────────────────────────────────────
+
+export type MeetingRole = "HOST" | "GUEST";
+
+/**
+ * Mirrors the standard `RTCIceServer` shape but without `RTCIceCredentialType`,
+ * which the JSON-over-the-wire form from the server doesn't provide. Fed
+ * directly into `new RTCPeerConnection({ iceServers })`.
+ */
+export type IceServerConfig = {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+};
+
+export type MeetingTokenResponse = {
+  token: string;
+  iceServers: IceServerConfig[];
+  role: MeetingRole;
+  appointmentId: string;
+  expiresAt: string;
+};
+
+export type PeerStatePayload = {
+  audio: boolean;
+  video: boolean;
+  screen: boolean;
 };

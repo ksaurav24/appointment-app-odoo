@@ -40,6 +40,7 @@ import type {
   ListUsersQuery,
   LoginInput,
   LoginResponse,
+  MeetingTokenResponse,
   OrgByAppointmentType,
   OrgBusyHours,
   OrgDashboard,
@@ -72,7 +73,7 @@ import type {
 } from "@/types";
 
 const baseURL =
-  process.env.NEXT_PUBLIC_API_URL ?? "https://api.appointly.sauravcodes.in";
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export const api = axios.create({
   baseURL,
@@ -1193,6 +1194,45 @@ export async function rescheduleAppointment(
     const { data } = await api.post<AppointmentWithRelations>(
       `/appointments/${publicId}/reschedule`,
       body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+// ─── Meeting (WebRTC) ──────────────────────────────────────────
+
+/**
+ * Mints a short-lived JWT for the host (organiser) to join the meeting
+ * socket. Auth is by session cookie (existing axios `withCredentials`).
+ */
+export async function getMeetingTokenAsHost(
+  appointmentId: string,
+): Promise<MeetingTokenResponse> {
+  try {
+    const { data } = await api.post<MeetingTokenResponse>(
+      `/appointments/${appointmentId}/meeting-token`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+/**
+ * Mints a short-lived JWT for the guest (customer) using the booking's
+ * confirmation code. No session cookie required — this is the path used
+ * from the public bookings/share-link flow.
+ */
+export async function getMeetingTokenAsGuest(
+  appointmentId: string,
+  confirmationCode: string,
+): Promise<MeetingTokenResponse> {
+  try {
+    const { data } = await api.post<MeetingTokenResponse>(
+      `/appointments/${appointmentId}/meeting-token/guest`,
+      { confirmationCode },
     );
     return data;
   } catch (err) {
