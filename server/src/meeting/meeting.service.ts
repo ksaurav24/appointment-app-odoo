@@ -46,15 +46,8 @@ export class MeetingService {
     appointmentId: string,
     principal: MeetingPrincipal,
   ): Promise<AppointmentWithRelations> {
-    let parsedId: bigint;
-    try {
-      parsedId = BigInt(appointmentId);
-    } catch {
-      throw new NotFoundException('Appointment not found');
-    }
-
     const appointment = await this.prisma.appointment.findUnique({
-      where: { id: parsedId },
+      where: { publicId: appointmentId },
       include: APPOINTMENT_INCLUDE,
     });
     if (!appointment) throw new NotFoundException('Appointment not found');
@@ -111,10 +104,10 @@ export class MeetingService {
   ): Promise<MeetingTokenResponse> {
     const appointment = await this.assertJoinable(appointmentId, principal);
     const role: MeetingRole = principal.role;
-    const idStr = appointment.id.toString();
+    const publicId = appointment.publicId;
 
     const { token, expiresAt } = this.tokenService.sign({
-      appointmentId: idStr,
+      appointmentId: publicId,
       role,
       ...(principal.role === 'HOST'
         ? { userId: principal.userId }
@@ -125,7 +118,7 @@ export class MeetingService {
       token,
       iceServers: this.getIceServers(),
       role,
-      appointmentId: idStr,
+      appointmentId: publicId,
       expiresAt: expiresAt.toISOString(),
     };
   }

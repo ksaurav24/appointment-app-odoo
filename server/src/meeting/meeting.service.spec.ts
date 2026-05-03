@@ -6,7 +6,7 @@ import { MeetingService } from './meeting.service';
 import { MeetingTokenService } from './meeting-token.service';
 
 const APPT_ID = 42n;
-const APPT_ID_STR = APPT_ID.toString();
+const APPT_PUBLIC_ID = 'appt_public_abc123';
 const ORGANISER_ID = 'organiser-uuid';
 const CONFIRMATION_CODE = 'ABC-XYZ-123';
 
@@ -17,6 +17,7 @@ function makeAppointment(overrides: Record<string, unknown> = {}) {
   // window (-10 / +30) is comfortably open from every direction.
   return {
     id: APPT_ID,
+    publicId: APPT_PUBLIC_ID,
     confirmationCode: CONFIRMATION_CODE,
     status: AppointmentStatus.CONFIRMED,
     startTime: new Date(NOW.getTime() - 5 * 60_000),
@@ -27,12 +28,15 @@ function makeAppointment(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makePrisma(appointment: unknown): PrismaService {
-  return {
-    appointment: {
-      findUnique: jest.fn().mockResolvedValue(appointment),
-    },
+function makePrisma(appointment: unknown): {
+  service: PrismaService;
+  findUnique: jest.Mock;
+} {
+  const findUnique = jest.fn().mockResolvedValue(appointment);
+  const service = {
+    appointment: { findUnique },
   } as unknown as PrismaService;
+  return { service, findUnique };
 }
 
 function makeConfig(env: Record<string, unknown> = {}): ConfigService {
@@ -73,7 +77,7 @@ function makeService(opts: {
   );
   const config = makeConfig(opts.config);
   const token = makeTokenService();
-  const svc = new MeetingService(prisma, token.service, config);
+  const svc = new MeetingService(prisma.service, token.service, config);
   return { svc, prisma, config, token };
 }
 
@@ -86,21 +90,17 @@ describe('MeetingService', () => {
   });
 
   describe('assertJoinable', () => {
-    it('throws NotFoundException when appointment id is unparsable', async () => {
-      const { svc } = makeService({ appointment: makeAppointment() });
+    it('throws NotFoundException when appointment is missing', async () => {
+      const { svc, prisma } = makeService({ appointment: null });
       await expect(
-        svc.assertJoinable('not-a-bigint', {
+        svc.assertJoinable(APPT_PUBLIC_ID, {
           role: 'HOST',
           userId: ORGANISER_ID,
         }),
       ).rejects.toBeInstanceOf(NotFoundException);
-    });
-
-    it('throws NotFoundException when appointment is missing', async () => {
-      const { svc } = makeService({ appointment: null });
-      await expect(
-        svc.assertJoinable(APPT_ID_STR, { role: 'HOST', userId: ORGANISER_ID }),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { publicId: APPT_PUBLIC_ID } }),
+      );
     });
 
     it('throws ForbiddenException when appointment type is not online', async () => {
@@ -108,7 +108,10 @@ describe('MeetingService', () => {
         appointment: makeAppointment({ appointmentType: { isOnline: false } }),
       });
       await expect(
-        svc.assertJoinable(APPT_ID_STR, { role: 'HOST', userId: ORGANISER_ID }),
+        svc.assertJoinable(APPT_PUBLIC_ID, {
+          role: 'HOST',
+          userId: ORGANISER_ID,
+        }),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
@@ -121,7 +124,10 @@ describe('MeetingService', () => {
         appointment: makeAppointment({ status }),
       });
       await expect(
-        svc.assertJoinable(APPT_ID_STR, { role: 'HOST', userId: ORGANISER_ID }),
+        svc.assertJoinable(APPT_PUBLIC_ID, {
+          role: 'HOST',
+          userId: ORGANISER_ID,
+        }),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
@@ -135,7 +141,10 @@ describe('MeetingService', () => {
         }),
       });
       await expect(
-        svc.assertJoinable(APPT_ID_STR, { role: 'HOST', userId: ORGANISER_ID }),
+        svc.assertJoinable(APPT_PUBLIC_ID, {
+          role: 'HOST',
+          userId: ORGANISER_ID,
+        }),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
@@ -147,14 +156,17 @@ describe('MeetingService', () => {
         }),
       });
       await expect(
-        svc.assertJoinable(APPT_ID_STR, { role: 'HOST', userId: ORGANISER_ID }),
+        svc.assertJoinable(APPT_PUBLIC_ID, {
+          role: 'HOST',
+          userId: ORGANISER_ID,
+        }),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('throws ForbiddenException for HOST with wrong user id', async () => {
       const { svc } = makeService({});
       await expect(
-        svc.assertJoinable(APPT_ID_STR, {
+        svc.assertJoinable(APPT_PUBLIC_ID, {
           role: 'HOST',
           userId: 'someone-else',
         }),
@@ -164,7 +176,7 @@ describe('MeetingService', () => {
     it('throws ForbiddenException for GUEST with wrong confirmation code', async () => {
       const { svc } = makeService({});
       await expect(
-        svc.assertJoinable(APPT_ID_STR, {
+        svc.assertJoinable(APPT_PUBLIC_ID, {
           role: 'GUEST',
           confirmationCode: 'WRONG',
         }),
@@ -173,7 +185,7 @@ describe('MeetingService', () => {
 
     it('returns the appointment for a HOST happy path', async () => {
       const { svc } = makeService({});
-      const result = await svc.assertJoinable(APPT_ID_STR, {
+      const result = await svc.assertJoinable(APPT_PUBLIC_ID, {
         role: 'HOST',
         userId: ORGANISER_ID,
       });
@@ -182,7 +194,7 @@ describe('MeetingService', () => {
 
     it('returns the appointment for a GUEST happy path', async () => {
       const { svc } = makeService({});
-      const result = await svc.assertJoinable(APPT_ID_STR, {
+      const result = await svc.assertJoinable(APPT_PUBLIC_ID, {
         role: 'GUEST',
         confirmationCode: CONFIRMATION_CODE,
       });
@@ -193,17 +205,17 @@ describe('MeetingService', () => {
   describe('issueToken', () => {
     it('returns a HOST token response with stringified appointment id', async () => {
       const { svc, token } = makeService({});
-      const result = await svc.issueToken(APPT_ID_STR, {
+      const result = await svc.issueToken(APPT_PUBLIC_ID, {
         role: 'HOST',
         userId: ORGANISER_ID,
       });
       expect(result.role).toBe('HOST');
-      expect(result.appointmentId).toBe(APPT_ID_STR);
+      expect(result.appointmentId).toBe(APPT_PUBLIC_ID);
       expect(result.token).toBe('signed.token.value');
       expect(result.iceServers.length).toBeGreaterThan(0);
       expect(token.sign).toHaveBeenCalledWith(
         expect.objectContaining({
-          appointmentId: APPT_ID_STR,
+          appointmentId: APPT_PUBLIC_ID,
           role: 'HOST',
           userId: ORGANISER_ID,
         }),
@@ -212,14 +224,14 @@ describe('MeetingService', () => {
 
     it('returns a GUEST token response when confirmation code matches', async () => {
       const { svc, token } = makeService({});
-      const result = await svc.issueToken(APPT_ID_STR, {
+      const result = await svc.issueToken(APPT_PUBLIC_ID, {
         role: 'GUEST',
         confirmationCode: CONFIRMATION_CODE,
       });
       expect(result.role).toBe('GUEST');
       expect(token.sign).toHaveBeenCalledWith(
         expect.objectContaining({
-          appointmentId: APPT_ID_STR,
+          appointmentId: APPT_PUBLIC_ID,
           role: 'GUEST',
           confirmationCode: CONFIRMATION_CODE,
         }),

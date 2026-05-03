@@ -612,7 +612,7 @@ export class NotificationsService {
       return { customer: undefined, host: undefined };
     }
     const baseUrl = this.config.get('APP_BASE_URL', { infer: true });
-    const id = appointment.id.toString();
+    const id = appointment.publicId;
     return {
       customer: `${baseUrl}/meeting/${id}?code=${encodeURIComponent(appointment.confirmationCode)}`,
       host: `${baseUrl}/meeting/${id}`,
