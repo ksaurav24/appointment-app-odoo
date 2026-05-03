@@ -7,6 +7,8 @@ import {
 import {
   AppointmentType,
   AppointmentTypeEntity,
+  BookablePerson,
+  BookableResource,
   BookingQuestion,
   Prisma,
   Schedule,
@@ -23,16 +25,48 @@ import { validateAppointmentTypePolicy } from './helpers/validate-appointment-ty
 import { SchedulesService } from './schedules.service';
 import { slugify, SLUG_REGEX } from '../utils/slug';
 
-export interface AppointmentTypeWithRelations extends AppointmentType {
-  entities: AppointmentTypeEntity[];
-  schedules: (Schedule & { rules: ScheduleRule[] })[];
-  bookingQuestions: BookingQuestion[];
+export interface PublicOrganizationSummary {
+  id: string;
+  name: string;
+  slug: string;
+  address: string | null;
+  logoUrl: string | null;
 }
 
+export type AppointmentTypeEntityWithRelations = AppointmentTypeEntity & {
+  bookablePerson: BookablePerson | null;
+  bookableResource: BookableResource | null;
+};
+
+export interface AppointmentTypeWithRelations extends AppointmentType {
+  entities: AppointmentTypeEntityWithRelations[];
+  schedules: (Schedule & { rules: ScheduleRule[] })[];
+  bookingQuestions: BookingQuestion[];
+  organization?: PublicOrganizationSummary;
+}
+
+const PUBLIC_ORG_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  address: true,
+  logoUrl: true,
+} as const;
+
 const FULL_INCLUDE = {
-  entities: true,
+  entities: {
+    include: {
+      bookablePerson: true,
+      bookableResource: true,
+    },
+  },
   schedules: { include: { rules: true } },
   bookingQuestions: { orderBy: { displayOrder: 'asc' } },
+} as const;
+
+const PUBLIC_FULL_INCLUDE = {
+  ...FULL_INCLUDE,
+  organization: { select: PUBLIC_ORG_SELECT },
 } as const;
 
 @Injectable()
@@ -378,18 +412,32 @@ export class AppointmentTypesService {
   // Public (customer-facing) reads
   // -------------------------------------------------------------------------
 
-  publicList(): Promise<AppointmentType[]> {
+  publicList(): Promise<
+    (AppointmentType & { organization: PublicOrganizationSummary })[]
+  > {
     return this.prisma.appointmentType.findMany({
       where: this.publicWhereClause(),
       orderBy: { createdAt: 'desc' },
+      include: { organization: { select: PUBLIC_ORG_SELECT } },
     });
   }
 
   async publicFindById(id: string): Promise<AppointmentTypeWithRelations> {
-    const found = await this.prisma.appointmentType.findFirst({
-      where: { id, ...this.publicWhereClause() },
-      include: FULL_INCLUDE,
-    });
+    let found: AppointmentTypeWithRelations | null;
+    try {
+      found = await this.prisma.appointmentType.findFirst({
+        where: { id, ...this.publicWhereClause() },
+        include: PUBLIC_FULL_INCLUDE,
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2023'
+      ) {
+        throw new NotFoundException('Appointment type not found');
+      }
+      throw err;
+    }
     if (!found) throw new NotFoundException('Appointment type not found');
     return found;
   }
@@ -402,7 +450,7 @@ export class AppointmentTypesService {
         shareToken: token,
         organization: { approvalStatus: 'APPROVED', isActive: true },
       },
-      include: FULL_INCLUDE,
+      include: PUBLIC_FULL_INCLUDE,
     });
     if (!found) throw new NotFoundException('Appointment type not found');
     return found;

@@ -13,6 +13,7 @@ import {
   Prisma,
   Role,
 } from '@prisma/client';
+import { AnalyticsCacheService } from '../analytics/cache/analytics-cache.service';
 import { writeAuditLog } from '../common/audit/audit-log.helper';
 import { REFUND_HANDLER, RefundHandler } from '../common/refund-handler.token';
 import {
@@ -56,10 +57,20 @@ export class AppointmentsService {
     private readonly prisma: PrismaService,
     private readonly organizations: OrganizationsService,
     private readonly notifications: NotificationsService,
+    private readonly analyticsCache: AnalyticsCacheService,
     @Optional()
     @Inject(REFUND_HANDLER)
     private readonly refundHandler: RefundHandler | null = null,
   ) {}
+
+  private async invalidateAnalyticsCache(
+    organizationId: string,
+  ): Promise<void> {
+    await Promise.all([
+      this.analyticsCache.invalidateOrgScope(organizationId),
+      this.analyticsCache.invalidateAdminScope(),
+    ]);
+  }
 
   // -------------------------------------------------------------------------
   // Customer flows
@@ -114,8 +125,16 @@ export class AppointmentsService {
       ? PaymentStatus.PENDING
       : PaymentStatus.PAID;
 
+    const entityIdForLock = lock.bookablePersonId ?? lock.bookableResourceId!;
+    const advisoryKey = `${appointmentType.id}:${entityIdForLock}:${lock.slotStart.toISOString()}`;
+
     let mailJobs: PendingMailJob[] = [];
     const result = await this.prisma.$transaction(async (tx) => {
+      // Serialise against concurrent slot-lock acquires / other bookings on
+      // the same (type, entity, slot). Without this the capacity recheck below
+      // races under READ COMMITTED.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${advisoryKey}, 0))`;
+
       // Re-check capacity in transaction (PRD §6.1 step 9 — final guard).
       const consumed = await countConsumedCapacity(
         tx,
@@ -123,7 +142,7 @@ export class AppointmentsService {
           id: appointmentType.id,
           entityType: appointmentType.entityType,
         },
-        lock.bookablePersonId ?? lock.bookableResourceId!,
+        entityIdForLock,
         { start: lock.slotStart, end: lock.slotEnd },
         { lockId: lock.id },
       );
@@ -186,6 +205,7 @@ export class AppointmentsService {
     });
 
     await this.notifications.flush(mailJobs);
+    await this.invalidateAnalyticsCache(result.organizationId);
     return result;
   }
 
@@ -311,6 +331,7 @@ export class AppointmentsService {
       return this.loadById(tx, updated.id);
     });
     await this.notifications.flush(mailJobs);
+    await this.invalidateAnalyticsCache(result.organizationId);
     return result;
   }
 
@@ -345,6 +366,7 @@ export class AppointmentsService {
       return this.loadById(tx, updated.id);
     });
     await this.notifications.flush(mailJobs);
+    await this.invalidateAnalyticsCache(result.organizationId);
     return result;
   }
 
@@ -362,6 +384,7 @@ export class AppointmentsService {
       where: { publicId },
       data: { status: AppointmentStatus.COMPLETED },
     });
+    await this.invalidateAnalyticsCache(existing.organizationId);
     return this.findOneForOrganiser(organiserId, publicId);
   }
 
@@ -379,6 +402,7 @@ export class AppointmentsService {
       where: { publicId },
       data: { status: AppointmentStatus.NO_SHOW },
     });
+    await this.invalidateAnalyticsCache(existing.organizationId);
     return this.findOneForOrganiser(organiserId, publicId);
   }
 
@@ -515,6 +539,7 @@ export class AppointmentsService {
       return this.loadById(tx, existing.id);
     });
     await this.notifications.flush(mailJobs);
+    await this.invalidateAnalyticsCache(existing.organizationId);
     return result;
   }
 
@@ -596,8 +621,16 @@ export class AppointmentsService {
     const previousStart = existing.startTime;
     const previousEnd = existing.endTime;
 
+    const rescheduleEntityId = (existing.bookablePersonId ??
+      existing.bookableResourceId)!;
+    const advisoryKey = `${existing.appointmentTypeId}:${rescheduleEntityId}:${lock.slotStart.toISOString()}`;
+
     let mailJobs: PendingMailJob[] = [];
     const result = await this.prisma.$transaction(async (tx) => {
+      // Serialise against concurrent acquires/bookings on the new slot so the
+      // capacity recheck below is race-free under READ COMMITTED.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${advisoryKey}, 0))`;
+
       // Capacity recheck against the new slot range, excluding both this
       // appointment (it's about to move) and the new lock (it's about to be
       // consumed).
@@ -607,7 +640,7 @@ export class AppointmentsService {
           id: existing.appointmentTypeId,
           entityType: existing.appointmentType.entityType,
         },
-        (existing.bookablePersonId ?? existing.bookableResourceId)!,
+        rescheduleEntityId,
         { start: lock.slotStart, end: lock.slotEnd },
         { lockId: lock.id, appointmentId: existing.id },
       );
@@ -672,6 +705,7 @@ export class AppointmentsService {
       return this.loadById(tx, existing.id);
     });
     await this.notifications.flush(mailJobs);
+    await this.invalidateAnalyticsCache(existing.organizationId);
     return result;
   }
 

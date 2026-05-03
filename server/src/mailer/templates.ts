@@ -169,6 +169,20 @@ export function bookingConfirmedCustomerEmail(
   return { subject, text, html };
 }
 
+export function bookingAwaitingPaymentCustomerEmail(
+  ctx: BookingEmailContext,
+): RenderedEmail {
+  const subject = `Booking received — payment required`;
+  const text = `Hi ${ctx.recipientName}, we've received your booking for ${ctx.appointmentTypeName} with ${ctx.organizationName} on ${formatRange(ctx)}. Your slot is held while we wait for your payment to complete. You'll receive a separate confirmation email once payment succeeds.`;
+  const html = wrap(
+    'Booking received — payment required',
+    `<p>Hi ${ctx.recipientName},</p>
+     <p>We've received your booking and are holding your slot while we wait for payment to complete. You'll receive a separate confirmation email once payment succeeds.</p>
+     ${bookingDetailsBlock(ctx)}`,
+  );
+  return { subject, text, html };
+}
+
 export function bookingPendingApprovalCustomerEmail(
   ctx: BookingEmailContext,
 ): RenderedEmail {
@@ -237,9 +251,14 @@ export function bookingCancelledEmail(
   ctx: BookingEmailContext & {
     actor: 'customer' | 'organiser';
     reason?: string;
+    /** When HIGH (e.g. organiser-initiated cancellation), the email is marked
+     *  important in the subject and gets a top-of-body callout. */
+    priority?: 'LOW' | 'NORMAL' | 'HIGH';
   },
 ): RenderedEmail {
-  const subject = `Booking cancelled — ${ctx.appointmentTypeName}`;
+  const isHighPriority = ctx.priority === 'HIGH';
+  const subjectPrefix = isHighPriority ? 'Important: ' : '';
+  const subject = `${subjectPrefix}Booking cancelled — ${ctx.appointmentTypeName}`;
   const actorLine =
     ctx.actor === 'organiser'
       ? `This booking has been cancelled by ${ctx.organizationName}.`
@@ -247,10 +266,14 @@ export function bookingCancelledEmail(
   const reasonHtml = ctx.reason
     ? `<p><strong>Reason:</strong> ${ctx.reason}</p>`
     : '';
+  const calloutHtml = isHighPriority
+    ? `<p style="padding: 10px 12px; background: #fef3c7; border-left: 4px solid #d97706; margin-bottom: 16px;"><strong>Important:</strong> Your upcoming appointment has been cancelled by the organiser. Please review the details below.</p>`
+    : '';
   const text = `Hi ${ctx.recipientName}, ${actorLine} ${ctx.reason ? `Reason: ${ctx.reason}.` : ''}`;
   const html = wrap(
     'Booking cancelled',
     `<p>Hi ${ctx.recipientName},</p>
+     ${calloutHtml}
      <p>${actorLine}</p>
      ${bookingDetailsBlock(ctx)}
      ${reasonHtml}`,

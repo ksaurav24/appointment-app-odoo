@@ -1,114 +1,157 @@
 "use client";
 
-// Central auth hook. All authentication mutations live here.
-//
-// Architecture notes:
-// - Backend uses httpOnly cookies for access/refresh tokens.
-//   No token is stored in JS — the browser handles cookies automatically.
-//
-// Registration flow:
-//   registerCustomerMutation → POST /auth/register (no org) → role=CUSTOMER
-//   registerOrgMutation      → POST /auth/register + org   → role=ORGANIZER
-//   verifyEmailMutation      → POST /auth/verify-email
-//   loginMutation            → POST /auth/login (sets cookies)
-//   logoutMutation           → POST /auth/logout (clears cookies)
-
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ApiError,
+  changePassword,
+  disableTwoFactor,
+  enableTwoFactor,
   forgotPassword,
+  getCurrentUser,
   loginTwoFactor,
   loginUser,
+  logoutAll,
   logoutUser,
-  registerCustomer,
-  registerOrgUser,
+  registerUser,
   resendOtp,
   resetPassword,
   verifyEmail,
 } from "@/lib/api";
-import { useAppStore } from "@/store/useAppStore";
 import type {
-  ForgotPasswordFormValues,
-  LoginFormValues,
-  OrgRegistrationPayload,
-  OtpVerificationFormValues,
-  ResetPasswordFormValues,
+  ChangePasswordInput,
+  DisableTwoFactorInput,
+  ForgotPasswordInput,
+  GenericMessage,
+  LoginInput,
+  LoginResponse,
+  RegisterInput,
+  RegisterResponse,
+  ResendOtpInput,
+  ResetPasswordInput,
+  SafeUser,
+  VerifyEmailInput,
+  VerifyTwoFactorInput,
 } from "@/types";
 
-export function useAuth() {
-  const setUser = useAppStore((state) => state.setUser);
-  const clearAuth = useAppStore((state) => state.clearAuth);
+const AUTH_KEY = ["auth", "me"] as const;
 
-  // ── Register Customer ─────────────────────────────────────────────────────────
-  // Returns { userId, message }. No session — user must verify email then login.
-  const registerCustomerMutation = useMutation({
-    mutationFn: (creds: { fullName: string; email: string; password: string }) =>
-      registerCustomer(creds),
+export function useCurrentUser() {
+  return useQuery<SafeUser | null>({
+    queryKey: AUTH_KEY,
+    queryFn: getCurrentUser,
+    staleTime: 5 * 60_000,
+    retry: false,
   });
+}
 
-  // ── Register Organizer ────────────────────────────────────────────────────────
-  // Returns { userId, organizationId, message }. No session — same verify+login flow.
-  const registerOrgMutation = useMutation({
-    mutationFn: (payload: OrgRegistrationPayload) => registerOrgUser(payload),
-  });
+export function useLogin() {
+  const qc = useQueryClient();
 
-  // ── Verify Email (OTP) ────────────────────────────────────────────────────────
-  // Returns { message }. No session — user must call loginMutation next.
-  const verifyEmailMutation = useMutation({
-    mutationFn: (payload: OtpVerificationFormValues) => verifyEmail(payload),
-  });
-
-  // ── Login ─────────────────────────────────────────────────────────────────────
-  // Returns { user } (cookies set) or { twoFactorRequired: true }.
-  const loginMutation = useMutation({
-    mutationFn: (payload: LoginFormValues) => loginUser(payload),
-    onSuccess: (result) => {
-      if (result.user) setUser(result.user);
+  return useMutation<LoginResponse, ApiError, LoginInput>({
+    mutationFn: loginUser,
+    onSuccess: (data) => {
+      if (data.user) {
+        qc.setQueryData(AUTH_KEY, data.user);
+      }
     },
   });
+}
 
-  // ── Login 2FA ─────────────────────────────────────────────────────────────────
-  const loginTwoFactorMutation = useMutation({
-    mutationFn: ({ email, code }: { email: string; code: string }) =>
-      loginTwoFactor(email, code),
-    onSuccess: (result) => setUser(result.user),
+export function useLoginTwoFactor() {
+  const qc = useQueryClient();
+
+  return useMutation<{ user: SafeUser }, ApiError, VerifyTwoFactorInput>({
+    mutationFn: loginTwoFactor,
+    onSuccess: (data) => {
+      qc.setQueryData(AUTH_KEY, data.user);
+    },
   });
+}
 
-  // ── Logout ────────────────────────────────────────────────────────────────────
-  const logoutMutation = useMutation({
-    mutationFn: () => logoutUser(),
-    onSuccess: () => clearAuth(),
+export function useRegister() {
+  return useMutation<RegisterResponse, ApiError, RegisterInput>({
+    mutationFn: registerUser,
   });
+}
 
-  // ── Resend OTP ────────────────────────────────────────────────────────────────
-  const resendOtpMutation = useMutation({
-    mutationFn: ({
-      email,
-      purpose,
-    }: {
-      email: string;
-      purpose: "SIGNUP" | "LOGIN";
-    }) => resendOtp(email, purpose),
+export function useVerifyEmail() {
+  return useMutation<GenericMessage, ApiError, VerifyEmailInput>({
+    mutationFn: verifyEmail,
   });
+}
 
-  // ── Forgot Password ───────────────────────────────────────────────────────────
-  const forgotPasswordMutation = useMutation({
-    mutationFn: (payload: ForgotPasswordFormValues) => forgotPassword(payload),
+export function useResendOtp() {
+  return useMutation<GenericMessage, ApiError, ResendOtpInput>({
+    mutationFn: resendOtp,
   });
+}
 
-  // ── Reset Password ────────────────────────────────────────────────────────────
-  const resetPasswordMutation = useMutation({
-    mutationFn: (payload: ResetPasswordFormValues) => resetPassword(payload),
+export function useForgotPassword() {
+  return useMutation<GenericMessage, ApiError, ForgotPasswordInput>({
+    mutationFn: forgotPassword,
   });
+}
 
-  return {
-    registerCustomerMutation,
-    registerOrgMutation,
-    verifyEmailMutation,
-    loginMutation,
-    loginTwoFactorMutation,
-    logoutMutation,
-    resendOtpMutation,
-    forgotPasswordMutation,
-    resetPasswordMutation,
-  };
+export function useResetPassword() {
+  return useMutation<GenericMessage, ApiError, ResetPasswordInput>({
+    mutationFn: resetPassword,
+  });
+}
+
+export function useChangePassword() {
+  const qc = useQueryClient();
+
+  return useMutation<GenericMessage, ApiError, ChangePasswordInput>({
+    mutationFn: changePassword,
+    onSuccess: () => {
+      qc.setQueryData(AUTH_KEY, null);
+      qc.invalidateQueries({ queryKey: ["auth"] });
+    },
+  });
+}
+
+export function useLogout() {
+  const qc = useQueryClient();
+
+  return useMutation<GenericMessage, ApiError, void>({
+    mutationFn: logoutUser,
+    onSuccess: () => {
+      qc.setQueryData(AUTH_KEY, null);
+      qc.invalidateQueries({ queryKey: ["auth"] });
+    },
+  });
+}
+
+export function useLogoutAll() {
+  const qc = useQueryClient();
+
+  return useMutation<GenericMessage, ApiError, void>({
+    mutationFn: logoutAll,
+    onSuccess: () => {
+      qc.setQueryData(AUTH_KEY, null);
+      qc.invalidateQueries({ queryKey: ["auth"] });
+    },
+  });
+}
+
+export function useEnableTwoFactor() {
+  const qc = useQueryClient();
+
+  return useMutation<GenericMessage, ApiError, void>({
+    mutationFn: enableTwoFactor,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: AUTH_KEY });
+    },
+  });
+}
+
+export function useDisableTwoFactor() {
+  const qc = useQueryClient();
+
+  return useMutation<GenericMessage, ApiError, DisableTwoFactorInput>({
+    mutationFn: disableTwoFactor,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: AUTH_KEY });
+    },
+  });
 }

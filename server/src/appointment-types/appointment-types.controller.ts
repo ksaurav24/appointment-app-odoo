@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Put,
@@ -61,7 +62,7 @@ export class AppointmentTypesController {
   @ApiOperation({ summary: 'Fetch an appointment type with all sub-resources' })
   findOne(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<AppointmentTypeWithRelations> {
     return this.appointmentTypes.findOneForOrganiser(user.sub, id);
   }
@@ -70,7 +71,7 @@ export class AppointmentTypesController {
   @ApiOperation({ summary: 'Update appointment type basics + policy' })
   update(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateAppointmentTypeDto,
   ): Promise<AppointmentTypeWithRelations> {
     return this.appointmentTypes.update(user.sub, id, body);
@@ -83,7 +84,7 @@ export class AppointmentTypesController {
   })
   async remove(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     await this.appointmentTypes.remove(user.sub, id);
   }
@@ -95,7 +96,7 @@ export class AppointmentTypesController {
   })
   publish(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<AppointmentTypeWithRelations> {
     return this.appointmentTypes.publish(user.sub, id);
   }
@@ -105,7 +106,7 @@ export class AppointmentTypesController {
   @ApiOperation({ summary: 'Unpublish an appointment type' })
   unpublish(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<AppointmentTypeWithRelations> {
     return this.appointmentTypes.unpublish(user.sub, id);
   }
@@ -115,7 +116,7 @@ export class AppointmentTypesController {
   @ApiOperation({ summary: 'Regenerate the private share token' })
   regenerateShareToken(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ shareToken: string }> {
     return this.appointmentTypes.regenerateShareToken(user.sub, id);
   }
@@ -124,7 +125,7 @@ export class AppointmentTypesController {
   @ApiOperation({ summary: 'Replace the entity assignments' })
   setEntities(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() body: SetEntitiesDto,
   ): Promise<AppointmentTypeWithRelations> {
     return this.appointmentTypes.setEntities(user.sub, id, body.entityIds);
@@ -134,7 +135,7 @@ export class AppointmentTypesController {
   @ApiOperation({ summary: 'Replace the schedule and all rules' })
   setSchedule(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() body: SetScheduleDto,
   ): Promise<AppointmentTypeWithRelations> {
     return this.appointmentTypes.setSchedule(
@@ -150,7 +151,7 @@ export class AppointmentTypesController {
   @ApiOperation({ summary: 'Replace the booking question list' })
   setQuestions(
     @CurrentUser() user: JwtUserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() body: SetBookingQuestionsDto,
   ): Promise<AppointmentTypeWithRelations> {
     return this.appointmentTypes.setBookingQuestions(

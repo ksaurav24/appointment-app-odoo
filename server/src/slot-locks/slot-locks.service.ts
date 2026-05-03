@@ -60,7 +60,13 @@ export class SlotLocksService {
     const expiresAt = new Date(Date.now() + DEFAULT_TTL_MINUTES * 60_000);
 
     return this.prisma.$transaction(async (tx) => {
-      // Re-check inside the transaction (PRD §12.2 — defense against races).
+      // Serialise concurrent acquires for this exact (type, entity, slotStart):
+      // pg_advisory_xact_lock blocks any other tx that hashes to the same key
+      // until this one commits/rolls back. Without it the capacity recheck
+      // below has a TOCTOU race under READ COMMITTED.
+      const lockKey = `${at.id}:${entityId}:${slotStart.toISOString()}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+
       const consumed = await countConsumedCapacity(tx, at, entityId, {
         start: slotStart,
         end: slotEnd,

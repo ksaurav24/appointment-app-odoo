@@ -89,10 +89,25 @@ export class AuthController {
   @Throttle({ otpSubmit: { limit: 10, ttl: 600_000 } })
   @HttpCode(HttpStatus.OK)
   @Post('verify-email')
-  @ApiOperation({ summary: 'Verify email address with the OTP sent at signup' })
-  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<{ message: string }> {
-    await this.auth.verifyEmail(dto.email, dto.code);
-    return { message: 'Email verified.' };
+  @ApiOperation({
+    summary:
+      'Verify email address with the OTP sent at signup. On first-time success, sets auth cookies and returns the user so the client can skip a manual login step.',
+  })
+  async verifyEmail(
+    @Body() dto: VerifyEmailDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ message: string; user?: SafeUser }> {
+    const { tokens } = await this.auth.verifyEmail(
+      dto.email,
+      dto.code,
+      requestMeta(req),
+    );
+    if (!tokens) {
+      return { message: 'Email already verified.' };
+    }
+    const user = await this.completeLogin(res, tokens);
+    return { message: 'Email verified.', user };
   }
 
   @Public()

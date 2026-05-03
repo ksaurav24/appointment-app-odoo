@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppointmentStatus, PaymentStatus, Prisma } from '@prisma/client';
+import { AnalyticsCacheService } from '../analytics/cache/analytics-cache.service';
 import { writeAuditLog } from '../common/audit/audit-log.helper';
 import { RefundHandler } from '../common/refund-handler.token';
 import { EnvVars } from '../config/env.validation';
@@ -47,11 +48,21 @@ export class PaymentsService implements RefundHandler {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly analyticsCache: AnalyticsCacheService,
     @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway,
     config: ConfigService<EnvVars, true>,
   ) {
     this.currency = config.get('PAYMENT_CURRENCY', { infer: true });
     this.keyId = config.get('RAZORPAY_KEY_ID', { infer: true });
+  }
+
+  private async invalidateAnalyticsCache(
+    organizationId: string,
+  ): Promise<void> {
+    await Promise.all([
+      this.analyticsCache.invalidateOrgScope(organizationId),
+      this.analyticsCache.invalidateAdminScope(),
+    ]);
   }
 
   // -------------------------------------------------------------------------
@@ -229,6 +240,7 @@ export class PaymentsService implements RefundHandler {
    */
   async markPaid(paymentId: bigint, gatewayPaymentId?: string): Promise<void> {
     const mailJobs: PendingMailJob[] = [];
+    let organizationId: string | null = null;
     await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({
         where: { id: paymentId },
@@ -242,6 +254,7 @@ export class PaymentsService implements RefundHandler {
         );
         return;
       }
+      organizationId = payment.appointment.organizationId;
 
       await tx.payment.update({
         where: { id: payment.id },
@@ -291,6 +304,7 @@ export class PaymentsService implements RefundHandler {
       mailJobs.push(...receiptJobs);
     });
     await this.notifications.flush(mailJobs);
+    if (organizationId) await this.invalidateAnalyticsCache(organizationId);
   }
 
   /**
@@ -298,6 +312,7 @@ export class PaymentsService implements RefundHandler {
    */
   async markFailed(paymentId: bigint): Promise<void> {
     const mailJobs: PendingMailJob[] = [];
+    let organizationId: string | null = null;
     await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({
         where: { id: paymentId },
@@ -314,6 +329,7 @@ export class PaymentsService implements RefundHandler {
         );
         return;
       }
+      organizationId = payment.appointment.organizationId;
 
       await tx.payment.update({
         where: { id: payment.id },
@@ -355,6 +371,7 @@ export class PaymentsService implements RefundHandler {
       }
     });
     await this.notifications.flush(mailJobs);
+    if (organizationId) await this.invalidateAnalyticsCache(organizationId);
   }
 
   // -------------------------------------------------------------------------

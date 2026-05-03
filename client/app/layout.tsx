@@ -1,40 +1,39 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { SiteShell } from "@/components/layout/site-shell";
-import { Providers } from "@/components/layout/providers";
+import { Geist, Geist_Mono, Figtree, Raleway } from "next/font/google"
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
+import { QueryProvider } from "@/components/providers/query-provider"
+import { Toaster } from "@/components/ui/sonner"
+import { cn } from "@/lib/utils";
+
+const ralewayHeading = Raleway({subsets:['latin'],variable:'--font-heading'});
+
+const figtree = Figtree({subsets:['latin'],variable:'--font-sans'})
+
+const fontMono = Geist_Mono({
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "Appointment App",
-  description: "Book, manage, and verify appointments with ease.",
-};
+  variable: "--font-mono",
+})
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={cn("antialiased", fontMono.variable, "font-sans", figtree.variable, ralewayHeading.variable)}
     >
-      <body className="min-h-full bg-gray-50 text-gray-900">
-        <Providers>
-          {/* Keep one shared shell so route-specific layout rules stay centralized. */}
-          <SiteShell>{children}</SiteShell>
-        </Providers>
+      <body>
+        <QueryProvider>
+          <ThemeProvider>
+            {children}
+            <Toaster richColors position="top-right" closeButton duration={3000} />
+          </ThemeProvider>
+        </QueryProvider>
       </body>
     </html>
-  );
+  )
 }
