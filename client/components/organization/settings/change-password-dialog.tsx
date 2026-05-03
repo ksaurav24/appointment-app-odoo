@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,17 @@ export function ChangePasswordDialog({ open, onOpenChange }: Props) {
     );
   };
 
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!open) {
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+      setLocalError(null);
+    }
+  }, [open]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -97,7 +108,9 @@ export function ChangePasswordDialog({ open, onOpenChange }: Props) {
             />
           </div>
           {localError ? (
-            <p className="text-sm text-destructive">{localError}</p>
+            <p role="alert" className="text-sm text-destructive">
+              {localError}
+            </p>
           ) : null}
           <DialogFooter>
             <Button
