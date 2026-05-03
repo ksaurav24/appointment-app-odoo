@@ -28,6 +28,86 @@ services:
       timeout: 5s
       retries: 5
 
+  # ----- Production images (default profile) -----
+  server:
+    profiles: ["prod"]
+    build:
+      context: ./server
+      target: production
+    env_file:
+      - ./server/.env
+    environment:
+      DATABASE_URL: postgresql://odoo:odoo@postgres:5432/odoo?schema=public
+      REDIS_URL: redis://redis:6379
+      PORT: "8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  client:
+    profiles: ["prod"]
+    build:
+      context: ./client
+      target: production
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+  # ----- Dev images with hot reload (use: `docker compose --profile dev up`) -----
+  server-dev:
+    profiles: ["dev"]
+    build:
+      context: ./server
+      target: dev
+    env_file:
+      - ./server/.env
+    environment:
+      DATABASE_URL: postgresql://odoo:odoo@postgres:5432/odoo?schema=public
+      REDIS_URL: redis://redis:6379
+      PORT: "8000"
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./server:/app
+      - server_node_modules:/app/node_modules
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  client-dev:
+    profiles: ["dev"]
+    build:
+      context: ./client
+      target: dev
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./client:/app
+      - client_node_modules:/app/node_modules
+      - client_next_cache:/app/.next
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server-dev
+
 volumes:
   postgres_data:
   redis_data:
+  server_node_modules:
+  client_node_modules:
+  client_next_cache:
