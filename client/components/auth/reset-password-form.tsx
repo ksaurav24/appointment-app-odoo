@@ -8,8 +8,9 @@ import { toast } from "sonner";
 import { AuthError } from "@/components/auth/auth-error";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
+import { PasswordStrengthMeter } from "@/components/ui/password-strength-meter";
 import { Spinner } from "@/components/ui/spinner";
 import { useResetPassword } from "@/hooks/useAuth";
 
@@ -62,7 +63,6 @@ export function ResetPasswordForm() {
   return (
     <AuthShell
       title="Choose a new password"
-      description="Pick something strong — at least 8 characters."
       footer={
         <Link href="/login" className="text-foreground hover:underline">
           Back to sign in
@@ -72,9 +72,8 @@ export function ResetPasswordForm() {
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="newPassword">New password</Label>
-          <Input
+          <PasswordInput
             id="newPassword"
-            type="password"
             autoComplete="new-password"
             required
             minLength={8}
@@ -83,24 +82,27 @@ export function ResetPasswordForm() {
             onChange={(e) => setNewPassword(e.target.value)}
             disabled={reset.isPending}
           />
+          <PasswordStrengthMeter password={newPassword} />
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="confirm">Confirm password</Label>
-          <Input
+          <PasswordInput
             id="confirm"
-            type="password"
             autoComplete="new-password"
             required
             minLength={8}
             maxLength={72}
             value={confirm}
             aria-invalid={mismatch || undefined}
+            aria-describedby={mismatch ? "confirm-error" : undefined}
             onChange={(e) => setConfirm(e.target.value)}
             disabled={reset.isPending}
           />
           {mismatch ? (
-            <p className="text-xs text-destructive">Passwords don&apos;t match.</p>
+            <p id="confirm-error" className="text-xs text-destructive">
+              Passwords don&apos;t match.
+            </p>
           ) : null}
         </div>
 
