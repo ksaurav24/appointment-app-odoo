@@ -16,6 +16,7 @@ import type {
 import {
   buildGeometry,
   getHourTicks,
+  getSlotMarkers,
   getValidEndTargets,
   getValidStartTargets,
   pointToAngle,
@@ -135,6 +136,10 @@ function DialView({
   const hourTicks = useMemo(
     () => getHourTicks(geom, availability.timezone),
     [geom, availability.timezone],
+  );
+  const slotMarkers = useMemo(
+    () => getSlotMarkers(availability, geom),
+    [availability, geom],
   );
 
   const startAngle = selectedStart ? timeToAngle(selectedStart, geom) : null;
@@ -325,18 +330,28 @@ function DialView({
     isDragging: dragging === "end",
   });
 
-  // Empty state.
+  // Empty state. Distinguish "schedule existed but every slot is full" from
+  // "nothing scheduled at all" so the customer doesn't think they picked a
+  // bad day when really every slot just sold out.
   if (
     geom.totalMins === 0 ||
     validStarts.length === 0 ||
     (availability.durationMode === "FIXED" &&
       (availability as FixedAvailability).slots.length === 0)
   ) {
+    const allBooked =
+      availability.durationMode === "FIXED" &&
+      (availability as FixedAvailability).slots.length > 0 &&
+      (availability as FixedAvailability).slots.every(
+        (s) => s.state === "booked",
+      );
     return (
       <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-3 py-12">
         <DialEmptySvg />
         <p className="text-sm text-muted-foreground">
-          No times available on this day.
+          {allBooked
+            ? "All times on this day are fully booked."
+            : "No times available on this day."}
         </p>
       </div>
     );
@@ -365,6 +380,7 @@ function DialView({
           selectedStartAngle={visibleStartAngle}
           selectedEndAngle={visibleEndAngle}
           hourTicks={hourTicks}
+          slotMarkers={slotMarkers}
           cx={CENTER}
           cy={CENTER}
         />
@@ -446,6 +462,30 @@ function DialView({
       <p className="text-xs text-muted-foreground">
         Drag the handles or use arrow keys.
       </p>
+      {slotMarkers.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground">
+          {slotMarkers.some((m) => m.state === "pending") ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className="inline-block size-2.5 rounded-sm"
+                style={{ backgroundColor: "#f59e0b" }}
+              />
+              Pending approval
+            </span>
+          ) : null}
+          {slotMarkers.some((m) => m.state === "booked") ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className="inline-block size-2.5 rounded-sm"
+                style={{ backgroundColor: "#9ca3af" }}
+              />
+              Booked
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

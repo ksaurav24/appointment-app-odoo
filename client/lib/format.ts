@@ -1,5 +1,12 @@
 // Formatters for booking UI: prices, durations, times, dates.
 // All pure — safe to call from server components.
+//
+// Date/time formatting goes through moment-timezone so every surface
+// (slot picker, review screen, confirmation, booking detail) renders the
+// same wall-clock string in the configured zone, regardless of the
+// browser's local timezone.
+
+import moment from "moment-timezone";
 
 export function formatPrice(decimalString: string | null, currency = "INR"): string {
   if (!decimalString) return "Free";
@@ -32,26 +39,23 @@ export function formatDurationRange(
   return `${min}–${max} min`;
 }
 
+// Falls back to UTC if `timeZone` is missing/unknown to moment-tz, so a
+// stale payload never crashes formatting in production.
+function inZone(iso: string, timeZone: string): moment.Moment {
+  const zone = timeZone && moment.tz.zone(timeZone) ? timeZone : "UTC";
+  return moment.tz(iso, zone);
+}
+
 export function formatTimeInZone(iso: string, timeZone: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone,
-  });
+  return inZone(iso, timeZone).format("h:mm A");
 }
 
 export function formatDateInZone(iso: string, timeZone: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone,
-  });
+  return inZone(iso, timeZone).format("ddd, MMM D, YYYY");
 }
 
 export function formatDateTimeInZone(iso: string, timeZone: string): string {
-  return `${formatDateInZone(iso, timeZone)} at ${formatTimeInZone(iso, timeZone)}`;
+  return inZone(iso, timeZone).format("ddd, MMM D, YYYY [at] h:mm A");
 }
 
 // "Mon", "Tue", … from a 0..6 dayOfWeek (0=Sun).
@@ -65,8 +69,7 @@ export function dayOfWeekName(day: number): string {
 export function formatHHMM(hhmm: string): string {
   const [h, m] = hhmm.split(":").map(Number);
   if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
-  const date = new Date(2000, 0, 1, h, m);
-  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return moment({ hour: h, minute: m }).format("h:mm A");
 }
 
 // Compute the difference from now to an ISO timestamp, formatted as M:SS.

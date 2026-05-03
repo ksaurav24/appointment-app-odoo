@@ -17,6 +17,7 @@ import {
   PendingMailJob,
 } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AvailabilityEmitter } from '../realtime/availability.emitter';
 import { VerifyPaymentDto } from './dto/verify-payment.dto';
 import { PAYMENT_GATEWAY } from './gateways/payment-gateway.token';
 import type { PaymentGateway } from './gateways/payment-gateway.interface';
@@ -49,6 +50,7 @@ export class PaymentsService implements RefundHandler {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     private readonly analyticsCache: AnalyticsCacheService,
+    private readonly availabilityEmitter: AvailabilityEmitter,
     @Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway,
     config: ConfigService<EnvVars, true>,
   ) {
@@ -241,6 +243,12 @@ export class PaymentsService implements RefundHandler {
   async markPaid(paymentId: bigint, gatewayPaymentId?: string): Promise<void> {
     const mailJobs: PendingMailJob[] = [];
     let organizationId: string | null = null;
+    let emitTarget: {
+      appointmentTypeId: string;
+      entityId: string;
+      slotStart: Date;
+      slotEnd: Date;
+    } | null = null;
     await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({
         where: { id: paymentId },
@@ -255,6 +263,17 @@ export class PaymentsService implements RefundHandler {
         return;
       }
       organizationId = payment.appointment.organizationId;
+      const entityId =
+        payment.appointment.bookablePersonId ??
+        payment.appointment.bookableResourceId;
+      if (entityId) {
+        emitTarget = {
+          appointmentTypeId: payment.appointment.appointmentTypeId,
+          entityId,
+          slotStart: payment.appointment.startTime,
+          slotEnd: payment.appointment.endTime,
+        };
+      }
 
       await tx.payment.update({
         where: { id: payment.id },
@@ -305,6 +324,7 @@ export class PaymentsService implements RefundHandler {
     });
     await this.notifications.flush(mailJobs);
     if (organizationId) await this.invalidateAnalyticsCache(organizationId);
+    if (emitTarget) await this.availabilityEmitter.emitForSlot(emitTarget);
   }
 
   /**
@@ -313,6 +333,12 @@ export class PaymentsService implements RefundHandler {
   async markFailed(paymentId: bigint): Promise<void> {
     const mailJobs: PendingMailJob[] = [];
     let organizationId: string | null = null;
+    let emitTarget: {
+      appointmentTypeId: string;
+      entityId: string;
+      slotStart: Date;
+      slotEnd: Date;
+    } | null = null;
     await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({
         where: { id: paymentId },
@@ -330,6 +356,17 @@ export class PaymentsService implements RefundHandler {
         return;
       }
       organizationId = payment.appointment.organizationId;
+      const entityId =
+        payment.appointment.bookablePersonId ??
+        payment.appointment.bookableResourceId;
+      if (entityId) {
+        emitTarget = {
+          appointmentTypeId: payment.appointment.appointmentTypeId,
+          entityId,
+          slotStart: payment.appointment.startTime,
+          slotEnd: payment.appointment.endTime,
+        };
+      }
 
       await tx.payment.update({
         where: { id: payment.id },
@@ -372,6 +409,7 @@ export class PaymentsService implements RefundHandler {
     });
     await this.notifications.flush(mailJobs);
     if (organizationId) await this.invalidateAnalyticsCache(organizationId);
+    if (emitTarget) await this.availabilityEmitter.emitForSlot(emitTarget);
   }
 
   // -------------------------------------------------------------------------

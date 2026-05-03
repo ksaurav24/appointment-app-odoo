@@ -19,6 +19,7 @@ import type {
   ChangePasswordInput,
   ChangeRoleInput,
   CreateAppointmentInput,
+  CreateAppointmentRequestInput,
   CreateAppointmentTypeInput,
   CreateBookablePersonInput,
   CreateBookableResourceInput,
@@ -698,6 +699,21 @@ export async function createAppointment(
   try {
     const { data } = await api.post<AppointmentWithRelations>(
       "/appointments",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function submitAppointmentRequest(
+  appointmentTypeId: string,
+  body: CreateAppointmentRequestInput,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/public/appointment-types/${appointmentTypeId}/requests`,
       body,
     );
     return data;

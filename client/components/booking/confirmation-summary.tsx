@@ -13,14 +13,26 @@ type ConfirmationSummaryProps = {
 };
 
 export function ConfirmationSummary({ appointment }: ConfirmationSummaryProps) {
-  const tz = "UTC";
+  // Render the time in the org's configured zone so the confirmation matches
+  // the wall-clock time the customer picked in the slot list.
+  const tz = appointment.appointmentType.organization.timezone;
+
+  // PENDING means two different things depending on the appointment type:
+  // an advance-payment hold (payment in flight) vs a manual-approval request
+  // (organiser must approve, possibly choosing among competing applicants).
+  const isApprovalPending =
+    appointment.status === "PENDING" &&
+    appointment.appointmentType.manualConfirmation &&
+    !appointment.appointmentType.advancePaymentEnabled;
 
   const headline =
     appointment.status === "CONFIRMED"
       ? "You're booked!"
-      : appointment.status === "PENDING"
-        ? "Awaiting organizer confirmation"
-        : `Booking ${appointment.status.toLowerCase()}`;
+      : isApprovalPending
+        ? "Request submitted"
+        : appointment.status === "PENDING"
+          ? "Awaiting organizer confirmation"
+          : `Booking ${appointment.status.toLowerCase()}`;
 
   const paymentLine = (() => {
     if (appointment.paymentStatus === "PAID") return "Paid";
@@ -79,6 +91,13 @@ export function ConfirmationSummary({ appointment }: ConfirmationSummaryProps) {
         <div className="rounded-md border border-amber-500/40 bg-amber-50 p-3 text-xs dark:bg-amber-950/30">
           Payment is being processed. We&apos;ll update this page when it
           confirms.
+        </div>
+      ) : null}
+
+      {isApprovalPending ? (
+        <div className="rounded-md border border-amber-500/40 bg-amber-50 p-3 text-xs dark:bg-amber-950/30">
+          Other customers may also have requested this slot. The organizer
+          will choose who to confirm — you&apos;ll get an email either way.
         </div>
       ) : null}
 

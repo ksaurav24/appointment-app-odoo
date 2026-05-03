@@ -32,9 +32,11 @@ import {
   useCreatePaymentIntent,
   useExtendSlotLock,
   useReleaseSlotLock,
+  useSubmitAppointmentRequest,
   useVerifyPayment,
 } from "@/hooks/useBooking";
 import { useAvailability } from "@/hooks/usePublicAppointments";
+import { useAvailabilityRealtime } from "@/hooks/useAvailabilityRealtime";
 import {
   bookingReducer,
   INITIAL_STATE,
@@ -139,10 +141,50 @@ export function BookingStepper({ type }: BookingStepperProps) {
     },
   );
 
+  // Tracks the rare case where the user has already moved past the
+  // time-picker and a `slot:updated` arrives announcing the slot they had
+  // selected just filled. We store the *slot key* of the affected slot
+  // rather than a boolean; `selectedSlotFilled` is then derived, which
+  // means a new selection (different `state.startTime`) auto-resets it
+  // without needing a setState-in-effect.
+  const [filledSlotKey, setFilledSlotKey] = useState<string | null>(null);
+  const currentSlotKey =
+    state.startTime && state.endTime
+      ? `${state.startTime}|${state.endTime}`
+      : null;
+  const selectedSlotFilled =
+    filledSlotKey !== null && filledSlotKey === currentSlotKey;
+
+  useAvailabilityRealtime(
+    {
+      appointmentTypeId: type.id,
+      date: state.date || undefined,
+      entityId: state.entityId,
+    },
+    (payload) => {
+      if (
+        state.startTime &&
+        state.endTime &&
+        payload.slotStart === state.startTime &&
+        payload.slotEnd === state.endTime &&
+        payload.state === "booked"
+      ) {
+        setFilledSlotKey(`${payload.slotStart}|${payload.slotEnd}`);
+      }
+    },
+  );
+
+  // Manual-approval types skip slot_locks entirely so multiple customers can
+  // submit competing PENDING requests for the same slot. The slot-lock hooks
+  // are still mounted unconditionally (React rules) but the effects that call
+  // them no-op for these types — see the `useEffect` below.
+  const isApprovalFlow = type.manualConfirmation;
+
   const acquire = useAcquireSlotLock();
   const extend = useExtendSlotLock();
   const release = useReleaseSlotLock();
   const createAppt = useCreateAppointment();
+  const submitRequest = useSubmitAppointmentRequest(type.id);
   const cancelAppt = useCancelAppointment();
   const createIntent = useCreatePaymentIntent();
   const verify = useVerifyPayment();
@@ -179,6 +221,7 @@ export function BookingStepper({ type }: BookingStepperProps) {
   }, [state.step]);
 
   useEffect(() => {
+    if (isApprovalFlow) return;
     if (state.step !== "review") return;
     if (state.slotLockId) return;
     if (acquireRequestedRef.current) return;
@@ -223,6 +266,7 @@ export function BookingStepper({ type }: BookingStepperProps) {
     type.assignmentMode,
     user,
     acquireMutate,
+    isApprovalFlow,
   ]);
 
   const handleExtend = useCallback(() => {
@@ -255,7 +299,7 @@ export function BookingStepper({ type }: BookingStepperProps) {
   }, [release, state.slotLockId]);
 
   const goBackFromReview = () => {
-    releaseLockSync();
+    if (!isApprovalFlow) releaseLockSync();
     goPrev();
   };
 
@@ -264,15 +308,59 @@ export function BookingStepper({ type }: BookingStepperProps) {
   const [paymentDismissed, setPaymentDismissed] = useState(false);
 
   const handleConfirm = () => {
+    const answersArr = type.bookingQuestions.map((q) => ({
+      questionId: q.id,
+      answerText: state.answers[q.id]?.trim() ? state.answers[q.id] : null,
+    }));
+
+    if (isApprovalFlow) {
+      if (!state.startTime || !state.endTime) {
+        toast.error("Pick a time before submitting.");
+        dispatch({ type: "GO_TO_STEP", step: "time" });
+        return;
+      }
+      submitRequest.mutate(
+        {
+          entityId:
+            type.assignmentMode === "MANUAL" ? state.entityId : undefined,
+          startTime: state.startTime,
+          endTime: state.endTime,
+          capacityBooked: state.capacityBooked,
+          answers: answersArr.length > 0 ? answersArr : undefined,
+        },
+        {
+          onSuccess: (appt) => {
+            dispatch({ type: "SET_APPOINTMENT", appointmentPublicId: appt.publicId });
+            clearBookingDraft(type.id);
+            router.push(
+              `/book/${type.id}/confirmed?appointment=${encodeURIComponent(
+                appt.publicId,
+              )}`,
+            );
+          },
+          onError: (err) => {
+            if (err.status === 409) {
+              toast.error("Slot was just filled by approved bookings. Pick another time.");
+              dispatch({ type: "GO_TO_STEP", step: "time" });
+            } else if (err.status === 400) {
+              toast.error(err.messages[0] ?? "Couldn't submit request.");
+              if (type.bookingQuestions.length > 0) {
+                dispatch({ type: "GO_TO_STEP", step: "questions" });
+              }
+            } else {
+              toast.error(err.messages[0] ?? "Couldn't submit request.");
+            }
+          },
+        },
+      );
+      return;
+    }
+
     if (!state.slotLockId) {
       toast.error("Slot hold not active. Re-select a time.");
       dispatch({ type: "GO_TO_STEP", step: "time" });
       return;
     }
-    const answersArr = type.bookingQuestions.map((q) => ({
-      questionId: q.id,
-      answerText: state.answers[q.id]?.trim() ? state.answers[q.id] : null,
-    }));
     createAppt.mutate(
       {
         slotLockId: state.slotLockId,
@@ -421,6 +509,27 @@ export function BookingStepper({ type }: BookingStepperProps) {
         </h1>
         <p className="text-sm text-muted-foreground">{type.organization.name}</p>
 
+        {selectedSlotFilled &&
+        state.step !== "entity" &&
+        state.step !== "time" ? (
+          <div
+            role="alert"
+            className="mt-6 flex flex-col gap-3 rounded-md border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p>This time was just filled. Please pick another.</p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (!isApprovalFlow && state.slotLockId) releaseLockSync();
+                dispatch({ type: "GO_TO_STEP", step: "time" });
+              }}
+            >
+              Pick another time
+            </Button>
+          </div>
+        ) : null}
+
         <div className="mt-8 space-y-6">
           {state.step === "entity" ? (
             <section className="space-y-4">
@@ -495,9 +604,17 @@ export function BookingStepper({ type }: BookingStepperProps) {
 
           {state.step === "review" ? (
             <section className="space-y-4">
-              <h2 className="font-heading text-base font-semibold">Review</h2>
+              <h2 className="font-heading text-base font-semibold">
+                {isApprovalFlow ? "Review your request" : "Review"}
+              </h2>
 
-              {state.slotLockExpiresAt ? (
+              {isApprovalFlow ? (
+                <p className="rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                  This service requires organiser approval. Other customers
+                  may also request the same time — the organiser will choose
+                  who to confirm.
+                </p>
+              ) : state.slotLockExpiresAt ? (
                 <SlotLockCountdown
                   expiresAt={state.slotLockExpiresAt}
                   onExtend={handleExtend}
@@ -563,13 +680,25 @@ export function BookingStepper({ type }: BookingStepperProps) {
               <Button
                 onClick={handleConfirm}
                 disabled={
-                  !state.slotLockId || createAppt.isPending || acquire.isPending
+                  selectedSlotFilled
+                    ? true
+                    : isApprovalFlow
+                      ? submitRequest.isPending ||
+                        !state.startTime ||
+                        !state.endTime
+                      : !state.slotLockId ||
+                        createAppt.isPending ||
+                        acquire.isPending
                 }
               >
-                {createAppt.isPending ? <Spinner className="mr-2 size-4" /> : null}
-                {type.advancePaymentEnabled
-                  ? "Continue to payment"
-                  : "Confirm booking"}
+                {(isApprovalFlow ? submitRequest.isPending : createAppt.isPending) ? (
+                  <Spinner className="mr-2 size-4" />
+                ) : null}
+                {isApprovalFlow
+                  ? "Submit request"
+                  : type.advancePaymentEnabled
+                    ? "Continue to payment"
+                    : "Confirm booking"}
               </Button>
             </section>
           ) : null}

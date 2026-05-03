@@ -5,9 +5,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AssignmentMode, EntityType, Prisma, SlotLock } from '@prisma/client';
+import { EntityType, Prisma, SlotLock } from '@prisma/client';
 import { countConsumedCapacity } from '../appointments/helpers/capacity';
+import { pickEntityForSlot } from '../appointments/helpers/entity-pick';
 import { PrismaService } from '../prisma/prisma.service';
+import { AvailabilityEmitter } from '../realtime/availability.emitter';
 
 const APPOINTMENT_TYPE_INCLUDE = {
   entities: true,
@@ -31,7 +33,10 @@ export interface AcquireSlotLockInput {
 
 @Injectable()
 export class SlotLocksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly availabilityEmitter: AvailabilityEmitter,
+  ) {}
 
   async acquire(
     customerId: string,
@@ -50,7 +55,17 @@ export class SlotLocksService {
     }
 
     const at = await this.loadAppointmentType(input.appointmentTypeId);
-    const entityId = await this.pickEntity(
+    if (at.manualConfirmation) {
+      // Manual-approval types intentionally bypass slot_locks so that multiple
+      // customers can submit competing PENDING requests for the same slot.
+      // The frontend should call POST /public/appointment-types/:id/requests
+      // instead. Defence-in-depth against a misbehaving client.
+      throw new BadRequestException(
+        'This appointment type requires approval; submit a request via /public/appointment-types/:id/requests instead of acquiring a slot lock',
+      );
+    }
+    const entityId = await pickEntityForSlot(
+      this.prisma,
       at,
       input.entityId,
       slotStart,
@@ -59,7 +74,7 @@ export class SlotLocksService {
 
     const expiresAt = new Date(Date.now() + DEFAULT_TTL_MINUTES * 60_000);
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       // Serialise concurrent acquires for this exact (type, entity, slotStart):
       // pg_advisory_xact_lock blocks any other tx that hashes to the same key
       // until this one commits/rolls back. Without it the capacity recheck
@@ -87,6 +102,13 @@ export class SlotLocksService {
         },
       });
     });
+    await this.availabilityEmitter.emitForSlot({
+      appointmentTypeId: at.id,
+      entityId,
+      slotStart,
+      slotEnd,
+    });
+    return created;
   }
 
   async release(customerId: string, lockId: bigint): Promise<void> {
@@ -98,6 +120,15 @@ export class SlotLocksService {
       throw new ForbiddenException('Cannot release another user’s slot lock');
     }
     await this.prisma.slotLock.delete({ where: { id: lockId } });
+    const releasedEntity = lock.bookablePersonId ?? lock.bookableResourceId;
+    if (releasedEntity) {
+      await this.availabilityEmitter.emitForSlot({
+        appointmentTypeId: lock.appointmentTypeId,
+        entityId: releasedEntity,
+        slotStart: lock.slotStart,
+        slotEnd: lock.slotEnd,
+      });
+    }
   }
 
   async extend(
@@ -155,11 +186,47 @@ export class SlotLocksService {
     });
   }
 
-  /** Hard-delete every expired lock. Wired to a scheduled job. */
+  /**
+   * Hard-delete every expired lock. Wired to a scheduled job. Emits one
+   * `slot:updated` per unique (appointmentTypeId, entityId, slotStart,
+   * slotEnd) the cleanup freed up — connected booking pages get the
+   * capacity-restored event without a manual refresh.
+   */
   async cleanupExpired(): Promise<{ deleted: number }> {
-    const result = await this.prisma.slotLock.deleteMany({
-      where: { expiresAt: { lt: new Date() } },
+    const now = new Date();
+    // Load first so we can emit per-slot after the delete commits.
+    // `deleteMany` doesn't return rows.
+    const expired = await this.prisma.slotLock.findMany({
+      where: { expiresAt: { lt: now } },
+      select: {
+        appointmentTypeId: true,
+        bookablePersonId: true,
+        bookableResourceId: true,
+        slotStart: true,
+        slotEnd: true,
+      },
     });
+    if (expired.length === 0) return { deleted: 0 };
+
+    const result = await this.prisma.slotLock.deleteMany({
+      where: { expiresAt: { lt: now } },
+    });
+
+    await this.availabilityEmitter.emitForSlots(
+      expired
+        .map((l) => {
+          const entityId = l.bookablePersonId ?? l.bookableResourceId;
+          if (!entityId) return null;
+          return {
+            appointmentTypeId: l.appointmentTypeId,
+            entityId,
+            slotStart: l.slotStart,
+            slotEnd: l.slotEnd,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null),
+    );
+
     return { deleted: result.count };
   }
 
@@ -184,58 +251,5 @@ export class SlotLocksService {
       // and let availability enforce its own checks.
     }
     return at;
-  }
-
-  /**
-   * MANUAL → caller must specify an entity that is linked.
-   * AUTO → if no entity supplied, pick the first linked entity that has the
-   * slot free. This keeps the schema invariant (entity required on lock)
-   * while honoring PRD §4.1 step 4 — system picks for AUTO at slot pick time.
-   */
-  private async pickEntity(
-    at: LoadedAppointmentType,
-    requested: string | undefined,
-    slotStart: Date,
-    slotEnd: Date,
-  ): Promise<string> {
-    const linkedIds = at.entities
-      .map((e) =>
-        at.entityType === EntityType.PERSON
-          ? e.bookablePersonId
-          : e.bookableResourceId,
-      )
-      .filter((x): x is string => x != null);
-
-    if (linkedIds.length === 0) {
-      throw new BadRequestException('Appointment type has no linked entities');
-    }
-
-    if (requested) {
-      if (!linkedIds.includes(requested)) {
-        throw new BadRequestException(
-          'entityId is not linked to this appointment type',
-        );
-      }
-      return requested;
-    }
-
-    if (at.assignmentMode === AssignmentMode.MANUAL) {
-      throw new BadRequestException(
-        'entityId is required for MANUAL assignment',
-      );
-    }
-
-    for (const candidate of linkedIds) {
-      const consumed = await countConsumedCapacity(this.prisma, at, candidate, {
-        start: slotStart,
-        end: slotEnd,
-      });
-      if (consumed < at.maxBookingsPerSlot) {
-        return candidate;
-      }
-    }
-    throw new ConflictException(
-      'No entity is available for the requested slot',
-    );
   }
 }

@@ -1,7 +1,15 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { AssignmentMode, EntityType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AvailabilityEmitter } from '../realtime/availability.emitter';
 import { SlotLocksService } from './slot-locks.service';
+
+function makeEmitterStub(): AvailabilityEmitter {
+  return {
+    emitForSlot: jest.fn().mockResolvedValue(undefined),
+    emitForSlots: jest.fn().mockResolvedValue(undefined),
+  } as unknown as AvailabilityEmitter;
+}
 
 interface PrismaMockState {
   appointmentTypeFindFirst: jest.Mock;
@@ -65,7 +73,7 @@ describe('SlotLocksService.acquire', () => {
       slotLockCreate: jest.fn().mockResolvedValue({ id: 1n }),
       txExecuteRaw: jest.fn().mockResolvedValue(1),
     };
-    service = new SlotLocksService(makePrismaMock(state));
+    service = new SlotLocksService(makePrismaMock(state), makeEmitterStub());
   });
 
   it('creates a lock when the slot is free', async () => {
@@ -124,6 +132,17 @@ describe('SlotLocksService.acquire', () => {
     expect(state.txExecuteRaw.mock.invocationCallOrder[0]).toBeLessThan(
       state.slotLockCount.mock.invocationCallOrder[0],
     );
+  });
+
+  it('refuses to issue a lock for manual-approval appointment types', async () => {
+    state.appointmentTypeFindFirst.mockResolvedValue({
+      ...baseAppointmentType,
+      manualConfirmation: true,
+    });
+    await expect(service.acquire('cust-1', validRequest)).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(state.slotLockCreate).not.toHaveBeenCalled();
   });
 
   it('auto-picks the first available entity in AUTO mode', async () => {
