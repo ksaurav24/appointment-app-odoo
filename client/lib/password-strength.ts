@@ -95,12 +95,12 @@ export function scorePassword(
   }
 
   const unmet: string[] = [];
+  if (penaltyReason === "common") unmet.push("Avoid common passwords");
+  if (penaltyReason === "context") unmet.push("Avoid using your name or email");
   if (len < 12) unmet.push("Use at least 12 characters");
   if (!(hasLower && hasUpper)) unmet.push("Mix upper and lowercase letters");
   if (!hasDigit) unmet.push("Add a number");
   if (!hasSymbol) unmet.push("Add a symbol like ! or #");
-  if (penaltyReason === "context") unmet.push("Avoid using your name or email");
-  if (penaltyReason === "common") unmet.push("Avoid common passwords");
 
   return {
     score,
