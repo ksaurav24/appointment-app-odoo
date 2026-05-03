@@ -42,6 +42,18 @@ function reducer(state: State, action: Action): State {
     case "connected":
       return { ...state, status: "connected" };
     case "disconnected":
+      // A disconnect AFTER a successful connection means we lost the
+      // active session mid-call. Surface as an error so the room can
+      // transition to ENDED. A disconnect from any other prior state
+      // (e.g. cleanup before connect, programmatic teardown) is benign
+      // and returns us to idle.
+      if (state.status === "connected") {
+        return {
+          ...state,
+          status: "error",
+          error: new Error("Connection lost"),
+        };
+      }
       return { ...state, status: "idle" };
     case "error":
       return { ...state, status: "error", error: action.error };

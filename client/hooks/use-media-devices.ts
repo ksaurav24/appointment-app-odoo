@@ -57,9 +57,8 @@ export function useMediaDevices({
     let cancelled = false;
 
     if (typeof navigator === "undefined" || !navigator.mediaDevices) {
-      // Defer to a task so the lint rule against synchronous setState
-      // inside an effect body is satisfied — and so the consumer renders
-      // once before we surface the error.
+      // Defer to a task so we don't trip react-hooks/set-state-in-effect,
+      // and so the consumer renders once before we surface the error.
       queueMicrotask(() => {
         if (cancelled) return;
         setError(
@@ -73,7 +72,7 @@ export function useMediaDevices({
     }
 
     // Reset transient state for the new acquisition pass. Deferred via
-    // microtask so we don't trip react-hooks/set-state-in-effect.
+    // microtask to avoid react-hooks/set-state-in-effect.
     queueMicrotask(() => {
       if (cancelled) return;
       setIsPending(true);

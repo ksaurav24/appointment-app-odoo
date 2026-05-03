@@ -12,6 +12,12 @@ type Props = {
   onLeave: () => void;
   /** Disable screen-share toggle while a swap is in progress. */
   screenPending?: boolean;
+  /**
+   * Disable screen-share toggle when the call hasn't started yet (no
+   * peer connection exists, so a captured display stream would never be
+   * sent). Surfaced via `title` for an affordance.
+   */
+  screenDisabled?: boolean;
 };
 
 export function MeetingControls({
@@ -23,7 +29,9 @@ export function MeetingControls({
   onToggleScreen,
   onLeave,
   screenPending = false,
+  screenDisabled = false,
 }: Props) {
+  const screenIsDisabled = screenPending || screenDisabled;
   return (
     <div className="flex items-center justify-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-2 backdrop-blur">
       <Button
@@ -51,8 +59,10 @@ export function MeetingControls({
         variant={screenEnabled ? "default" : "secondary"}
         size="sm"
         onClick={onToggleScreen}
-        disabled={screenPending}
+        disabled={screenIsDisabled}
+        aria-disabled={screenIsDisabled}
         aria-pressed={screenEnabled}
+        title={screenDisabled ? "Available once the call starts" : undefined}
       >
         {screenEnabled ? "Stop sharing" : "Share screen"}
       </Button>

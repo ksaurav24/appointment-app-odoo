@@ -73,6 +73,10 @@ export function MeetingRoom({
   // Move from TOKEN → PREFLIGHT once we have a token + role.
   useEffect(() => {
     if (phase !== "TOKEN" || !tokenQuery.data) return;
+    // Defer via microtask: phase is a state machine driven by an external
+    // signal (the token query). Direct setState here trips
+    // react-hooks/set-state-in-effect; queueMicrotask defers to the next
+    // task so React commits the current render first.
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) setPhase("PREFLIGHT");
@@ -97,6 +101,8 @@ export function MeetingRoom({
   // Once socket is connected, transition into the role-appropriate waiting state.
   useEffect(() => {
     if (phase !== "SIGNALING" || socketStatus !== "connected") return;
+    // Phase machine driven by external socket status — defer via microtask
+    // to avoid react-hooks/set-state-in-effect cascading-render warning.
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
@@ -111,10 +117,12 @@ export function MeetingRoom({
     };
   }, [phase, socketStatus, role, hostPresent]);
 
-  // Socket-error / handshake failure → end with toast.
+  // Socket-error / handshake failure / mid-call disconnect → end with toast.
   useEffect(() => {
     if (socketStatus !== "error" || !socketError) return;
     toast.error(socketError.message || "Failed to join meeting");
+    // Defer phase transition via microtask: react to external socket
+    // error without tripping react-hooks/set-state-in-effect.
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
@@ -214,6 +222,8 @@ export function MeetingRoom({
     ) {
       return;
     }
+    // Defer phase transition via microtask to avoid
+    // react-hooks/set-state-in-effect cascading-render warning.
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) setPhase("IN_CALL");
@@ -378,7 +388,10 @@ export function MeetingRoom({
       left: "You left the meeting.",
       "peer-left": "The other participant left the meeting.",
       rejected: "The host declined to admit you.",
-      error: "We couldn't establish the connection.",
+      // Prefer the live socket error message ("Connection lost",
+      // handshake details, etc.) when present; otherwise fall back.
+      error:
+        socketError?.message ?? "We couldn't establish the connection.",
     };
     return (
       <EndedScreen
@@ -435,10 +448,8 @@ export function MeetingRoom({
                 <WaitingBanner variant="guest" />
               ) : phase === "WAITING_GUEST" ? (
                 <WaitingBanner
-                  variant="host"
-                  guestLabel="Customer"
-                  onAdmit={() => undefined}
-                  onReject={() => undefined}
+                  variant="host-waiting"
+                  guestLabel="the customer"
                 />
               ) : phase === "GUEST_PRESENT" ? (
                 <WaitingBanner
@@ -475,6 +486,7 @@ export function MeetingRoom({
               videoEnabled={media.videoEnabled}
               screenEnabled={screenEnabled}
               screenPending={screenPending}
+              screenDisabled={phase !== "IN_CALL"}
               onToggleAudio={media.toggleAudio}
               onToggleVideo={media.toggleVideo}
               onToggleScreen={() => void handleToggleScreen()}

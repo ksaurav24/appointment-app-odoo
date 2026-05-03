@@ -188,7 +188,7 @@ export function BookingDetailView({ appointment }: Props) {
                 <Button
                   render={
                     <Link
-                      href={`/meeting/${appointment.publicId}?code=${appointment.confirmationCode}`}
+                      href={`/meeting/${appointment.publicId}?code=${encodeURIComponent(appointment.confirmationCode)}`}
                     />
                   }
                 >
