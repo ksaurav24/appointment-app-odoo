@@ -10,6 +10,8 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
+import { PasswordStrengthMeter } from "@/components/ui/password-strength-meter";
 import { Spinner } from "@/components/ui/spinner";
 import { useRegister } from "@/hooks/useAuth";
 
@@ -23,6 +25,9 @@ export function SignupForm() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const mismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,6 +72,7 @@ export function SignupForm() {
             id="fullName"
             type="text"
             autoComplete="name"
+            autoFocus
             required
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
@@ -89,9 +95,8 @@ export function SignupForm() {
 
         <div className="space-y-1.5">
           <Label htmlFor="password">Password</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="new-password"
             required
             minLength={8}
@@ -100,7 +105,28 @@ export function SignupForm() {
             onChange={(e) => setPassword(e.target.value)}
             disabled={registerMutation.isPending}
           />
-          <p className="text-xs text-muted-foreground">At least 8 characters.</p>
+          <PasswordStrengthMeter
+            password={password}
+            context={{ email, fullName }}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="confirmPassword">Confirm password</Label>
+          <PasswordInput
+            id="confirmPassword"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            maxLength={72}
+            value={confirmPassword}
+            aria-invalid={mismatch || undefined}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            disabled={registerMutation.isPending}
+          />
+          {mismatch ? (
+            <p className="text-xs text-destructive">Passwords don&apos;t match.</p>
+          ) : null}
         </div>
 
         <AuthError error={registerMutation.error} />
@@ -113,7 +139,9 @@ export function SignupForm() {
             registerMutation.isPending ||
             !fullName ||
             !email ||
-            password.length < 8
+            password.length < 8 ||
+            confirmPassword.length < 8 ||
+            mismatch
           }
         >
           {registerMutation.isPending ? <Spinner /> : null}
