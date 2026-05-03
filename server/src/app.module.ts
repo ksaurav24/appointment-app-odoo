@@ -21,6 +21,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { OrganizationApprovedGuard } from './organizations/guards/organization-approved.guard';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { SlotLocksModule } from './slot-locks/slot-locks.module';
 import { UsersModule } from './users/users.module';
 
@@ -46,6 +47,7 @@ import { UsersModule } from './users/users.module';
       ],
     }),
     PrismaModule,
+    RealtimeModule,
     MailerModule,
     NotificationsModule,
     UsersModule,

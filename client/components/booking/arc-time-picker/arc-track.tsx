@@ -4,11 +4,15 @@
 // ticks, and the selected arc. Pure render — no interaction state lives here.
 
 import { describeArc, polarToCartesian } from "./arc-geometry";
-import type { RingGeometry } from "./arc-geometry";
+import type { RingGeometry, SlotMarker } from "./arc-geometry";
 
 const RING_RADIUS = 120;
 const TRACK_WIDTH = 24;
 const SELECTED_WIDTH = 26;
+// Slot markers ride at the same radius as the track so they read as the
+// state of the underlying band, but with a slightly thinner stroke so the
+// notch geometry around them stays legible.
+const MARKER_WIDTH = TRACK_WIDTH - 2;
 const TICK_OUTER = RING_RADIUS + TRACK_WIDTH / 2 + 4;
 const TICK_INNER = RING_RADIUS + TRACK_WIDTH / 2 - 4;
 const NOTCH_OUTER = RING_RADIUS + TRACK_WIDTH / 2;
@@ -20,6 +24,8 @@ export type ArcTrackProps = {
   selectedStartAngle: number | null;
   selectedEndAngle: number | null;
   hourTicks: Array<{ angle: number; label: string }>;
+  /** Per-slot occupancy bands (booked/pending). `available` is implicit. */
+  slotMarkers?: SlotMarker[];
   cx: number;
   cy: number;
 };
@@ -29,6 +35,7 @@ export function ArcTrack({
   selectedStartAngle,
   selectedEndAngle,
   hourTicks,
+  slotMarkers = [],
   cx,
   cy,
 }: ArcTrackProps) {
@@ -75,6 +82,34 @@ export function ArcTrack({
           strokeLinecap="butt"
         />
       ))}
+
+      {/* Per-slot occupancy bands. Drawn on top of the window arc so they
+          replace the "available" colour for occupied/pending slots. */}
+      {slotMarkers.map((m, i) => {
+        const d = describeArc(cx, cy, trackR, m.startAngle, m.endAngle);
+        if (!d) return null;
+        const isPending = m.state === "pending";
+        return (
+          <path
+            key={`marker-${i}`}
+            d={d}
+            fill="none"
+            // Inline colours so the dial reads the same regardless of the
+            // current Tailwind/shadcn theme tokens — amber for pending,
+            // muted-foreground for booked.
+            stroke={isPending ? "#f59e0b" : "#9ca3af"}
+            strokeWidth={MARKER_WIDTH}
+            strokeLinecap="butt"
+            opacity={isPending ? 0.85 : 0.6}
+          >
+            <title>
+              {isPending
+                ? "Has pending approval requests"
+                : "Slot is full"}
+            </title>
+          </path>
+        );
+      })}
 
       {/* Gap notches at inter-window seams. */}
       {gapNotches.map((angle, i) => {

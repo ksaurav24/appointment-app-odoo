@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import type { EnvVars } from './config/env.validation';
 import { NodeEnv } from './config/env.validation';
+import { RedisIoAdapter } from './realtime/redis-io-adapter';
 import { setupSwagger } from './swagger';
 
 // Internal Tier C ids (SlotLock, etc.) are BigInt; JSON.stringify rejects
@@ -44,6 +45,13 @@ async function bootstrap(): Promise<void> {
   if (config.get('NODE_ENV', { infer: true }) !== NodeEnv.Production) {
     setupSwagger(app);
   }
+
+  // Wire socket.io with the Redis adapter so `slot:updated` events fan out
+  // to connected clients on every Node instance, not just the one that ran
+  // the mutation. Falls back to in-memory if REDIS_URL is unset.
+  const wsAdapter = new RedisIoAdapter(app);
+  await wsAdapter.connectToRedis(config.get('REDIS_URL', { infer: true }));
+  app.useWebSocketAdapter(wsAdapter);
 
   const port = config.get('PORT', { infer: true });
   await app.listen(port);

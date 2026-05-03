@@ -1,3 +1,4 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   ConflictException,
@@ -9,10 +10,12 @@ import {
 import {
   AppointmentStatus,
   AppointmentType,
+  EntityType,
   PaymentStatus,
   Prisma,
   Role,
 } from '@prisma/client';
+import { Queue } from 'bullmq';
 import { AnalyticsCacheService } from '../analytics/cache/analytics-cache.service';
 import { writeAuditLog } from '../common/audit/audit-log.helper';
 import { REFUND_HANDLER, RefundHandler } from '../common/refund-handler.token';
@@ -22,17 +25,27 @@ import {
 } from '../notifications/notifications.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AvailabilityEmitter } from '../realtime/availability.emitter';
+import {
+  APPOINTMENTS_QUEUE_NAME,
+  AUTO_REJECT_FANOUT_JOB,
+  AutoRejectFanoutPayload,
+} from './queue/appointments.queue';
 import { CancelAppointmentDto } from './dto/cancel-appointment.dto';
+import { CreateAppointmentRequestDto } from './dto/create-appointment-request.dto';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { ListAppointmentsQuery } from './dto/list-appointments.query';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
 import { countConsumedCapacity } from './helpers/capacity';
 import { generateConfirmationCode } from './helpers/confirmation-code';
+import { pickEntityForSlot } from './helpers/entity-pick';
 import { assertCancellable, assertReschedulable } from './helpers/policy';
 import { AnswerInput, validateAnswers } from './helpers/validate-answers';
 
 const APPOINTMENT_INCLUDE = {
-  appointmentType: true,
+  // organization is nested under appointmentType so the client can render
+  // start/end times in the org's configured timezone (matches the slot picker).
+  appointmentType: { include: { organization: true } },
   bookablePerson: true,
   bookableResource: true,
   answers: { include: { question: true } },
@@ -40,6 +53,13 @@ const APPOINTMENT_INCLUDE = {
 
 // BigInt `id` is internal; clients address appointments by `publicId`.
 const APPOINTMENT_OMIT = { id: true } satisfies Prisma.AppointmentOmit;
+
+/**
+ * Reason recorded on appointments that are auto-cancelled because another
+ * applicant's approval filled the slot. Surfaced verbatim to the customer
+ * via the APPOINTMENT_REJECTED notification.
+ */
+const AUTO_REJECT_REASON = 'Slot filled by another applicant';
 
 export type AppointmentWithRelations = Prisma.AppointmentGetPayload<{
   include: typeof APPOINTMENT_INCLUDE;
@@ -58,10 +78,30 @@ export class AppointmentsService {
     private readonly organizations: OrganizationsService,
     private readonly notifications: NotificationsService,
     private readonly analyticsCache: AnalyticsCacheService,
+    @InjectQueue(APPOINTMENTS_QUEUE_NAME)
+    private readonly appointmentsQueue: Queue<AutoRejectFanoutPayload>,
+    private readonly availabilityEmitter: AvailabilityEmitter,
     @Optional()
     @Inject(REFUND_HANDLER)
     private readonly refundHandler: RefundHandler | null = null,
   ) {}
+
+  /**
+   * Returns the entity id from an appointment row regardless of whether it
+   * points at a person or a resource. Throws when neither is set, which
+   * shouldn't happen for any appointment that successfully passed the
+   * service layer.
+   */
+  private appointmentEntityId(a: {
+    bookablePersonId: string | null;
+    bookableResourceId: string | null;
+  }): string {
+    const id = a.bookablePersonId ?? a.bookableResourceId;
+    if (!id) {
+      throw new Error('Appointment is missing both person and resource id');
+    }
+    return id;
+  }
 
   private async invalidateAnalyticsCache(
     organizationId: string,
@@ -206,6 +246,165 @@ export class AppointmentsService {
 
     await this.notifications.flush(mailJobs);
     await this.invalidateAnalyticsCache(result.organizationId);
+    await this.availabilityEmitter.emitForSlot({
+      appointmentTypeId: appointmentType.id,
+      entityId: entityIdForLock,
+      slotStart: lock.slotStart,
+      slotEnd: lock.slotEnd,
+    });
+    return result;
+  }
+
+  /**
+   * Submit a manual-approval booking request (PRD §6.2). The appointment type
+   * must have `manualConfirmation = true`. No slot lock is involved — multiple
+   * customers may submit competing PENDING requests for the same slot, and
+   * the organiser approves up to `maxBookingsPerSlot` of them via
+   * `approve()`.
+   *
+   * The advisory lock + confirmed-only capacity recheck guard against the
+   * (rare) case where the slot is already filled with CONFIRMED appointments
+   * by the time the request lands.
+   */
+  async submitRequest(
+    customerId: string,
+    appointmentTypeId: string,
+    input: CreateAppointmentRequestDto,
+  ): Promise<AppointmentWithRelations> {
+    const slotStart = new Date(input.startTime);
+    const slotEnd = new Date(input.endTime);
+    if (
+      Number.isNaN(slotStart.getTime()) ||
+      Number.isNaN(slotEnd.getTime()) ||
+      slotEnd.getTime() <= slotStart.getTime()
+    ) {
+      throw new BadRequestException(
+        'startTime and endTime must be valid ISO instants with endTime > startTime',
+      );
+    }
+
+    const appointmentType = await this.prisma.appointmentType.findFirst({
+      where: {
+        id: appointmentTypeId,
+        organization: { approvalStatus: 'APPROVED', isActive: true },
+      },
+      include: {
+        bookingQuestions: true,
+        organization: true,
+        entities: true,
+      },
+    });
+    if (!appointmentType) {
+      throw new NotFoundException('Appointment type not found');
+    }
+    if (!appointmentType.manualConfirmation) {
+      throw new BadRequestException(
+        'This appointment type does not require approval; use POST /appointments with a slot lock instead',
+      );
+    }
+    if (appointmentType.advancePaymentEnabled) {
+      // Approval + advance payment combined isn't supported in v1 — the two
+      // PENDING-driving signals would race. Reject up front to avoid silent
+      // surprises rather than letting the user submit a request that can
+      // never be approved without a payment flow that doesn't exist yet.
+      throw new BadRequestException(
+        'Manual-approval flow does not support advance payment yet',
+      );
+    }
+
+    const capacityBooked = this.resolveCapacity(
+      appointmentType,
+      input.capacityBooked,
+    );
+    const answers = validateAnswers(
+      appointmentType.bookingQuestions,
+      (input.answers ?? []) as AnswerInput[],
+    );
+
+    // Pick the entity by CONFIRMED-only capacity so PENDING applicants don't
+    // exhaust the AUTO selection.
+    const entityId = await pickEntityForSlot(
+      this.prisma,
+      appointmentType,
+      input.entityId,
+      slotStart,
+      slotEnd,
+      'confirmed_only',
+    );
+
+    const durationMins = Math.floor(
+      (slotEnd.getTime() - slotStart.getTime()) / 60_000,
+    );
+    const advisoryKey = `${appointmentType.id}:${entityId}:${slotStart.toISOString()}`;
+
+    let mailJobs: PendingMailJob[] = [];
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Serialise against approve() and other submitRequest()s for the same
+      // slot so the CONFIRMED-count recheck below is race-free.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${advisoryKey}, 0))`;
+
+      const confirmed = await countConsumedCapacity(
+        tx,
+        {
+          id: appointmentType.id,
+          entityType: appointmentType.entityType,
+        },
+        entityId,
+        { start: slotStart, end: slotEnd },
+        {},
+        'confirmed_only',
+      );
+      if (confirmed + capacityBooked > appointmentType.maxBookingsPerSlot) {
+        throw new ConflictException(
+          'Slot is already filled by approved bookings',
+        );
+      }
+
+      const appointment = await tx.appointment.create({
+        data: {
+          appointmentTypeId: appointmentType.id,
+          organizationId: appointmentType.organizationId,
+          customerId,
+          ...(appointmentType.entityType === 'PERSON'
+            ? { bookablePersonId: entityId }
+            : { bookableResourceId: entityId }),
+          startTime: slotStart,
+          endTime: slotEnd,
+          durationMins,
+          status: AppointmentStatus.PENDING,
+          capacityBooked,
+          totalAmount: null,
+          paymentStatus: PaymentStatus.PAID,
+          confirmationCode: generateConfirmationCode(),
+        },
+      });
+
+      if (answers.length > 0) {
+        await tx.appointmentAnswer.createMany({
+          data: answers.map((a) => ({
+            appointmentId: appointment.id,
+            questionId: BigInt(a.questionId),
+            answerText: a.answerText,
+          })),
+        });
+      }
+
+      mailJobs = await this.notifications.dispatch(tx, {
+        type: 'APPOINTMENT_PENDING_APPROVAL',
+        appointmentId: appointment.id,
+      });
+
+      return this.loadById(tx, appointment.id);
+    });
+
+    await this.notifications.flush(mailJobs);
+    await this.invalidateAnalyticsCache(result.organizationId);
+    await this.availabilityEmitter.emitForSlot({
+      appointmentTypeId: appointmentType.id,
+      entityId,
+      slotStart,
+      slotEnd,
+    });
     return result;
   }
 
@@ -306,7 +505,14 @@ export class AppointmentsService {
     return appointment;
   }
 
-  /** Approve a PENDING appointment (when manualConfirmation is enabled). */
+  /**
+   * Approve a PENDING appointment (manual confirmation). When approval pushes
+   * the slot's CONFIRMED count to `maxBookingsPerSlot`, every other PENDING
+   * for the same (entity, slot) is auto-cancelled in the same transaction
+   * with `cancellationReason = AUTO_REJECT_REASON`. Per-loser
+   * `APPOINTMENT_REJECTED` notifications are fanned out via BullMQ so the
+   * organiser's request returns immediately even when many losers exist.
+   */
   async approve(
     organiserId: string,
     publicId: string,
@@ -318,8 +524,35 @@ export class AppointmentsService {
       );
     }
 
+    const at = existing.appointmentType;
+    const entityId = (existing.bookablePersonId ??
+      existing.bookableResourceId) as string;
+    const advisoryKey = `${existing.appointmentTypeId}:${entityId}:${existing.startTime.toISOString()}`;
+
     let mailJobs: PendingMailJob[] = [];
+    let autoRejectedIds: bigint[] = [];
+
     const result = await this.prisma.$transaction(async (tx) => {
+      // Serialise against concurrent approves and submitRequest()s for the
+      // same slot so the CONFIRMED-count recheck below is race-free under
+      // READ COMMITTED. Two organisers approving simultaneously must not
+      // both push CONFIRMED past maxBookingsPerSlot.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${advisoryKey}, 0))`;
+
+      // 'confirmed_only' mode skips PENDING rows, so the appointment we are
+      // about to approve is automatically excluded — no need to filter by id.
+      const confirmed = await countConsumedCapacity(
+        tx,
+        { id: at.id, entityType: at.entityType },
+        entityId,
+        { start: existing.startTime, end: existing.endTime },
+        {},
+        'confirmed_only',
+      );
+      if (confirmed + existing.capacityBooked > at.maxBookingsPerSlot) {
+        throw new ConflictException('Slot is already fully booked');
+      }
+
       const updated = await tx.appointment.update({
         where: { publicId },
         data: { status: AppointmentStatus.CONFIRMED },
@@ -328,10 +561,73 @@ export class AppointmentsService {
         type: 'APPOINTMENT_APPROVED',
         appointmentId: updated.id,
       });
+
+      const newConfirmed = confirmed + existing.capacityBooked;
+      if (newConfirmed >= at.maxBookingsPerSlot) {
+        const losers = await tx.appointment.findMany({
+          where: {
+            appointmentTypeId: existing.appointmentTypeId,
+            status: AppointmentStatus.PENDING,
+            startTime: existing.startTime,
+            endTime: existing.endTime,
+            ...(at.entityType === EntityType.PERSON
+              ? { bookablePersonId: entityId }
+              : { bookableResourceId: entityId }),
+            id: { not: updated.id },
+          },
+          select: { id: true, publicId: true },
+        });
+        if (losers.length > 0) {
+          autoRejectedIds = losers.map((l) => l.id);
+          await tx.appointment.updateMany({
+            where: { id: { in: autoRejectedIds } },
+            data: {
+              status: AppointmentStatus.CANCELLED,
+              cancellationReason: AUTO_REJECT_REASON,
+              cancelledAt: new Date(),
+            },
+          });
+          for (const loser of losers) {
+            await writeAuditLog(tx, {
+              actorId: organiserId,
+              actorRole: Role.ORGANIZER,
+              action: 'appointment.auto_rejected',
+              entityType: 'appointment',
+              entityId: loser.publicId,
+              metadata: {
+                triggeredByAppointmentPublicId: updated.publicId,
+                slotStart: existing.startTime.toISOString(),
+                slotEnd: existing.endTime.toISOString(),
+              },
+            });
+          }
+        }
+      }
+
       return this.loadById(tx, updated.id);
     });
+
     await this.notifications.flush(mailJobs);
+
+    if (autoRejectedIds.length > 0) {
+      // Fan-out APPOINTMENT_REJECTED notifications out-of-band: the DB state
+      // is already durable, so a queue failure only delays mail — it can't
+      // corrupt the slot.
+      await this.appointmentsQueue.add(AUTO_REJECT_FANOUT_JOB, {
+        appointmentIds: autoRejectedIds.map((id) => id.toString()),
+        reason: AUTO_REJECT_REASON,
+      });
+    }
+
     await this.invalidateAnalyticsCache(result.organizationId);
+    // Both the approve and the auto-reject batch happened on the same
+    // (entity, slot), so a single emit reflects both transitions.
+    await this.availabilityEmitter.emitForSlot({
+      appointmentTypeId: existing.appointmentTypeId,
+      entityId,
+      slotStart: existing.startTime,
+      slotEnd: existing.endTime,
+    });
     return result;
   }
 
@@ -367,6 +663,12 @@ export class AppointmentsService {
     });
     await this.notifications.flush(mailJobs);
     await this.invalidateAnalyticsCache(result.organizationId);
+    await this.availabilityEmitter.emitForSlot({
+      appointmentTypeId: existing.appointmentTypeId,
+      entityId: this.appointmentEntityId(existing),
+      slotStart: existing.startTime,
+      slotEnd: existing.endTime,
+    });
     return result;
   }
 
@@ -540,6 +842,12 @@ export class AppointmentsService {
     });
     await this.notifications.flush(mailJobs);
     await this.invalidateAnalyticsCache(existing.organizationId);
+    await this.availabilityEmitter.emitForSlot({
+      appointmentTypeId: existing.appointmentTypeId,
+      entityId: this.appointmentEntityId(existing),
+      slotStart: existing.startTime,
+      slotEnd: existing.endTime,
+    });
     return result;
   }
 
@@ -706,6 +1014,24 @@ export class AppointmentsService {
     });
     await this.notifications.flush(mailJobs);
     await this.invalidateAnalyticsCache(existing.organizationId);
+    // Reschedules touch two slots: the previous one (which freed up) and the
+    // new one (which is now consumed). Emit for both so subscribers on
+    // either day refetch.
+    const rescheduleEntity = this.appointmentEntityId(existing);
+    await this.availabilityEmitter.emitForSlots([
+      {
+        appointmentTypeId: existing.appointmentTypeId,
+        entityId: rescheduleEntity,
+        slotStart: previousStart,
+        slotEnd: previousEnd,
+      },
+      {
+        appointmentTypeId: existing.appointmentTypeId,
+        entityId: rescheduleEntity,
+        slotStart: lock.slotStart,
+        slotEnd: lock.slotEnd,
+      },
+    ]);
     return result;
   }
 

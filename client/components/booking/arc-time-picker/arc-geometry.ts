@@ -5,6 +5,7 @@
 
 import type {
   AvailabilityResponse,
+  FixedAvailability,
   VariableAvailability,
 } from "@/types";
 
@@ -33,6 +34,19 @@ export type EndTarget = {
   iso: string;
   angle: number;
   durationMins: number;
+};
+
+/**
+ * Per-slot occupancy marker for the dial. Fixed-mode slots that have a
+ * non-default state (`pending` or `booked`) are rendered as colored bands
+ * over the ring so the customer sees who's competing for which time.
+ * `available` slots are intentionally omitted since the underlying window
+ * arc already represents them.
+ */
+export type SlotMarker = {
+  startAngle: number;
+  endAngle: number;
+  state: "pending" | "booked";
 };
 
 function mergeContiguous(
@@ -123,6 +137,9 @@ export function getValidStartTargets(
   if (a.durationMode === "FIXED") {
     const out: SnapTarget[] = [];
     for (const s of a.slots) {
+      // Booked slots have remainingCapacity === 0 — skip them so drag/snap
+      // can't land on a slot the customer can't take. Pending slots are
+      // selectable (the customer is competing for the slot).
       if (s.remainingCapacity <= 0) continue;
       const angle = timeToAngle(s.startTime, geom);
       if (angle === null) continue;
@@ -131,6 +148,28 @@ export function getValidStartTargets(
     return out;
   }
   return getVariableStartTargets(a, geom);
+}
+
+/**
+ * Build the colored marker bands the dial overlays on top of the window
+ * arcs. Only fixed-mode slots produce markers; variable-mode availability
+ * has no discrete slots to mark in v1.
+ */
+export function getSlotMarkers(
+  a: AvailabilityResponse,
+  geom: RingGeometry,
+): SlotMarker[] {
+  if (geom.totalMins === 0 || a.durationMode !== "FIXED") return [];
+  const fixed = a as FixedAvailability;
+  const out: SlotMarker[] = [];
+  for (const s of fixed.slots) {
+    if (s.state === "available") continue;
+    const startAngle = timeToAngle(s.startTime, geom);
+    const endAngle = timeToAngle(s.endTime, geom);
+    if (startAngle === null || endAngle === null) continue;
+    out.push({ startAngle, endAngle, state: s.state });
+  }
+  return out;
 }
 
 function getVariableStartTargets(

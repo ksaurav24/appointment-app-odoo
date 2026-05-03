@@ -13,6 +13,7 @@ import {
   listMyAppointments,
   releaseSlotLock,
   rescheduleAppointment,
+  submitAppointmentRequest,
   verifyPayment,
 } from "@/lib/api";
 import type {
@@ -20,6 +21,7 @@ import type {
   AppointmentWithRelations,
   CancelAppointmentInput,
   CreateAppointmentInput,
+  CreateAppointmentRequestInput,
   CreatePaymentIntentInput,
   CreatePaymentIntentResult,
   ListMyAppointmentsQuery,
@@ -57,6 +59,25 @@ export function useCreateAppointment() {
     mutationFn: createAppointment,
     onSuccess: (appt) => {
       qc.setQueryData(appointmentKey(appt.publicId), appt);
+    },
+  });
+}
+
+export function useSubmitAppointmentRequest(appointmentTypeId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    AppointmentWithRelations,
+    ApiError,
+    CreateAppointmentRequestInput
+  >({
+    mutationFn: (body) => submitAppointmentRequest(appointmentTypeId, body),
+    onSuccess: (appt) => {
+      qc.setQueryData(appointmentKey(appt.publicId), appt);
+      // Force the booking page to re-fetch availability so the slot we just
+      // applied to flips to `pending` for the current user.
+      qc.invalidateQueries({
+        queryKey: ["public", "appointment-types", appointmentTypeId, "availability"],
+      });
     },
   });
 }
