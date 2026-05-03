@@ -121,11 +121,14 @@ export function SignupForm() {
             maxLength={72}
             value={confirmPassword}
             aria-invalid={mismatch || undefined}
+            aria-describedby={mismatch ? "confirmPassword-error" : undefined}
             onChange={(e) => setConfirmPassword(e.target.value)}
             disabled={registerMutation.isPending}
           />
           {mismatch ? (
-            <p className="text-xs text-destructive">Passwords don&apos;t match.</p>
+            <p id="confirmPassword-error" className="text-xs text-destructive">
+              Passwords don&apos;t match.
+            </p>
           ) : null}
         </div>
 
