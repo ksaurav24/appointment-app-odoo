@@ -1,6 +1,7 @@
 export type ISODate = `${number}-${number}-${number}`;
 export type ISODateTime = string; // NOSONAR - keeps intent clear without impacting runtime.
 export type TimeOfDay = `${number}:${number}`;
+export type EntityId = string | number | bigint;
 
 export interface LocalTimeWindow {
   startMinutes: number;

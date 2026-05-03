@@ -3,11 +3,12 @@ import type {
   EntityAssignment,
   ExistingAppointment,
 } from '../domain/models.ts';
-import type { ISODateTime } from '../domain/value-objects.ts';
+import type { EntityId, ISODateTime } from '../domain/value-objects.ts';
+import { idsEqual } from '../shared/ids.ts';
 
 interface AssignmentCarrier {
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
 }
 
 export function intervalsOverlap(
@@ -24,21 +25,24 @@ export function assignmentConflicts(
   existing: AssignmentCarrier,
 ): boolean {
   const sharesPerson =
-    !!candidate.bookablePersonId &&
-    candidate.bookablePersonId === (existing.bookablePersonId ?? null);
+    candidate.bookablePersonId != null &&
+    idsEqual(candidate.bookablePersonId, existing.bookablePersonId ?? null);
   const sharesResource =
-    !!candidate.bookableResourceId &&
-    candidate.bookableResourceId === (existing.bookableResourceId ?? null);
+    candidate.bookableResourceId != null &&
+    idsEqual(candidate.bookableResourceId, existing.bookableResourceId ?? null);
 
-  if (candidate.bookablePersonId && candidate.bookableResourceId) {
+  if (
+    candidate.bookablePersonId != null &&
+    candidate.bookableResourceId != null
+  ) {
     return sharesPerson || sharesResource;
   }
 
-  if (candidate.bookablePersonId) {
+  if (candidate.bookablePersonId != null) {
     return sharesPerson;
   }
 
-  if (candidate.bookableResourceId) {
+  if (candidate.bookableResourceId != null) {
     return sharesResource;
   }
 

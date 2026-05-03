@@ -5,6 +5,7 @@ import type {
   ConfirmBookingInput,
 } from '../domain/models.ts';
 import type { ISODateTime } from '../domain/value-objects.ts';
+import { idsEqual } from '../shared/ids.ts';
 import { addMinutesToIso } from '../shared/time.ts';
 import { resolveRequestedSlot } from './request-evaluator.ts';
 
@@ -25,7 +26,7 @@ export function confirmBookingFromSnapshot(
     };
   }
 
-  if (input.snapshot.appointmentType.id !== input.appointmentTypeId) {
+  if (!idsEqual(input.snapshot.appointmentType.id, input.appointmentTypeId)) {
     return {
       confirmed: false,
       reason: 'appointment_type_mismatch',
@@ -45,7 +46,9 @@ export function confirmBookingFromSnapshot(
   const snapshotForConfirmation: AvailabilitySnapshot = {
     ...input.snapshot,
     activeHolds: callerHold
-      ? input.snapshot.activeHolds.filter((hold) => hold.id !== callerHold.id)
+      ? input.snapshot.activeHolds.filter(
+          (hold) => !idsEqual(hold.id, callerHold.id),
+        )
       : input.snapshot.activeHolds,
   };
   const resolutionInput: {
@@ -102,8 +105,11 @@ function holdMatchesRequest(
   return (
     hold.slotStart === request.slotStart &&
     hold.slotEnd === addMinutesToIso(request.slotStart, request.requestedDuration) &&
-    (hold.bookablePersonId ?? null) === (request.bookablePersonId ?? null) &&
-    (hold.bookableResourceId ?? null) === (request.bookableResourceId ?? null)
+    idsEqual(hold.bookablePersonId ?? null, request.bookablePersonId ?? null) &&
+    idsEqual(
+      hold.bookableResourceId ?? null,
+      request.bookableResourceId ?? null,
+    )
   );
 }
 
@@ -128,14 +134,16 @@ function validateHold(input: ConfirmBookingFromSnapshotInput):
   }
 
   const hold =
-    input.snapshot.activeHolds.find((candidate) => candidate.id === holdId) ??
+    input.snapshot.activeHolds.find((candidate) =>
+      idsEqual(candidate.id, holdId),
+    ) ??
     null;
 
   if (!hold) {
     return { ok: false, reason: 'hold_not_found' };
   }
 
-  if (hold.customerId !== input.customerId) {
+  if (!idsEqual(hold.customerId, input.customerId)) {
     return { ok: false, reason: 'hold_not_owned' };
   }
 

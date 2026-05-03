@@ -4,6 +4,7 @@ import type {
   AvailabilitySlot,
   GetAvailabilityInput,
 } from '../domain/models.ts';
+import type { EntityId } from '../domain/value-objects.ts';
 import {
   expandAssignmentCandidates,
   filterAssignmentsByEntityType,
@@ -11,6 +12,7 @@ import {
 import { calculateRemainingCapacity } from './capacity-calculator.ts';
 import { resolveScheduleDay } from './schedule-resolver.ts';
 import { generateSlotCandidates } from './slot-generator.ts';
+import { idsEqual, toIdString } from '../shared/ids.ts';
 
 export interface GetAvailabilityFromSnapshotInput extends GetAvailabilityInput {
   snapshot: AvailabilitySnapshot;
@@ -21,6 +23,12 @@ export interface GetAvailabilityFromSnapshotInput extends GetAvailabilityInput {
 export function getAvailabilityFromSnapshot(
   input: GetAvailabilityFromSnapshotInput,
 ): AvailabilityDay {
+  if (!idsEqual(input.appointmentTypeId, input.snapshot.appointmentType.id)) {
+    throw new Error(
+      `Appointment type mismatch: expected ${toIdString(input.snapshot.appointmentType.id)}, received ${toIdString(input.appointmentTypeId)}`,
+    );
+  }
+
   const resolvedDay = resolveScheduleDay(
     input.snapshot.schedule,
     input.date,
@@ -34,7 +42,7 @@ export function getAvailabilityFromSnapshot(
     ),
   );
   const resourceLookup = new Map(
-    input.snapshot.resources.map((resource) => [resource.id, resource]),
+    input.snapshot.resources.map((resource) => [toIdString(resource.id), resource]),
   );
 
   const slots = assignments.flatMap((assignment) => {
@@ -75,7 +83,8 @@ export function getAvailabilityFromSnapshot(
         blockingStatuses: input.blockingStatuses,
         resource:
           assignment.bookableResourceId
-            ? resourceLookup.get(assignment.bookableResourceId) ?? null
+            ? resourceLookup.get(toIdString(assignment.bookableResourceId)) ??
+              null
             : null,
       };
 
@@ -114,15 +123,23 @@ function compareAvailabilitySlots(
     return left.slotStart.localeCompare(right.slotStart);
   }
 
-  if ((left.bookablePersonId ?? '') !== (right.bookablePersonId ?? '')) {
-    return (left.bookablePersonId ?? '').localeCompare(
-      right.bookablePersonId ?? '',
-    );
+  const personCompare = toSortableId(left.bookablePersonId).localeCompare(
+    toSortableId(right.bookablePersonId),
+  );
+  if (personCompare !== 0) {
+    return personCompare;
   }
 
-  return (left.bookableResourceId ?? '').localeCompare(
-    right.bookableResourceId ?? '',
+  return toSortableId(left.bookableResourceId).localeCompare(
+    toSortableId(right.bookableResourceId),
   );
+}
+
+function toSortableId(id: EntityId | null | undefined): string {
+  if (id == null) {
+    return '';
+  }
+  return toIdString(id);
 }
 
 function assignIfDefined<T, K extends keyof T>(

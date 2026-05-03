@@ -4,6 +4,7 @@ import type {
   OrganizerRecommendation,
   SlotRiskScore,
 } from '../domain/models.ts';
+import { toIdString } from '../shared/ids.ts';
 
 export interface BuildOrganizerRecommendationsInput {
   availability: AvailabilityDay;
@@ -110,7 +111,9 @@ function buildSlotKey(
   return [
     slot.slotStart,
     slot.slotEnd,
-    slot.bookablePersonId ?? 'none',
-    slot.bookableResourceId ?? 'none',
+    slot.bookablePersonId == null ? 'none' : toIdString(slot.bookablePersonId),
+    slot.bookableResourceId == null
+      ? 'none'
+      : toIdString(slot.bookableResourceId),
   ].join('|');
 }

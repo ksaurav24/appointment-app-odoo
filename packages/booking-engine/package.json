@@ -2,12 +2,24 @@
   "name": "@appointment-app/booking-engine",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "build": "node --experimental-strip-types scripts/build-check.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "build:check": "node --experimental-strip-types scripts/build-check.ts",
     "test": "node --experimental-strip-types --test --test-concurrency=1 --test-isolation=none test/index.spec.ts",
-    "stress": "node --experimental-strip-types scripts/stress-test.ts"
+    "stress": "node --experimental-strip-types scripts/stress-test.ts",
+    "prepare": "npm run build"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2"
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.3"
   }
 }

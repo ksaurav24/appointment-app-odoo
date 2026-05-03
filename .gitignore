@@ -4,3 +4,5 @@
 /coverage
 .next
 /superpowers
+/packages/booking-engine/dist
+/packages/booking-engine/node_modules

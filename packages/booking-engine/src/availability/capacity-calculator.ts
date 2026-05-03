@@ -7,11 +7,13 @@ import type {
   EntityAssignment,
   ExistingAppointment,
 } from '../domain/models.ts';
-import type { ISODateTime } from '../domain/value-objects.ts';
+import type { EntityId, ISODateTime } from '../domain/value-objects.ts';
 import {
   findOverlappingAppointments,
   findOverlappingHolds,
 } from './overlap-checker.ts';
+import { matchesStatus } from '../shared/normalizers.ts';
+import { idsEqual } from '../shared/ids.ts';
 
 export interface CalculateRemainingCapacityInput {
   appointmentType: AppointmentTypePolicy;
@@ -23,7 +25,7 @@ export interface CalculateRemainingCapacityInput {
   blockingStatuses: readonly string[];
   requestedCapacity?: number;
   resource?: BookableResource | null;
-  ignoredHoldIds?: readonly string[];
+  ignoredHoldIds?: readonly EntityId[];
   now?: ISODateTime;
 }
 
@@ -36,16 +38,19 @@ export function calculateRemainingCapacity(
     input.slotStart,
     input.slotEnd,
     input.appointments.filter((appointment) =>
-      input.blockingStatuses.includes(appointment.status),
+      matchesStatus(appointment.status, input.blockingStatuses),
     ),
   );
   const blockingHolds = findOverlappingHolds(
     input.assignment,
     input.slotStart,
     input.slotEnd,
-    filterActiveHolds(input.activeHolds, input.now).filter(
-      (hold) => !input.ignoredHoldIds?.includes(hold.id),
-    ),
+    filterActiveHolds(input.activeHolds, input.now).filter((hold) => {
+      const ignoredHoldIds = input.ignoredHoldIds ?? [];
+      return ignoredHoldIds.length === 0
+        ? true
+        : !ignoredHoldIds.some((ignoredId) => idsEqual(ignoredId, hold.id));
+    }),
   );
 
   if (!input.appointmentType.manageCapacity) {
@@ -129,7 +134,7 @@ function resolveCapacityLimit(
   }
 
   if (
-    assignment.bookableResourceId &&
+    assignment.bookableResourceId != null &&
     resource?.capacity &&
     resource.capacity > 0
   ) {

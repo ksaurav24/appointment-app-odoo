@@ -14,6 +14,14 @@ import {
   Role,
 } from '@prisma/client';
 import { AnalyticsCacheService } from '../analytics/cache/analytics-cache.service';
+import {
+  evaluateBookingWithEngine,
+  toBookingDecisionException,
+} from '../booking-engine/engine-runtime';
+import {
+  buildEngineSnapshot,
+  ENGINE_APPOINTMENT_TYPE_INCLUDE,
+} from '../booking-engine/snapshot-builder';
 import { writeAuditLog } from '../common/audit/audit-log.helper';
 import { REFUND_HANDLER, RefundHandler } from '../common/refund-handler.token';
 import {
@@ -95,7 +103,11 @@ export class AppointmentsService {
 
     const appointmentType = await this.prisma.appointmentType.findUnique({
       where: { id: lock.appointmentTypeId },
-      include: { bookingQuestions: true, organization: true },
+      include: {
+        bookingQuestions: true,
+        organization: true,
+        ...ENGINE_APPOINTMENT_TYPE_INCLUDE,
+      },
     });
     if (!appointmentType)
       throw new NotFoundException('Appointment type not found');
@@ -134,6 +146,29 @@ export class AppointmentsService {
       // the same (type, entity, slot). Without this the capacity recheck below
       // races under READ COMMITTED.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${advisoryKey}, 0))`;
+
+      const now = new Date();
+      const snapshot = await buildEngineSnapshot(
+        tx,
+        appointmentType,
+        { start: lock.slotStart, end: lock.slotEnd },
+        { now },
+      );
+      const decision = await evaluateBookingWithEngine({
+        appointmentTypeId: appointmentType.id,
+        customerId,
+        holdId: lock.id,
+        slotStart: lock.slotStart.toISOString(),
+        requestedDuration: durationMins,
+        requestedCapacity: capacityBooked,
+        bookablePersonId: lock.bookablePersonId,
+        bookableResourceId: lock.bookableResourceId,
+        snapshot,
+        now: now.toISOString(),
+      });
+      if (!decision.confirmed) {
+        throw toBookingDecisionException(decision.reason);
+      }
 
       // Re-check capacity in transaction (PRD §6.1 step 9 — final guard).
       const consumed = await countConsumedCapacity(
@@ -561,7 +596,9 @@ export class AppointmentsService {
   }): Promise<AppointmentWithRelations> {
     const existing = await this.prisma.appointment.findFirst({
       where: { publicId: args.publicId, ...args.ownership },
-      include: { appointmentType: true },
+      include: {
+        appointmentType: { include: ENGINE_APPOINTMENT_TYPE_INCLUDE },
+      },
     });
     if (!existing) throw new NotFoundException('Appointment not found');
     if (
@@ -620,6 +657,7 @@ export class AppointmentsService {
     );
     const previousStart = existing.startTime;
     const previousEnd = existing.endTime;
+    const engineCustomerId = args.requireLockOwner ?? lock.customerId;
 
     const rescheduleEntityId = (existing.bookablePersonId ??
       existing.bookableResourceId)!;
@@ -630,6 +668,29 @@ export class AppointmentsService {
       // Serialise against concurrent acquires/bookings on the new slot so the
       // capacity recheck below is race-free under READ COMMITTED.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${advisoryKey}, 0))`;
+
+      const now = new Date();
+      const snapshot = await buildEngineSnapshot(
+        tx,
+        existing.appointmentType,
+        { start: lock.slotStart, end: lock.slotEnd },
+        { now, excludeAppointmentId: existing.id },
+      );
+      const decision = await evaluateBookingWithEngine({
+        appointmentTypeId: existing.appointmentTypeId,
+        customerId: engineCustomerId,
+        holdId: lock.id,
+        slotStart: lock.slotStart.toISOString(),
+        requestedDuration: newDurationMins,
+        requestedCapacity: existing.capacityBooked,
+        bookablePersonId: lock.bookablePersonId,
+        bookableResourceId: lock.bookableResourceId,
+        snapshot,
+        now: now.toISOString(),
+      });
+      if (!decision.confirmed) {
+        throw toBookingDecisionException(decision.reason);
+      }
 
       // Capacity recheck against the new slot range, excluding both this
       // appointment (it's about to move) and the new lock (it's about to be

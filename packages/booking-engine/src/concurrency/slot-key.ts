@@ -1,20 +1,23 @@
-import type { ISODateTime } from '../domain/value-objects.ts';
+import type { EntityId, ISODateTime } from '../domain/value-objects.ts';
+import { toIdString } from '../shared/ids.ts';
 
 export interface SlotMutexKeyInput {
-  appointmentTypeId: string;
+  appointmentTypeId: EntityId;
   slotStart: ISODateTime;
   slotEnd: ISODateTime;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
 }
 
 export function buildSlotMutexKey(input: SlotMutexKeyInput): string {
   return [
     'booking-slot',
-    input.appointmentTypeId,
+    toIdString(input.appointmentTypeId),
     input.slotStart,
     input.slotEnd,
-    input.bookablePersonId ?? 'none',
-    input.bookableResourceId ?? 'none',
+    input.bookablePersonId == null ? 'none' : toIdString(input.bookablePersonId),
+    input.bookableResourceId == null
+      ? 'none'
+      : toIdString(input.bookableResourceId),
   ].join('|');
 }

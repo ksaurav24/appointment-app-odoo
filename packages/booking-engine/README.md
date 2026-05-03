@@ -35,6 +35,7 @@ Standalone booking intelligence package derived from `docs/schema.md` and `docs/
 
 - `specificDate` schedule rules are applied after weekly rules and therefore win on overlaps.
 - `slot_locks` currently fall back to `1` requested seat when `requestedCapacity` is missing.
+- ML feature extraction can consume payment signals from `payments` via `latestPayment` and falls back to appointment-level payment fields when not provided.
 - flexible slots expose `allowedDurations`, while `slotEnd` reflects the requested duration when provided, otherwise the shortest currently valid duration.
 - appointment blocking statuses are injected by integration code instead of being hardcoded here.
 - the package `build` step is a dependency-free module-graph validation check because this repo does not yet include a TypeScript emit toolchain.

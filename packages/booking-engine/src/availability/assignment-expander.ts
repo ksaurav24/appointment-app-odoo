@@ -3,9 +3,12 @@ import type {
   AppointmentTypePolicy,
   EntityAssignment,
 } from '../domain/models.ts';
+import type { EntityId } from '../domain/value-objects.ts';
+import { toIdString } from '../shared/ids.ts';
+import { normalizeEntityType } from '../shared/normalizers.ts';
 
 export function expandAssignmentCandidates(
-  appointmentTypeId: string,
+  appointmentTypeId: EntityId,
   links: readonly AppointmentTypeEntityLink[],
 ): EntityAssignment[] {
   const assignments: EntityAssignment[] = [];
@@ -55,12 +58,12 @@ export function filterAssignmentsByEntityType(
   appointmentType: AppointmentTypePolicy,
   assignments: readonly EntityAssignment[],
 ): EntityAssignment[] {
-  switch (appointmentType.entityType) {
-    case 'person':
+  switch (normalizeEntityType(appointmentType.entityType)) {
+    case 'PERSON':
       return assignments.filter((assignment) => assignment.shape === 'person-only');
-    case 'resource':
+    case 'RESOURCE':
       return assignments.filter((assignment) => assignment.shape === 'resource-only');
-    case 'person_resource_pair':
+    case 'PERSON_RESOURCE_PAIR':
       return assignments.filter((assignment) => assignment.shape === 'paired');
     default:
       return [...assignments];
@@ -68,13 +71,13 @@ export function filterAssignmentsByEntityType(
 }
 
 export function buildAssignmentKey(
-  appointmentTypeId: string,
-  bookablePersonId?: string | null,
-  bookableResourceId?: string | null,
+  appointmentTypeId: EntityId,
+  bookablePersonId?: EntityId | null,
+  bookableResourceId?: EntityId | null,
 ): string {
   return [
-    appointmentTypeId,
-    bookablePersonId ?? 'none',
-    bookableResourceId ?? 'none',
+    toIdString(appointmentTypeId),
+    bookablePersonId == null ? 'none' : toIdString(bookablePersonId),
+    bookableResourceId == null ? 'none' : toIdString(bookableResourceId),
   ].join(':');
 }

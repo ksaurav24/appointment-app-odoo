@@ -4,6 +4,7 @@ import type {
   HoldRequest,
 } from '../domain/models.ts';
 import type { ISODateTime } from '../domain/value-objects.ts';
+import { idsEqual } from '../shared/ids.ts';
 import { addMinutesToIso } from '../shared/time.ts';
 import { resolveRequestedSlot } from './request-evaluator.ts';
 import { buildSlotMutexKey } from './slot-key.ts';
@@ -30,7 +31,7 @@ export function placeHoldFromSnapshot(
     };
   }
 
-  if (input.snapshot.appointmentType.id !== input.appointmentTypeId) {
+  if (!idsEqual(input.snapshot.appointmentType.id, input.appointmentTypeId)) {
     return {
       granted: false,
       reason: 'appointment_type_mismatch',

@@ -36,3 +36,17 @@ test('getAvailabilityFromSnapshot keeps conflicting assignments unavailable with
     },
   ]);
 });
+
+test('getAvailabilityFromSnapshot rejects mismatched appointment type input', () => {
+  assert.throws(
+    () =>
+      getAvailabilityFromSnapshot({
+        appointmentTypeId: 'apt_other',
+        date: mondayDate,
+        requestedCapacity: 1,
+        snapshot: exclusiveAvailabilitySnapshot,
+        blockingStatuses: ['confirmed'],
+      }),
+    /Appointment type mismatch/,
+  );
+});

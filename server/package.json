@@ -6,6 +6,12 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "booking-engine:build": "node ./node_modules/typescript/bin/tsc -p ../packages/booking-engine/tsconfig.build.json",
+    "prebuild": "npm run booking-engine:build",
+    "prestart:dev": "npm run booking-engine:build",
+    "pretest": "npm run booking-engine:build",
+    "pretest:cov": "npm run booking-engine:build",
+    "pretest:e2e": "npm run booking-engine:build",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

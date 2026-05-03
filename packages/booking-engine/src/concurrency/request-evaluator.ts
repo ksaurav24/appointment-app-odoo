@@ -9,16 +9,17 @@ import type {
   AvailabilitySnapshot,
   EntityAssignment,
 } from '../domain/models.ts';
-import type { ISODate, ISODateTime } from '../domain/value-objects.ts';
+import type { EntityId, ISODate, ISODateTime } from '../domain/value-objects.ts';
+import { idsEqual } from '../shared/ids.ts';
 import { addMinutesToIso, extractIsoDateInTimeZone } from '../shared/time.ts';
 
 interface ReservationRequestShape {
-  appointmentTypeId: string;
+  appointmentTypeId: EntityId;
   slotStart: ISODateTime;
   requestedDuration: number;
   requestedCapacity?: number;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
 }
 
 export interface ResolveRequestedSlotInput {
@@ -72,7 +73,7 @@ export function resolveRequestedSlot(
   }
 
   const availabilityInput: {
-    appointmentTypeId: string;
+    appointmentTypeId: EntityId;
     date: ISODate;
     requestedDuration: number;
     snapshot: AvailabilitySnapshot;
@@ -110,22 +111,26 @@ export function resolveRequestedSlot(
         (slot) =>
           slot.slotStart === input.request.slotStart &&
           slot.slotEnd === expectedSlotEnd &&
-          (slot.bookablePersonId ?? null) ===
-            (input.request.bookablePersonId ?? null) &&
-          (slot.bookableResourceId ?? null) ===
-            (input.request.bookableResourceId ?? null),
+          idsEqual(
+            slot.bookablePersonId ?? null,
+            input.request.bookablePersonId ?? null,
+          ) &&
+          idsEqual(
+            slot.bookableResourceId ?? null,
+            input.request.bookableResourceId ?? null,
+          ),
       ) ?? null,
   };
 }
 
-    function assignIfDefined<T, K extends keyof T>(
-      target: T,
-      key: K,
-      value: T[K] | undefined,
-    ): void {
-      if (value === undefined) {
-        return;
-      }
+function assignIfDefined<T, K extends keyof T>(
+  target: T,
+  key: K,
+  value: T[K] | undefined,
+): void {
+  if (value === undefined) {
+    return;
+  }
 
-      target[key] = value;
-    }
+  target[key] = value;
+}

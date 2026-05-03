@@ -1,4 +1,5 @@
 import type {
+  EntityId,
   ISODate,
   ISODateTime,
   LocalTimeWindow,
@@ -6,12 +7,29 @@ import type {
 } from './value-objects.ts';
 
 export type AppointmentEntityType =
+  | 'PERSON'
+  | 'RESOURCE'
+  | 'PERSON_RESOURCE_PAIR'
   | 'person'
   | 'resource'
   | 'person_resource_pair';
 
-export type DurationMode = 'fixed' | 'variable' | 'range';
-export type ScheduleType = 'weekly' | 'date_override' | 'hybrid';
+export type DurationMode =
+  | 'FIXED'
+  | 'VARIABLE'
+  | 'RANGE'
+  | 'fixed'
+  | 'variable'
+  | 'range';
+export type ScheduleType =
+  | 'WEEKLY'
+  | 'FLEXIBLE'
+  | 'DATE_OVERRIDE'
+  | 'HYBRID'
+  | 'weekly'
+  | 'flexible'
+  | 'date_override'
+  | 'hybrid';
 export type AssignmentShape = 'person-only' | 'resource-only' | 'paired';
 
 export type AvailabilityBlockedReason =
@@ -20,29 +38,33 @@ export type AvailabilityBlockedReason =
   | 'overlapping_hold';
 
 export interface BookablePerson {
-  id: string;
-  organizationId: string;
+  id: EntityId;
+  organizationId: EntityId;
   name: string;
   contactEmail?: string | null;
   phone?: string | null;
   designation?: string | null;
   isActive: boolean;
+  createdAt?: ISODateTime | null;
+  updatedAt?: ISODateTime | null;
 }
 
 export interface BookableResource {
-  id: string;
-  organizationId: string;
+  id: EntityId;
+  organizationId: EntityId;
   name: string;
   resourceType: string;
   description?: string | null;
   capacity?: number | null;
   location?: string | null;
   isActive: boolean;
+  createdAt?: ISODateTime | null;
+  updatedAt?: ISODateTime | null;
 }
 
 export interface AppointmentTypePolicy {
-  id: string;
-  organizationId: string;
+  id: EntityId;
+  organizationId: EntityId;
   name: string;
   slug: string;
   description?: string | null;
@@ -66,11 +88,13 @@ export interface AppointmentTypePolicy {
   maxReschedulesAllowed?: number | null;
   isPublished: boolean;
   shareToken?: string | null;
+  createdAt?: ISODateTime | null;
+  updatedAt?: ISODateTime | null;
 }
 
 export interface ScheduleRule {
-  id: string;
-  scheduleId: string;
+  id: EntityId;
+  scheduleId: EntityId;
   dayOfWeek?: number | null;
   specificDate?: ISODate | null;
   startTime: TimeOfDay;
@@ -79,62 +103,81 @@ export interface ScheduleRule {
 }
 
 export interface ScheduleDefinition {
-  id: string;
-  appointmentTypeId: string;
+  id: EntityId;
+  appointmentTypeId: EntityId;
   scheduleType: ScheduleType;
   timezone: string;
+  createdAt?: ISODateTime | null;
+  updatedAt?: ISODateTime | null;
   rules: ScheduleRule[];
 }
 
 export interface ResolvedScheduleDay {
-  appointmentTypeId: string;
+  appointmentTypeId: EntityId;
   date: ISODate;
   timezone: string;
   windows: LocalTimeWindow[];
 }
 
 export interface AppointmentTypeEntityLink {
-  id: string;
-  appointmentTypeId: string;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  id: EntityId;
+  appointmentTypeId: EntityId;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
   createdAt?: ISODateTime | null;
 }
 
 export interface EntityAssignment {
   key: string;
-  appointmentTypeId: string;
+  appointmentTypeId: EntityId;
   shape: AssignmentShape;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
 }
 
 export interface ExistingAppointment {
-  id: string;
-  appointmentTypeId: string;
-  organizationId: string;
-  customerId: string;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  id: EntityId;
+  appointmentTypeId: EntityId;
+  organizationId: EntityId;
+  customerId: EntityId;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
   startTime: ISODateTime;
   endTime: ISODateTime;
   durationMins: number;
   status: string;
   rescheduleCount: number;
   capacityBooked: number;
+  totalAmount?: number | null;
   paymentStatus?: string | null;
   paymentPaidAt?: ISODateTime | null;
   cancellationReason?: string | null;
   cancelledAt?: ISODateTime | null;
+  confirmationCode?: string | null;
+  createdAt?: ISODateTime | null;
+  updatedAt?: ISODateTime | null;
+}
+
+export interface PaymentRecord {
+  id: EntityId;
+  appointmentId: EntityId;
+  customerId: EntityId;
+  amount: number;
+  currency: string;
+  paymentGateway: string;
+  gatewayTransactionId?: string | null;
+  status: string;
+  paidAt?: ISODateTime | null;
+  refundedAt?: ISODateTime | null;
   createdAt?: ISODateTime | null;
 }
 
 export interface ActiveHold {
-  id: string;
-  appointmentTypeId: string;
-  customerId: string;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  id: EntityId;
+  appointmentTypeId: EntityId;
+  customerId: EntityId;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
   slotStart: ISODateTime;
   slotEnd: ISODateTime;
   expiresAt: ISODateTime;
@@ -143,13 +186,13 @@ export interface ActiveHold {
 }
 
 export interface SlotCandidate {
-  appointmentTypeId: string;
+  appointmentTypeId: EntityId;
   date: ISODate;
   timezone: string;
   slotStart: ISODateTime;
   slotEnd: ISODateTime;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
   allowedDurations?: number[];
 }
 
@@ -161,14 +204,14 @@ export interface AvailabilitySlot extends SlotCandidate {
 }
 
 export interface AvailabilityDay {
-  appointmentTypeId: string;
+  appointmentTypeId: EntityId;
   date: ISODate;
   timezone: string;
   slots: AvailabilitySlot[];
 }
 
 export interface GetAvailabilityInput {
-  appointmentTypeId: string;
+  appointmentTypeId: EntityId;
   date: ISODate;
   timezoneOverride?: string;
   requestedDuration?: number;
@@ -176,13 +219,13 @@ export interface GetAvailabilityInput {
 }
 
 export interface HoldRequest {
-  appointmentTypeId: string;
-  customerId: string;
+  appointmentTypeId: EntityId;
+  customerId: EntityId;
   slotStart: ISODateTime;
   requestedDuration: number;
   requestedCapacity: number;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
 }
 
 export interface HoldDecision {
@@ -194,14 +237,14 @@ export interface HoldDecision {
 }
 
 export interface ConfirmBookingInput {
-  appointmentTypeId: string;
-  customerId: string;
-  holdId?: string | null;
+  appointmentTypeId: EntityId;
+  customerId: EntityId;
+  holdId?: EntityId | null;
   slotStart: ISODateTime;
   requestedDuration: number;
   requestedCapacity: number;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
 }
 
 export interface BookingDecision {
@@ -221,22 +264,22 @@ export type AvailabilityEventType =
 
 export interface AvailabilityEvent {
   type: AvailabilityEventType;
-  organizationId: string;
-  appointmentTypeId: string;
+  organizationId: EntityId;
+  appointmentTypeId: EntityId;
   affectedDate: ISODate;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
   reason: string;
   occurredAt: ISODateTime;
 }
 
 export interface AvailabilityMutationInput {
-  organizationId: string;
-  appointmentTypeId: string;
+  organizationId: EntityId;
+  appointmentTypeId: EntityId;
   oldStartTime?: ISODateTime | null;
   newStartTime?: ISODateTime | null;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
   timezone?: string;
   rangeStartDate?: ISODate | null;
   rangeEndDate?: ISODate | null;
@@ -248,6 +291,7 @@ export interface AvailabilityMutationInput {
 export interface NoShowFeatureInput {
   appointmentType: AppointmentTypePolicy;
   appointment: ExistingAppointment;
+  latestPayment?: PaymentRecord | null;
   organizationHistorySize: number;
   organizationNoShowRate?: number | null;
   appointmentTypeNoShowRate?: number | null;
@@ -259,8 +303,8 @@ export interface NoShowFeatureInput {
 }
 
 export interface NoShowFeatureVector {
-  appointmentTypeId: string;
-  appointmentId: string;
+  appointmentTypeId: EntityId;
+  appointmentId: EntityId;
   appointmentStatus: string;
   startsAtHour: number;
   appointmentWeekday: number;
@@ -299,8 +343,8 @@ export interface NoShowScore {
 export interface SlotRiskScore {
   slotStart: ISODateTime;
   slotEnd: ISODateTime;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
   score: number;
 }
 
@@ -311,14 +355,15 @@ export interface OrganizerRecommendation {
   message: string;
   slotStart?: ISODateTime;
   slotEnd?: ISODateTime;
-  bookablePersonId?: string | null;
-  bookableResourceId?: string | null;
+  bookablePersonId?: EntityId | null;
+  bookableResourceId?: EntityId | null;
   score?: number;
 }
 
 export interface AvailabilitySnapshot {
   appointmentType: AppointmentTypePolicy;
   schedule: ScheduleDefinition;
+  persons?: BookablePerson[];
   entityLinks: AppointmentTypeEntityLink[];
   resources: BookableResource[];
   appointments: ExistingAppointment[];

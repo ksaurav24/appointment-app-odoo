@@ -12,8 +12,8 @@ export interface RequestedAvailabilityPolicy {
 }
 
 export const DEFAULT_BLOCKING_STATUSES = [
-  'confirmed',
-  'pending_payment',
+  'CONFIRMED',
+  'PENDING',
 ] as const;
 
 export function resolveBlockingStatuses(

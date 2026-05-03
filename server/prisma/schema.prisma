@@ -133,7 +133,7 @@ enum NotificationPriority {
 // ===========================================================================
 
 model User {
-  id               String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email            String   @unique
   passwordHash     String
   fullName         String
@@ -162,7 +162,7 @@ model User {
 }
 
 model Organization {
-  id             String                     @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  id             String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organiserId    String                     @unique @db.Uuid
   organiser      User                       @relation("OrganizationOrganiser", fields: [organiserId], references: [id], onDelete: Cascade)
   name           String
@@ -246,7 +246,7 @@ model RefreshToken {
 // ---------------------------------------------------------------------------
 
 model BookablePerson {
-  id             String       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String       @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
@@ -267,7 +267,7 @@ model BookablePerson {
 }
 
 model BookableResource {
-  id             String       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String       @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
@@ -293,7 +293,7 @@ model BookableResource {
 // ---------------------------------------------------------------------------
 
 model AppointmentType {
-  id                       String         @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  id                       String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId           String         @db.Uuid
   organization             Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name                     String

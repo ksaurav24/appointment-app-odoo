@@ -7,15 +7,19 @@ export function buildNoShowFeatures(
   input: NoShowFeatureInput,
 ): NoShowFeatureVector {
   const appointmentStart = new Date(input.appointment.startTime);
+  const paymentStatus =
+    input.latestPayment?.status ?? input.appointment.paymentStatus ?? null;
   const cancelledAt = input.appointment.cancelledAt
     ? new Date(input.appointment.cancelledAt)
     : null;
   const createdAt = input.appointment.createdAt
     ? new Date(input.appointment.createdAt)
     : null;
-  const paymentPaidAt = input.appointment.paymentPaidAt
-    ? new Date(input.appointment.paymentPaidAt)
-    : null;
+  const paymentPaidAt = input.latestPayment?.paidAt
+    ? new Date(input.latestPayment.paidAt)
+    : input.appointment.paymentPaidAt
+      ? new Date(input.appointment.paymentPaidAt)
+      : null;
   const lastRescheduledAt = input.lastRescheduledAt
     ? new Date(input.lastRescheduledAt)
     : null;
@@ -52,7 +56,7 @@ export function buildNoShowFeatures(
     lastRescheduleLeadHours,
     durationMode: input.appointmentType.durationMode,
     maxBookingsPerSlot: input.appointmentType.maxBookingsPerSlot ?? null,
-    paymentStatus: input.appointment.paymentStatus ?? null,
+    paymentStatus,
     advancePaymentEnabled: Boolean(input.appointmentType.advancePaymentEnabled),
     manualConfirmation: input.appointmentType.manualConfirmation,
     cancellationAllowed: input.appointmentType.cancellationAllowed,

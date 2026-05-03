@@ -66,3 +66,40 @@ test('buildNoShowFeatures extracts schema-driven appointment signals for scoring
     bookableResourceNoShowRate: 0.12,
   });
 });
+
+test('buildNoShowFeatures prefers paidAt and status from the payments schema when provided', () => {
+  const features = buildNoShowFeatures({
+    appointmentType: fixedDurationPolicy,
+    appointment: {
+      id: 'appt_ml_3',
+      appointmentTypeId: 'apt_fixed',
+      organizationId: 'org_1',
+      customerId: 'customer_1',
+      bookablePersonId: 'person_1',
+      startTime: '2026-05-04T18:00:00.000Z',
+      endTime: '2026-05-04T19:00:00.000Z',
+      durationMins: 60,
+      status: 'confirmed',
+      rescheduleCount: 0,
+      capacityBooked: 1,
+      paymentStatus: 'pending',
+      paymentPaidAt: '2026-05-04T16:00:00.000Z',
+      createdAt: '2026-05-04T10:00:00.000Z',
+    },
+    latestPayment: {
+      id: 'payment_1',
+      appointmentId: 'appt_ml_3',
+      customerId: 'customer_1',
+      amount: 500,
+      currency: 'INR',
+      paymentGateway: 'stripe',
+      status: 'paid',
+      paidAt: '2026-05-04T14:00:00.000Z',
+      createdAt: '2026-05-04T13:30:00.000Z',
+    },
+    organizationHistorySize: 10,
+  });
+
+  assert.equal(features.paymentStatus, 'paid');
+  assert.equal(features.paymentLeadHours, 4);
+});

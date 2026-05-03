@@ -8,6 +8,7 @@ import {
   addMinutesToIso,
   localMinutesToUtcIso,
 } from '../shared/time.ts';
+import { normalizeDurationMode } from '../shared/normalizers.ts';
 
 export interface GenerateSlotCandidatesInput {
   appointmentType: AppointmentTypePolicy;
@@ -110,7 +111,7 @@ function appendSlotsForWindow(input: {
     const displayDuration =
       input.requestedDuration ?? fittingDurations[0] ?? input.firstDuration;
     const allowedDurations =
-      input.appointmentType.durationMode === 'fixed'
+      normalizeDurationMode(input.appointmentType.durationMode) === 'FIXED'
         ? null
         : fittingDurations;
 
@@ -135,7 +136,7 @@ function resolveRequestedDurations(
   appointmentType: AppointmentTypePolicy,
   requestedDuration?: number,
 ): number[] {
-  if (appointmentType.durationMode === 'fixed') {
+  if (normalizeDurationMode(appointmentType.durationMode) === 'FIXED') {
     if (!appointmentType.durationMinutes || appointmentType.durationMinutes <= 0) {
       return [];
     }

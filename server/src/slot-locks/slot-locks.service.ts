@@ -5,18 +5,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AssignmentMode, EntityType, Prisma, SlotLock } from '@prisma/client';
+import { AssignmentMode, EntityType, SlotLock } from '@prisma/client';
+import {
+  buildEngineSnapshot,
+  ENGINE_APPOINTMENT_TYPE_INCLUDE,
+  type EngineAppointmentType,
+} from '../booking-engine/snapshot-builder';
+import {
+  evaluateHoldWithEngine,
+  toHoldDecisionException,
+} from '../booking-engine/engine-runtime';
 import { countConsumedCapacity } from '../appointments/helpers/capacity';
 import { PrismaService } from '../prisma/prisma.service';
-
-const APPOINTMENT_TYPE_INCLUDE = {
-  entities: true,
-  schedules: { include: { rules: true } },
-} satisfies Prisma.AppointmentTypeInclude;
-
-type LoadedAppointmentType = Prisma.AppointmentTypeGetPayload<{
-  include: typeof APPOINTMENT_TYPE_INCLUDE;
-}>;
 
 const DEFAULT_TTL_MINUTES = 5;
 
@@ -57,8 +57,6 @@ export class SlotLocksService {
       slotEnd,
     );
 
-    const expiresAt = new Date(Date.now() + DEFAULT_TTL_MINUTES * 60_000);
-
     return this.prisma.$transaction(async (tx) => {
       // Serialise concurrent acquires for this exact (type, entity, slotStart):
       // pg_advisory_xact_lock blocks any other tx that hashes to the same key
@@ -66,6 +64,34 @@ export class SlotLocksService {
       // below has a TOCTOU race under READ COMMITTED.
       const lockKey = `${at.id}:${entityId}:${slotStart.toISOString()}`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+
+      const now = new Date();
+      const requestedDuration = Math.floor(
+        (slotEnd.getTime() - slotStart.getTime()) / 60_000,
+      );
+      const snapshot = await buildEngineSnapshot(
+        tx,
+        at,
+        { start: slotStart, end: slotEnd },
+        { now },
+      );
+      const holdDecision = await evaluateHoldWithEngine({
+        appointmentTypeId: at.id,
+        customerId,
+        slotStart: slotStart.toISOString(),
+        requestedDuration,
+        requestedCapacity: 1,
+        bookablePersonId: at.entityType === EntityType.PERSON ? entityId : null,
+        bookableResourceId:
+          at.entityType === EntityType.RESOURCE ? entityId : null,
+        snapshot,
+        holdTtlMinutes: DEFAULT_TTL_MINUTES,
+        now: now.toISOString(),
+      });
+
+      if (!holdDecision.granted) {
+        throw toHoldDecisionException(holdDecision.reason);
+      }
 
       const consumed = await countConsumedCapacity(tx, at, entityId, {
         start: slotStart,
@@ -83,7 +109,9 @@ export class SlotLocksService {
           slotStart,
           slotEnd,
           customerId,
-          expiresAt,
+          expiresAt: holdDecision.holdExpiresAt
+            ? new Date(holdDecision.holdExpiresAt)
+            : new Date(now.getTime() + DEFAULT_TTL_MINUTES * 60_000),
         },
       });
     });
@@ -169,13 +197,13 @@ export class SlotLocksService {
 
   private async loadAppointmentType(
     id: string,
-  ): Promise<LoadedAppointmentType> {
+  ): Promise<EngineAppointmentType> {
     const at = await this.prisma.appointmentType.findFirst({
       where: {
         id,
         organization: { approvalStatus: 'APPROVED', isActive: true },
       },
-      include: APPOINTMENT_TYPE_INCLUDE,
+      include: ENGINE_APPOINTMENT_TYPE_INCLUDE,
     });
     if (!at) throw new NotFoundException('Appointment type not found');
     if (!at.isPublished && !at.shareToken) {
@@ -193,7 +221,7 @@ export class SlotLocksService {
    * while honoring PRD §4.1 step 4 — system picks for AUTO at slot pick time.
    */
   private async pickEntity(
-    at: LoadedAppointmentType,
+    at: EngineAppointmentType,
     requested: string | undefined,
     slotStart: Date,
     slotEnd: Date,

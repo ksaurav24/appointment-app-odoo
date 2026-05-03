@@ -39,6 +39,9 @@ function makeAppointmentType(overrides: Record<string, unknown> = {}) {
   return {
     id: appointmentTypeId,
     organizationId: 'org-1',
+    name: 'Consultation',
+    slug: 'consultation',
+    description: null,
     entityType: EntityType.RESOURCE,
     durationMode: DurationMode.VARIABLE,
     durationMinutes: null,
@@ -59,6 +62,47 @@ function makeAppointmentType(overrides: Record<string, unknown> = {}) {
     isPublished: true,
     shareToken: null,
     scheduleType: ScheduleType.WEEKLY,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    entities: [
+      {
+        id: 1n,
+        appointmentTypeId,
+        bookablePersonId: null,
+        bookableResourceId: 'res-1',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    ],
+    schedules: [
+      {
+        id: 1n,
+        appointmentTypeId,
+        scheduleType: ScheduleType.WEEKLY,
+        timezone: 'UTC',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        rules: [
+          {
+            id: 10n,
+            scheduleId: 1n,
+            dayOfWeek: 2,
+            specificDate: null,
+            startTime: '09:00',
+            endTime: '17:00',
+            isAvailable: true,
+          },
+          {
+            id: 11n,
+            scheduleId: 1n,
+            dayOfWeek: 3,
+            specificDate: null,
+            startTime: '09:00',
+            endTime: '17:00',
+            isAvailable: true,
+          },
+        ],
+      },
+    ],
     bookingQuestions: [
       {
         id: questionId,
@@ -79,10 +123,13 @@ interface PrismaMockHandles {
   slotLockFindUnique: jest.Mock;
   appointmentTypeFindUnique: jest.Mock;
   appointmentAggregate: jest.Mock;
+  appointmentFindMany: jest.Mock;
   slotLockCount: jest.Mock;
+  slotLockFindMany: jest.Mock;
   appointmentCreate: jest.Mock;
   appointmentAnswerCreateMany: jest.Mock;
   slotLockDelete: jest.Mock;
+  bookableResourceFindMany: jest.Mock;
   appointmentFindUnique: jest.Mock;
   txExecuteRaw: jest.Mock;
 }
@@ -91,14 +138,17 @@ function makePrisma(handles: PrismaMockHandles): PrismaService {
   const tx = {
     appointment: {
       aggregate: handles.appointmentAggregate,
+      findMany: handles.appointmentFindMany,
       create: handles.appointmentCreate,
       findUnique: handles.appointmentFindUnique,
     },
     appointmentAnswer: { createMany: handles.appointmentAnswerCreateMany },
     slotLock: {
       count: handles.slotLockCount,
+      findMany: handles.slotLockFindMany,
       delete: handles.slotLockDelete,
     },
+    bookableResource: { findMany: handles.bookableResourceFindMany },
     $executeRaw: handles.txExecuteRaw,
   };
   return {
@@ -139,12 +189,28 @@ describe('AppointmentsService.create', () => {
       appointmentAggregate: jest
         .fn()
         .mockResolvedValue({ _sum: { capacityBooked: 0 } }),
+      appointmentFindMany: jest.fn().mockResolvedValue([]),
       slotLockCount: jest.fn().mockResolvedValue(0),
+      slotLockFindMany: jest.fn().mockResolvedValue([]),
       appointmentCreate: jest.fn((args: { data: Record<string, unknown> }) =>
         Promise.resolve({ id: 100n, ...args.data }),
       ),
       appointmentAnswerCreateMany: jest.fn().mockResolvedValue({ count: 1 }),
       slotLockDelete: jest.fn().mockResolvedValue({}),
+      bookableResourceFindMany: jest.fn().mockResolvedValue([
+        {
+          id: 'res-1',
+          organizationId: 'org-1',
+          name: 'Room 1',
+          resourceType: 'ROOM',
+          description: null,
+          capacity: 1,
+          location: null,
+          isActive: true,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      ]),
       appointmentFindUnique: jest.fn().mockResolvedValue({
         publicId: 'apt-public-1',
         status: AppointmentStatus.CONFIRMED,
@@ -326,10 +392,26 @@ describe('AppointmentsService.rescheduleByCustomer', () => {
     const appointmentAggregate = jest
       .fn()
       .mockResolvedValue({ _sum: { capacityBooked: 0 } });
+    const appointmentFindMany = jest.fn().mockResolvedValue([]);
     const slotLockCount = jest.fn().mockResolvedValue(0);
+    const slotLockFindMany = jest.fn().mockResolvedValue([]);
     const appointmentRescheduleCreate = jest.fn().mockResolvedValue({});
     const appointmentUpdate = jest.fn().mockResolvedValue({});
     const slotLockDelete = jest.fn().mockResolvedValue({});
+    const bookableResourceFindMany = jest.fn().mockResolvedValue([
+      {
+        id: 'res-1',
+        organizationId: 'org-1',
+        name: 'Room 1',
+        resourceType: 'ROOM',
+        description: null,
+        capacity: 1,
+        location: null,
+        isActive: true,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    ]);
     const auditLogCreate = jest.fn().mockResolvedValue({});
     const appointmentFindUnique = jest.fn().mockResolvedValue({
       publicId: existingPublicId,
@@ -339,11 +421,17 @@ describe('AppointmentsService.rescheduleByCustomer', () => {
     const tx = {
       appointment: {
         aggregate: appointmentAggregate,
+        findMany: appointmentFindMany,
         update: appointmentUpdate,
         findUnique: appointmentFindUnique,
       },
       appointmentReschedule: { create: appointmentRescheduleCreate },
-      slotLock: { count: slotLockCount, delete: slotLockDelete },
+      slotLock: {
+        count: slotLockCount,
+        findMany: slotLockFindMany,
+        delete: slotLockDelete,
+      },
+      bookableResource: { findMany: bookableResourceFindMany },
       auditLog: { create: auditLogCreate },
       $executeRaw: txExecuteRaw,
     };

@@ -3,6 +3,7 @@ import type {
   NoShowScore,
 } from '../domain/models.ts';
 import type { MlModelPort } from '../ports/ml-model.port.ts';
+import { normalizeStatusToken } from '../shared/normalizers.ts';
 import { buildNoShowFeatures } from './feature-builder.ts';
 
 export interface ScoreNoShowInput extends NoShowFeatureInput {
@@ -66,16 +67,20 @@ function scorePaymentSignals(
 ): number {
   let score = 0;
   const paymentStatus = input.paymentStatus ?? null;
+  const normalizedStatus =
+    paymentStatus === null ? null : normalizeStatusToken(paymentStatus);
 
-  if (paymentStatus === null || paymentStatus === 'pending') {
+  if (normalizedStatus === null || normalizedStatus === 'PENDING') {
     score += 0.12;
   } else if (
-    ['paid', 'succeeded', 'captured', 'settled'].includes(paymentStatus)
+    ['PAID', 'SUCCEEDED', 'CAPTURED', 'SETTLED'].includes(
+      normalizedStatus,
+    )
   ) {
     score -= 0.08;
   }
 
-  if (input.advancePaymentEnabled && !paymentStatus) {
+  if (input.advancePaymentEnabled && normalizedStatus === null) {
     score += 0.04;
   }
 

@@ -14,6 +14,8 @@ POST /appointments                               →  AppointmentsModule  (confi
 
 `AvailabilityModule` answers "what slots are open?", `SlotLocksModule` puts a short-lived hold on a chosen slot so two customers can't grab it at the same time, and `AppointmentsModule` turns an active hold into a real appointment. Organisers manage the resulting appointments through a separate set of routes on the same module. A background timer evicts expired locks every minute.
 
+The hold/confirm path now uses the standalone `packages/booking-engine` as a decision layer (snapshot -> engine decision -> transactional write) while keeping the existing API contracts and persistence model unchanged.
+
 ## Wiring
 
 `server/src/app.module.ts` registers the three new modules alongside the existing ones:
@@ -107,7 +109,8 @@ The response is a discriminated union on `durationMode`:
    - `MANUAL` mode → caller must specify a linked `entityId`.
    - `AUTO` mode + no `entityId` → loop linked entities and pick the first one whose `consumedCapacity < maxBookingsPerSlot` for this slot.
 4. Compute `expiresAt = now + 5 min`.
-5. **In a transaction**, re-run `countConsumedCapacity` (defense against the race between step 3 and step 5) and create the `SlotLock` row with the chosen entity attached either via `bookablePersonId` or `bookableResourceId`.
+5. **In a transaction**, build a fresh engine snapshot for the requested slot and run `placeHold` to validate assignment + slot availability under current data.
+6. Re-run `countConsumedCapacity` (defense in depth) and create the `SlotLock` row with the chosen entity attached either via `bookablePersonId` or `bookableResourceId`.
 
 `countConsumedCapacity` is the same calculation availability uses: sum `capacityBooked` of overlapping non-cancelled appointments + count of overlapping unexpired locks. Locks contribute 1 each (matching the V1 simplification — multi-capacity reservations apply only to the appointment record, not to in-flight holds).
 
@@ -170,6 +173,7 @@ This is the heart of the booking-confirmation flow:
 5. Derive `durationMins` from `slotEnd − slotStart`.
 6. Pick the initial `status`: `PENDING` if `manualConfirmation` else `CONFIRMED`. Pick `paymentStatus`: `PENDING` if `advancePaymentEnabled` else `PAID`.
 7. **In a transaction**:
+   - Build a fresh engine snapshot and run `confirmBooking` (using the held slot + explicit assignment ids) as the first concurrency decision gate.
    - Recompute consumed capacity *excluding this lock* and reject if `consumed + capacityBooked > maxBookingsPerSlot` — final guard against any race that slipped past the lock.
    - `INSERT` the `Appointment` row.
    - `INSERT` the `AppointmentAnswer` rows.

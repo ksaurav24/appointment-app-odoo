@@ -6,40 +6,102 @@ import { SlotLocksService } from './slot-locks.service';
 interface PrismaMockState {
   appointmentTypeFindFirst: jest.Mock;
   appointmentAggregate: jest.Mock;
+  appointmentFindMany: jest.Mock;
   slotLockCount: jest.Mock;
+  slotLockFindMany: jest.Mock;
   slotLockCreate: jest.Mock;
+  bookableResourceFindMany: jest.Mock;
   txExecuteRaw: jest.Mock;
 }
 
 function makePrismaMock(state: PrismaMockState): PrismaService {
   const tx = {
-    appointment: { aggregate: state.appointmentAggregate },
-    slotLock: { count: state.slotLockCount, create: state.slotLockCreate },
+    appointment: {
+      aggregate: state.appointmentAggregate,
+      findMany: state.appointmentFindMany,
+    },
+    slotLock: {
+      count: state.slotLockCount,
+      create: state.slotLockCreate,
+      findMany: state.slotLockFindMany,
+    },
+    bookableResource: { findMany: state.bookableResourceFindMany },
     $executeRaw: state.txExecuteRaw,
   };
   return {
     appointmentType: { findFirst: state.appointmentTypeFindFirst },
-    appointment: { aggregate: state.appointmentAggregate },
-    slotLock: { count: state.slotLockCount, create: state.slotLockCreate },
+    appointment: {
+      aggregate: state.appointmentAggregate,
+      findMany: state.appointmentFindMany,
+    },
+    slotLock: {
+      count: state.slotLockCount,
+      create: state.slotLockCreate,
+      findMany: state.slotLockFindMany,
+    },
+    bookableResource: { findMany: state.bookableResourceFindMany },
     $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
   } as unknown as PrismaService;
 }
 
 const baseAppointmentType = {
   id: 'at-1',
+  organizationId: 'org-1',
+  name: 'Test service',
+  slug: 'test-service',
+  description: null,
   entityType: EntityType.RESOURCE,
+  scheduleType: 'WEEKLY',
+  durationMode: 'FIXED',
+  durationMinutes: 60,
+  minDurationMins: null,
+  maxDurationMins: null,
+  durationStepMins: null,
   assignmentMode: AssignmentMode.MANUAL,
   maxBookingsPerSlot: 1,
+  manageCapacity: false,
+  manualConfirmation: false,
+  advancePaymentEnabled: false,
+  advancePaymentAmount: null,
+  cancellationAllowed: true,
+  cancellationWindowHours: null,
+  rescheduleAllowed: true,
+  rescheduleWindowHours: null,
+  maxReschedulesAllowed: null,
   isPublished: true,
   shareToken: null,
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   entities: [
     {
       id: 1n,
+      appointmentTypeId: 'at-1',
       bookablePersonId: null,
       bookableResourceId: 'res-1',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
     },
   ],
-  schedules: [],
+  schedules: [
+    {
+      id: 1n,
+      appointmentTypeId: 'at-1',
+      scheduleType: 'WEEKLY',
+      timezone: 'UTC',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      rules: [
+        {
+          id: 10n,
+          scheduleId: 1n,
+          dayOfWeek: 2,
+          specificDate: null,
+          startTime: '09:00',
+          endTime: '17:00',
+          isAvailable: true,
+        },
+      ],
+    },
+  ],
 };
 
 const validRequest = {
@@ -55,14 +117,28 @@ describe('SlotLocksService.acquire', () => {
 
   beforeEach(() => {
     state = {
-      appointmentTypeFindFirst: jest
-        .fn()
-        .mockResolvedValue(baseAppointmentType),
+      appointmentTypeFindFirst: jest.fn().mockResolvedValue(baseAppointmentType),
       appointmentAggregate: jest
         .fn()
         .mockResolvedValue({ _sum: { capacityBooked: 0 } }),
+      appointmentFindMany: jest.fn().mockResolvedValue([]),
       slotLockCount: jest.fn().mockResolvedValue(0),
+      slotLockFindMany: jest.fn().mockResolvedValue([]),
       slotLockCreate: jest.fn().mockResolvedValue({ id: 1n }),
+      bookableResourceFindMany: jest.fn().mockResolvedValue([
+        {
+          id: 'res-1',
+          organizationId: 'org-1',
+          name: 'Room 1',
+          resourceType: 'ROOM',
+          description: null,
+          capacity: 1,
+          location: null,
+          isActive: true,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      ]),
       txExecuteRaw: jest.fn().mockResolvedValue(1),
     };
     service = new SlotLocksService(makePrismaMock(state));
@@ -131,8 +207,20 @@ describe('SlotLocksService.acquire', () => {
       ...baseAppointmentType,
       assignmentMode: AssignmentMode.AUTO,
       entities: [
-        { id: 1n, bookablePersonId: null, bookableResourceId: 'res-1' },
-        { id: 2n, bookablePersonId: null, bookableResourceId: 'res-2' },
+        {
+          id: 1n,
+          appointmentTypeId: 'at-1',
+          bookablePersonId: null,
+          bookableResourceId: 'res-1',
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+        {
+          id: 2n,
+          appointmentTypeId: 'at-1',
+          bookablePersonId: null,
+          bookableResourceId: 'res-2',
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
       ],
     });
     // First candidate is busy; second is free.
