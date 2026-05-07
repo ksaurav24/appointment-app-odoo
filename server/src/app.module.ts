@@ -32,8 +32,8 @@ import { UsersModule } from './users/users.module';
     }),
     ThrottlerModule.forRoot({
       throttlers: [
-        { name: 'default', limit: 120, ttl: 60_000 },
-        { name: 'login', limit: 50, ttl: 900_000 },
+        { name: 'default', limit: 240, ttl: 60_000 },
+        { name: 'login', limit: 200, ttl: 900_000 },
         { name: 'register', limit: 30, ttl: 3_600_000 },
         { name: 'otpSend', limit: 50, ttl: 3_600_000 },
         { name: 'otpSubmit', limit: 100, ttl: 600_000 },
