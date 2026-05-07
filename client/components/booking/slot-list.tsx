@@ -37,7 +37,6 @@ export function SlotList({
           // the day's full shape rather than wondering why a time is missing.
           // Pending slots are still clickable on manual-approval types — the
           // customer is competing for the slot, not consuming it.
-          const variant = isSelected ? "default" : "outline";
           const title = isBooked
             ? "Slot is full"
             : isPending
@@ -45,26 +44,29 @@ export function SlotList({
               : undefined;
 
           return (
-            <Button
+            <button
               key={slot.startTime}
-              variant={variant}
-              size="sm"
               disabled={isBooked}
               title={title}
               onClick={() => onSelect(slot.startTime, slot.endTime)}
               className={cn(
-                // Pending: amber background, still selectable.
-                isPending &&
-                  !isSelected &&
-                  "border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-100",
-                // Booked: muted background, strikethrough, no hover effect so
-                // it reads as occupied rather than just disabled.
+                "rounded-lg border-[1.5px] px-2 py-2 text-center text-xs font-medium transition-all",
+                // Default available slot
+                !isSelected && !isBooked && !isPending &&
+                  "border-cream2 bg-white text-muted-foreground hover:border-forest hover:text-forest",
+                // Selected slot
+                isSelected &&
+                  "border-forest bg-forest text-white",
+                // Pending: amber tones
+                isPending && !isSelected &&
+                  "border-amber bg-amber-pale text-amber-deep hover:bg-amber-pale/80",
+                // Booked: muted, line-through
                 isBooked &&
-                  "border-muted bg-muted text-muted-foreground line-through opacity-70 hover:bg-muted",
+                  "border-cream2 bg-slate-pale text-slate-light line-through cursor-default opacity-70",
               )}
             >
               {formatTimeInZone(slot.startTime, availability.timezone)}
-            </Button>
+            </button>
           );
         })}
       </div>
@@ -72,12 +74,16 @@ export function SlotList({
       {/* Legend appears only when at least one occupied slot is on screen, so
           a fully-available day stays uncluttered. */}
       {hasPending || hasBooked ? (
-        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+        <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block text-foreground">●</span>
+            Available
+          </span>
           {hasPending ? (
             <span className="inline-flex items-center gap-1.5">
               <span
                 aria-hidden
-                className="inline-block size-2.5 rounded-sm border border-amber-400 bg-amber-100 dark:bg-amber-950/30"
+                className="inline-block size-2.5 rounded-sm border border-amber bg-amber-pale"
               />
               Pending approval
             </span>
@@ -86,7 +92,7 @@ export function SlotList({
             <span className="inline-flex items-center gap-1.5">
               <span
                 aria-hidden
-                className="inline-block size-2.5 rounded-sm border border-muted-foreground/30 bg-muted"
+                className="inline-block size-2.5 rounded-sm border border-cream2 bg-slate-pale line-through"
               />
               Booked
             </span>

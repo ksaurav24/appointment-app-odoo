@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -31,78 +32,116 @@
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
 
+  /* BookEase extended palette */
+  --color-forest: #1A3C34;
+  --color-forest-mid: #2D5A4E;
+  --color-forest-light: #4A8573;
+  --color-forest-pale: #E8F2EE;
+  --color-amber: #E8A020;
+  --color-amber-deep: #C4820A;
+  --color-amber-pale: #FEF3DC;
+  --color-coral: #E85D3A;
+  --color-coral-pale: #FDEEE9;
+  --color-cream: #FAF7F2;
+  --color-cream2: #F3EEE5;
+  --color-slate-dark: #2C2C28;
+  --color-slate-mid: #5C5C54;
+  --color-slate-light: #9C9C90;
+  --color-slate-pale: #F5F4F0;
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+
+  --font-sans: 'DM Sans', sans-serif;
+  --font-heading: 'DM Serif Display', serif;
 }
 
 @layer base {
   :root {
+    /* BookEase Cream backgrounds */
+    --background: 36 33% 96%;       /* #FAF7F2 cream */
+    --foreground: 45 4% 16%;        /* #2C2C28 slate */
 
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Cards are white on cream */
+    --card: 0 0% 100%;              /* #FFFFFF */
+    --card-foreground: 45 4% 16%;   /* #2C2C28 */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 45 4% 16%;
 
-    /* Indigo 600 */
-    --primary: 243 75% 59%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary = Forest Green */
+    --primary: 162 38% 17%;         /* #1A3C34 */
+    --primary-foreground: 0 0% 100%;
 
-    /* Slate 100 */
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary = Amber */
+    --secondary: 38 80% 52%;        /* #E8A020 */
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted = Cream 2 / Slate pale */
+    --muted: 35 20% 93%;            /* #F3EEE5 */
+    --muted-foreground: 45 5% 34%;  /* #5C5C54 */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent = Forest Pale */
+    --accent: 156 28% 93%;          /* #E8F2EE */
+    --accent-foreground: 162 38% 17%; /* #1A3C34 */
 
-    /* Red 500 */
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Destructive = Coral */
+    --destructive: 14 78% 57%;      /* #E85D3A */
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 243 75% 59%;
+    /* Borders = Cream2 */
+    --border: 35 20% 93%;           /* #F3EEE5 */
+    --input: 35 20% 93%;
+    --ring: 162 38% 17%;            /* Forest green */
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;             /* 10px base — design system buttons */
+
+    /* Chart colors aligned to BookEase palette */
+    --chart-1: 162 38% 17%;         /* Forest */
+    --chart-2: 38 80% 52%;          /* Amber */
+    --chart-3: 14 78% 57%;          /* Coral */
+    --chart-4: 162 38% 35%;         /* Forest Light */
+    --chart-5: 38 80% 40%;          /* Amber Deep */
   }
 
   .dark {
-    /* Deep Slate /0F172A */
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Dark mode: deep forest tones */
+    --background: 162 38% 7%;       /* Deep forest dark */
+    --foreground: 36 15% 90%;       /* Warm off-white */
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 162 30% 10%;
+    --card-foreground: 36 15% 90%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 162 30% 10%;
+    --popover-foreground: 36 15% 90%;
 
-    /* Indigo 500 for better dark visibility */
-    --primary: 243 75% 66%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* Primary stays forest but lighter for dark */
+    --primary: 156 28% 75%;         /* Forest pale in dark */
+    --primary-foreground: 162 38% 10%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    /* Secondary amber stays */
+    --secondary: 38 80% 52%;
+    --secondary-foreground: 45 4% 12%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 162 20% 14%;
+    --muted-foreground: 45 5% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 162 20% 16%;
+    --accent-foreground: 156 28% 80%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 14 65% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 243 75% 66%;
+    --border: 162 15% 16%;
+    --input: 162 15% 16%;
+    --ring: 156 28% 75%;
+
+    --chart-1: 156 28% 65%;
+    --chart-2: 38 80% 60%;
+    --chart-3: 14 65% 55%;
+    --chart-4: 156 28% 50%;
+    --chart-5: 38 80% 45%;
   }
 }
 
@@ -112,5 +151,11 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: 'DM Sans', sans-serif;
+  }
+  /* DM Serif Display for headings */
+  .font-heading {
+    font-family: 'DM Serif Display', serif;
+    font-weight: 400;
   }
 }

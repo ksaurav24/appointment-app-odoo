@@ -34,12 +34,12 @@ export function PublicShell({ children, showBrowseLink = true }: PublicShellProp
 
   return (
     <div className="flex min-h-svh flex-col">
-      <header className="flex items-center justify-between px-6 py-5">
+      <header className="flex items-center justify-between border-b border-cream2 px-6 py-5">
         <Link
           href="/"
-          className="font-heading text-base font-semibold tracking-tight"
+          className="font-heading text-lg tracking-tight text-foreground"
         >
-          appointly
+          BookEase
         </Link>
 
         <nav className="flex items-center gap-3">
@@ -89,14 +89,14 @@ export function PublicShell({ children, showBrowseLink = true }: PublicShellProp
 
       <main className="flex flex-1 flex-col">{children}</main>
 
-      <footer className="border-t px-6 py-6 text-xs text-muted-foreground">
+      <footer className="border-t border-cream2 px-6 py-6 text-xs text-muted-foreground">
         <div className="flex items-center justify-between">
-          <span>© appointly</span>
+          <span>© BookEase</span>
           <div className="flex items-center gap-4">
-            <Link href="/" className="hover:underline">
+            <Link href="/" className="hover:text-foreground transition-colors">
               Home
             </Link>
-            <Link href="/browse" className="hover:underline">
+            <Link href="/browse" className="hover:text-foreground transition-colors">
               Browse
             </Link>
           </div>

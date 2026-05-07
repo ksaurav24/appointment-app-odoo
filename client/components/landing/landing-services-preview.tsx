@@ -19,11 +19,11 @@ export function LandingServicesPreview() {
   if (!isPending && services.length === 0) return null;
 
   return (
-    <section className="border-t bg-muted/20 px-6 py-16">
+    <section className="border-t border-cream2 px-6 py-16">
       <div className="mx-auto max-w-5xl">
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
-            <h2 className="font-heading text-3xl font-semibold tracking-tight">
+            <h2 className="font-heading text-3xl tracking-tight">
               Popular services
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -38,7 +38,7 @@ export function LandingServicesPreview() {
         {isPending ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: PREVIEW_LIMIT }).map((_, i) => (
-              <Skeleton key={i} className="h-40 rounded-xl" />
+              <Skeleton key={i} className="h-40 rounded-[14px]" />
             ))}
           </div>
         ) : (

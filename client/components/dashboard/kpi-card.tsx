@@ -25,12 +25,12 @@ export function KpiCard({
   return (
     <Card size="sm" className={cn("gap-3", className)}>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <CardTitle className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-slate-light">
           <span>{label}</span>
           {icon ? (
             <HugeiconsIcon
               icon={icon}
-              className="size-4 text-muted-foreground"
+              className="size-4 text-slate-light"
             />
           ) : null}
         </CardTitle>
@@ -39,12 +39,12 @@ export function KpiCard({
         {loading ? (
           <Skeleton className="h-7 w-20" />
         ) : (
-          <p className="font-heading text-2xl font-semibold tracking-tight">
+          <p className="font-heading text-[28px] text-foreground">
             {value}
           </p>
         )}
         {hint ? (
-          <p className="text-xs text-muted-foreground">{hint}</p>
+          <p className="text-[11px] text-muted-foreground">{hint}</p>
         ) : null}
       </CardContent>
     </Card>

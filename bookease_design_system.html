@@ -1,0 +1,503 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0;}
+
+:root{
+  --cream:#FAF7F2;
+  --cream2:#F3EEE5;
+  --forest:#1A3C34;
+  --forest-mid:#2D5A4E;
+  --forest-light:#4A8573;
+  --forest-pale:#E8F2EE;
+  --amber:#E8A020;
+  --amber-deep:#C4820A;
+  --amber-pale:#FEF3DC;
+  --coral:#E85D3A;
+  --coral-pale:#FDEEE9;
+  --slate:#2C2C28;
+  --slate-mid:#5C5C54;
+  --slate-light:#9C9C90;
+  --slate-pale:#F5F4F0;
+  --white:#FFFFFF;
+}
+
+body{font-family:'DM Sans',sans-serif;background:transparent;}
+
+.ds{background:var(--cream);min-height:100vh;padding:0;}
+
+/* tab nav */
+.tabs{display:flex;gap:0;background:var(--white);border-bottom:1px solid var(--cream2);padding:0 1.5rem;overflow-x:auto;}
+.tab{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--slate-mid);padding:14px 18px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;background:none;border-top:none;border-left:none;border-right:none;}
+.tab:hover{color:var(--forest);}
+.tab.on{color:var(--forest);border-bottom-color:var(--forest);font-weight:600;}
+
+.pane{display:none;padding:2rem 1.5rem;animation:fadein .2s ease;}
+.pane.on{display:block;}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* labels */
+.sec{font-family:'DM Serif Display',serif;font-size:22px;color:var(--slate);margin-bottom:6px;}
+.sec-sub{font-size:13px;color:var(--slate-mid);margin-bottom:1.5rem;line-height:1.6;}
+.label{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--slate-light);margin-bottom:10px;}
+
+/* color swatches */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;margin-bottom:2rem;}
+.swatch{border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.07);}
+.swatch-color{height:72px;}
+.swatch-info{background:var(--white);padding:8px 10px;}
+.swatch-name{font-size:12px;font-weight:600;color:var(--slate);}
+.swatch-hex{font-size:11px;color:var(--slate-light);font-family:monospace;}
+.swatch-use{font-size:10px;color:var(--slate-light);margin-top:2px;}
+
+/* typography */
+.type-row{margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--cream2);}
+.type-row:last-child{border-bottom:none;}
+.type-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.chip{font-size:10px;background:var(--slate-pale);color:var(--slate-mid);padding:3px 8px;border-radius:20px;font-weight:500;}
+.t-h1{font-family:'DM Serif Display',serif;font-size:40px;color:var(--slate);line-height:1.1;}
+.t-h2{font-family:'DM Serif Display',serif;font-size:28px;color:var(--slate);line-height:1.2;}
+.t-h3{font-family:'DM Sans',sans-serif;font-size:18px;font-weight:600;color:var(--slate);line-height:1.3;}
+.t-h4{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:var(--slate);}
+.t-body{font-family:'DM Sans',sans-serif;font-size:15px;color:var(--slate-mid);line-height:1.7;}
+.t-small{font-family:'DM Sans',sans-serif;font-size:13px;color:var(--slate-light);line-height:1.6;}
+.t-label{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--slate-light);}
+
+/* buttons */
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:1rem;}
+.btn{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;padding:10px 22px;border-radius:10px;cursor:pointer;transition:all .15s;border:none;display:inline-flex;align-items:center;gap:7px;}
+.btn-primary{background:var(--forest);color:var(--white);}
+.btn-primary:hover{background:var(--forest-mid);}
+.btn-secondary{background:var(--amber);color:var(--white);}
+.btn-secondary:hover{background:var(--amber-deep);}
+.btn-outline{background:transparent;color:var(--forest);border:1.5px solid var(--forest);}
+.btn-outline:hover{background:var(--forest-pale);}
+.btn-ghost{background:var(--slate-pale);color:var(--slate-mid);}
+.btn-ghost:hover{background:var(--cream2);}
+.btn-danger{background:var(--coral-pale);color:var(--coral);}
+.btn-sm{padding:7px 14px;font-size:12px;border-radius:8px;}
+.btn-lg{padding:14px 32px;font-size:16px;border-radius:12px;}
+
+/* badges */
+.badge-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1.5rem;}
+.bdg{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;letter-spacing:.03em;}
+.bdg-confirmed{background:#E8F2EE;color:#1A3C34;}
+.bdg-pending{background:#FEF3DC;color:#C4820A;}
+.bdg-cancelled{background:#FDEEE9;color:#C43D1A;}
+.bdg-rescheduled{background:#EBE8FC;color:#4A3AB0;}
+.bdg-online{background:#E8F2EE;color:#1A5C3E;}
+.bdg-inperson{background:#EEF3FE;color:#1A3A6C;}
+
+/* cards */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-bottom:2rem;}
+.card{background:var(--white);border-radius:14px;padding:18px;border:1px solid var(--cream2);}
+.card-icon{width:40px;height:40px;border-radius:10px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.card-icon-g{background:var(--forest-pale);}
+.card-icon-a{background:var(--amber-pale);}
+.card-icon-c{background:var(--coral-pale);}
+.card-title{font-size:14px;font-weight:600;color:var(--slate);margin-bottom:4px;}
+.card-sub{font-size:12px;color:var(--slate-light);line-height:1.5;}
+
+/* form */
+.form-group{margin-bottom:14px;}
+.form-label{font-size:12px;font-weight:600;color:var(--slate-mid);margin-bottom:5px;display:block;}
+.form-input{width:100%;font-family:'DM Sans',sans-serif;font-size:14px;padding:10px 14px;border-radius:10px;border:1.5px solid var(--cream2);background:var(--white);color:var(--slate);outline:none;transition:border-color .15s;}
+.form-input:focus{border-color:var(--forest);}
+.form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239C9C90' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px;}
+
+/* booking card */
+.booking-card{background:var(--white);border-radius:18px;overflow:hidden;border:1px solid var(--cream2);max-width:360px;}
+.booking-card-head{background:var(--forest);padding:20px;color:var(--white);}
+.booking-card-head .t{font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:2px;}
+.booking-card-head .s{font-size:12px;opacity:.7;}
+.booking-card-body{padding:18px;}
+.bc-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--cream2);font-size:13px;}
+.bc-row:last-child{border-bottom:none;}
+.bc-key{color:var(--slate-light);}
+.bc-val{font-weight:500;color:var(--slate);}
+.booking-card-foot{background:var(--slate-pale);padding:14px 18px;display:flex;gap:8px;}
+
+/* time slots */
+.slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1.5rem;}
+.slot{background:var(--white);border:1.5px solid var(--cream2);border-radius:8px;padding:8px 0;text-align:center;font-size:12px;font-weight:500;color:var(--slate-mid);cursor:pointer;transition:all .15s;}
+.slot:hover{border-color:var(--forest);color:var(--forest);}
+.slot.sel{background:var(--forest);border-color:var(--forest);color:var(--white);}
+.slot.taken{background:var(--slate-pale);color:var(--slate-light);cursor:default;text-decoration:line-through;}
+
+/* sidebar nav preview */
+.sidebar-preview{background:var(--forest);border-radius:14px;padding:16px;max-width:200px;}
+.sp-logo{font-family:'DM Serif Display',serif;font-size:18px;color:var(--white);margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.15);}
+.sp-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;font-size:13px;color:rgba(255,255,255,.65);margin-bottom:2px;cursor:pointer;transition:all .15s;}
+.sp-item:hover,.sp-item.on{background:rgba(255,255,255,.12);color:var(--white);}
+.sp-icon{width:16px;text-align:center;font-size:14px;}
+
+/* stats bar */
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:1.5rem;}
+.stat{background:var(--white);border-radius:12px;padding:14px 16px;border:1px solid var(--cream2);}
+.stat-n{font-family:'DM Serif Display',serif;font-size:28px;color:var(--slate);}
+.stat-l{font-size:11px;color:var(--slate-light);margin-top:2px;}
+.stat-d{font-size:11px;margin-top:4px;font-weight:500;}
+.up{color:#1A5C3E;} .dn{color:var(--coral);}
+
+/* grid layout */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+@media(max-width:500px){.g2,.g3{grid-template-columns:1fr;}.slots{grid-template-columns:repeat(3,1fr);}}
+
+/* divider */
+.divider{border:none;border-top:1px solid var(--cream2);margin:1.5rem 0;}
+
+/* tag */
+.tag{display:inline-block;font-size:11px;font-weight:500;padding:3px 9px;border-radius:6px;}
+.tg-must{background:var(--forest);color:var(--white);}
+.tg-opt{background:var(--amber-pale);color:var(--amber-deep);}
+</style>
+
+<div class="ds">
+
+<div class="tabs">
+  <button class="tab on" onclick="sw(0)">Colors</button>
+  <button class="tab" onclick="sw(1)">Typography</button>
+  <button class="tab" onclick="sw(2)">Components</button>
+  <button class="tab" onclick="sw(3)">Booking UI</button>
+  <button class="tab" onclick="sw(4)">Dashboard</button>
+  <button class="tab" onclick="sw(5)">Guidelines</button>
+</div>
+
+<!-- COLORS -->
+<div class="pane on" id="p0">
+  <div class="sec">Color Palette</div>
+  <div class="sec-sub">A warm, professional palette — Forest green builds trust, amber creates energy, cream feels premium and approachable.</div>
+
+  <div class="label">Primary — Forest Green</div>
+  <div class="swatches">
+    <div class="swatch"><div class="swatch-color" style="background:#1A3C34"></div><div class="swatch-info"><div class="swatch-name">Forest Deep</div><div class="swatch-hex">#1A3C34</div><div class="swatch-use">Sidebar, CTAs</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#2D5A4E"></div><div class="swatch-info"><div class="swatch-name">Forest Mid</div><div class="swatch-hex">#2D5A4E</div><div class="swatch-use">Hover states</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#4A8573"></div><div class="swatch-info"><div class="swatch-name">Forest Light</div><div class="swatch-hex">#4A8573</div><div class="swatch-use">Icons, links</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#E8F2EE"></div><div class="swatch-info"><div class="swatch-name">Forest Pale</div><div class="swatch-hex">#E8F2EE</div><div class="swatch-use">Backgrounds, tags</div></div></div>
+  </div>
+
+  <div class="label">Accent — Warm Amber</div>
+  <div class="swatches">
+    <div class="swatch"><div class="swatch-color" style="background:#E8A020"></div><div class="swatch-info"><div class="swatch-name">Amber</div><div class="swatch-hex">#E8A020</div><div class="swatch-use">Primary action btn</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#C4820A"></div><div class="swatch-info"><div class="swatch-name">Amber Deep</div><div class="swatch-hex">#C4820A</div><div class="swatch-use">Hover, Pending</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#FEF3DC"></div><div class="swatch-info"><div class="swatch-name">Amber Pale</div><div class="swatch-hex">#FEF3DC</div><div class="swatch-use">Pending badges</div></div></div>
+  </div>
+
+  <div class="label">Neutral — Warm Slate</div>
+  <div class="swatches">
+    <div class="swatch"><div class="swatch-color" style="background:#FAF7F2"></div><div class="swatch-info"><div class="swatch-name">Cream</div><div class="swatch-hex">#FAF7F2</div><div class="swatch-use">Page background</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#F3EEE5"></div><div class="swatch-info"><div class="swatch-name">Cream 2</div><div class="swatch-hex">#F3EEE5</div><div class="swatch-use">Dividers, borders</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#2C2C28"></div><div class="swatch-info"><div class="swatch-name">Slate</div><div class="swatch-hex">#2C2C28</div><div class="swatch-use">Headings, body</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#9C9C90"></div><div class="swatch-info"><div class="swatch-name">Slate Light</div><div class="swatch-hex">#9C9C90</div><div class="swatch-use">Captions, labels</div></div></div>
+  </div>
+
+  <div class="label">Status Colors</div>
+  <div class="swatches">
+    <div class="swatch"><div class="swatch-color" style="background:#E8F2EE"></div><div class="swatch-info"><div class="swatch-name">Confirmed</div><div class="swatch-hex">#E8F2EE / #1A3C34</div><div class="swatch-use">Confirmed bookings</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#FEF3DC"></div><div class="swatch-info"><div class="swatch-name">Pending</div><div class="swatch-hex">#FEF3DC / #C4820A</div><div class="swatch-use">Awaiting confirm</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#FDEEE9"></div><div class="swatch-info"><div class="swatch-name">Cancelled</div><div class="swatch-hex">#FDEEE9 / #C43D1A</div><div class="swatch-use">Cancelled apts</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#EBE8FC"></div><div class="swatch-info"><div class="swatch-name">Rescheduled</div><div class="swatch-hex">#EBE8FC / #4A3AB0</div><div class="swatch-use">Rescheduled</div></div></div>
+  </div>
+</div>
+
+<!-- TYPOGRAPHY -->
+<div class="pane" id="p1">
+  <div class="sec">Typography</div>
+  <div class="sec-sub">Two fonts — DM Serif Display for personality, DM Sans for clean readability. Both from the same family for visual harmony.</div>
+
+  <div style="background:var(--forest);border-radius:14px;padding:20px 24px;margin-bottom:1.5rem;">
+    <div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:12px;">Font pairing</div>
+    <div style="font-family:'DM Serif Display',serif;font-size:32px;color:#fff;margin-bottom:6px;">DM Serif Display</div>
+    <div style="font-family:'DM Sans',sans-serif;font-size:16px;color:rgba(255,255,255,.7);">paired with DM Sans — elegant, modern, warm</div>
+  </div>
+
+  <div class="type-row">
+    <div class="type-meta"><span class="chip">DM Serif Display</span><span class="chip">40px</span><span class="chip">Normal</span></div>
+    <div class="t-h1">Book your perfect appointment</div>
+  </div>
+  <div class="type-row">
+    <div class="type-meta"><span class="chip">DM Serif Display</span><span class="chip">28px</span><span class="chip">Normal</span></div>
+    <div class="t-h2">Manage your schedule</div>
+  </div>
+  <div class="type-row">
+    <div class="type-meta"><span class="chip">DM Sans</span><span class="chip">18px</span><span class="chip">600</span></div>
+    <div class="t-h3">Appointment Configuration</div>
+  </div>
+  <div class="type-row">
+    <div class="type-meta"><span class="chip">DM Sans</span><span class="chip">15px</span><span class="chip">600</span></div>
+    <div class="t-h4">Available time slots</div>
+  </div>
+  <div class="type-row">
+    <div class="type-meta"><span class="chip">DM Sans</span><span class="chip">15px</span><span class="chip">400</span></div>
+    <div class="t-body">Choose your preferred date and time from the available slots below. The organiser will confirm your booking within 24 hours.</div>
+  </div>
+  <div class="type-row">
+    <div class="type-meta"><span class="chip">DM Sans</span><span class="chip">13px</span><span class="chip">400</span></div>
+    <div class="t-small">Last updated 2 minutes ago · 12 slots available today</div>
+  </div>
+  <div class="type-row">
+    <div class="type-meta"><span class="chip">DM Sans</span><span class="chip">11px</span><span class="chip">600</span><span class="chip">Uppercase</span></div>
+    <div class="t-label">Upcoming appointments</div>
+  </div>
+</div>
+
+<!-- COMPONENTS -->
+<div class="pane" id="p2">
+  <div class="sec">UI Components</div>
+  <div class="sec-sub">Every component follows the same visual language — warm cream backgrounds, forest green primary actions, amber for energy.</div>
+
+  <div class="label">Buttons</div>
+  <div class="btn-row">
+    <button class="btn btn-primary">Book Now</button>
+    <button class="btn btn-secondary">Confirm</button>
+    <button class="btn btn-outline">View Details</button>
+    <button class="btn btn-ghost">Cancel</button>
+    <button class="btn btn-danger">Delete</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-primary btn-sm">Book</button>
+    <button class="btn btn-primary">Book Appointment</button>
+    <button class="btn btn-primary btn-lg">Book Appointment →</button>
+  </div>
+
+  <hr class="divider">
+  <div class="label">Status badges</div>
+  <div class="badge-row">
+    <span class="bdg bdg-confirmed">✓ Confirmed</span>
+    <span class="bdg bdg-pending">⏳ Pending</span>
+    <span class="bdg bdg-cancelled">✕ Cancelled</span>
+    <span class="bdg bdg-rescheduled">↻ Rescheduled</span>
+    <span class="bdg bdg-online">● Online</span>
+    <span class="bdg bdg-inperson">⊙ In Person</span>
+  </div>
+
+  <hr class="divider">
+  <div class="label">Form inputs</div>
+  <div class="g2">
+    <div>
+      <div class="form-group">
+        <label class="form-label">Full name</label>
+        <input class="form-input" placeholder="Riya Sharma" value="">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" placeholder="riya@email.com">
+      </div>
+    </div>
+    <div>
+      <div class="form-group">
+        <label class="form-label">Appointment type</label>
+        <select class="form-input form-select">
+          <option>General Consultation</option>
+          <option>Follow-up</option>
+          <option>Initial Meeting</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-input" rows="3" placeholder="Any specific requirements…" style="resize:none"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+  <div class="label">Info Cards</div>
+  <div class="cards-grid">
+    <div class="card">
+      <div class="card-icon card-icon-g">📅</div>
+      <div class="card-title">Upcoming booking</div>
+      <div class="card-sub">Your next appointment is tomorrow at 10:30 AM.</div>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-a">⚡</div>
+      <div class="card-title">Quick book</div>
+      <div class="card-sub">3 slots available today. Grab one before they fill up.</div>
+    </div>
+    <div class="card">
+      <div class="card-icon card-icon-c">🔔</div>
+      <div class="card-title">Confirmation needed</div>
+      <div class="card-sub">2 bookings are waiting for your manual confirmation.</div>
+    </div>
+  </div>
+</div>
+
+<!-- BOOKING UI -->
+<div class="pane" id="p3">
+  <div class="sec">Booking Experience</div>
+  <div class="sec-sub">How the core booking flow looks — the most important UX in the whole app.</div>
+
+  <div class="g2">
+    <div>
+      <div class="label">Time slot picker</div>
+      <div style="background:var(--white);border-radius:14px;padding:18px;border:1px solid var(--cream2);margin-bottom:14px;">
+        <div class="t-h4" style="margin-bottom:4px;">Thursday, May 8</div>
+        <div class="t-small" style="margin-bottom:14px;">12 slots · Dr. Priya Nair</div>
+        <div class="slots">
+          <div class="slot taken">9:00</div>
+          <div class="slot taken">9:30</div>
+          <div class="slot">10:00</div>
+          <div class="slot sel">10:30</div>
+          <div class="slot">11:00</div>
+          <div class="slot">11:30</div>
+          <div class="slot taken">12:00</div>
+          <div class="slot">2:00</div>
+          <div class="slot">2:30</div>
+          <div class="slot">3:00</div>
+          <div class="slot taken">3:30</div>
+          <div class="slot">4:00</div>
+        </div>
+        <div style="display:flex;gap:12px;font-size:11px;color:var(--slate-light);">
+          <span>● Available</span>
+          <span style="text-decoration:line-through">Taken</span>
+          <span style="background:var(--forest);color:#fff;padding:2px 7px;border-radius:4px;">Selected</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="label">Booking summary card</div>
+      <div class="booking-card">
+        <div class="booking-card-head">
+          <div class="t">General Consultation</div>
+          <div class="s">Booking confirmation · BK-2026-4821</div>
+        </div>
+        <div class="booking-card-body">
+          <div class="bc-row"><span class="bc-key">Provider</span><span class="bc-val">Dr. Priya Nair</span></div>
+          <div class="bc-row"><span class="bc-key">Date</span><span class="bc-val">Thu, May 8, 2026</span></div>
+          <div class="bc-row"><span class="bc-key">Time</span><span class="bc-val">10:30 AM</span></div>
+          <div class="bc-row"><span class="bc-key">Duration</span><span class="bc-val">30 minutes</span></div>
+          <div class="bc-row"><span class="bc-key">Venue</span><span class="bc-val">Room 204, Bldg A</span></div>
+          <div class="bc-row"><span class="bc-key">Status</span><span><span class="bdg bdg-confirmed">✓ Confirmed</span></span></div>
+        </div>
+        <div class="booking-card-foot">
+          <button class="btn btn-outline btn-sm" style="flex:1">Reschedule</button>
+          <button class="btn btn-danger btn-sm" style="flex:1">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="pane" id="p4">
+  <div class="sec">Dashboard Layout</div>
+  <div class="sec-sub">How the organiser and admin dashboards should be structured visually.</div>
+
+  <div class="g2" style="margin-bottom:1.5rem;">
+    <div>
+      <div class="label">Sidebar navigation</div>
+      <div class="sidebar-preview">
+        <div class="sp-logo">BookEase</div>
+        <div class="sp-item on"><span class="sp-icon">⊞</span>Dashboard</div>
+        <div class="sp-item"><span class="sp-icon">📅</span>Appointments</div>
+        <div class="sp-item"><span class="sp-icon">⚙</span>Services</div>
+        <div class="sp-item"><span class="sp-icon">👤</span>Customers</div>
+        <div class="sp-item"><span class="sp-icon">📊</span>Reports</div>
+        <div class="sp-item"><span class="sp-icon">🔔</span>Notifications</div>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.12)">
+          <div class="sp-item"><span class="sp-icon">⚙</span>Settings</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="label">Stats overview</div>
+      <div class="stats">
+        <div class="stat"><div class="stat-n">284</div><div class="stat-l">Total bookings</div><div class="stat-d up">↑ 12% this week</div></div>
+        <div class="stat"><div class="stat-n">18</div><div class="stat-l">Today's slots</div><div class="stat-d up">↑ 3 open</div></div>
+        <div class="stat"><div class="stat-n">94%</div><div class="stat-l">Confirmation rate</div><div class="stat-d up">↑ Good</div></div>
+        <div class="stat"><div class="stat-n">5</div><div class="stat-l">Pending review</div><div class="stat-d dn">Action needed</div></div>
+      </div>
+      <div class="label" style="margin-top:8px">Upcoming today</div>
+      <div style="background:var(--white);border-radius:12px;border:1px solid var(--cream2);overflow:hidden;">
+        <div style="padding:10px 16px;border-bottom:1px solid var(--cream2);display:flex;justify-content:space-between;align-items:center;font-size:13px;"><span style="color:var(--slate-mid)">Anjali Mehta · 9:00 AM</span><span class="bdg bdg-confirmed" style="font-size:10px">✓ Confirmed</span></div>
+        <div style="padding:10px 16px;border-bottom:1px solid var(--cream2);display:flex;justify-content:space-between;align-items:center;font-size:13px;"><span style="color:var(--slate-mid)">Rohan Patil · 10:30 AM</span><span class="bdg bdg-pending" style="font-size:10px">⏳ Pending</span></div>
+        <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;font-size:13px;"><span style="color:var(--slate-mid)">Sneha Joshi · 2:00 PM</span><span class="bdg bdg-confirmed" style="font-size:10px">✓ Confirmed</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GUIDELINES -->
+<div class="pane" id="p5">
+  <div class="sec">Design Guidelines</div>
+  <div class="sec-sub">Rules to follow throughout the app for visual consistency.</div>
+
+  <div class="g2">
+    <div>
+      <div class="label">Spacing scale</div>
+      <div style="background:var(--white);border-radius:12px;border:1px solid var(--cream2);padding:16px;margin-bottom:14px;">
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:12px;font-size:12px;">
+            <div style="width:4px;height:4px;background:var(--forest-light);border-radius:2px;"></div><span style="color:var(--slate-mid);min-width:40px">4px</span><span style="color:var(--slate-light)">Icon gaps, tight spacing</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;font-size:12px;">
+            <div style="width:8px;height:4px;background:var(--forest-light);border-radius:2px;"></div><span style="color:var(--slate-mid);min-width:40px">8px</span><span style="color:var(--slate-light)">Badge padding, chips</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;font-size:12px;">
+            <div style="width:16px;height:4px;background:var(--forest-light);border-radius:2px;"></div><span style="color:var(--slate-mid);min-width:40px">16px</span><span style="color:var(--slate-light)">Card padding, row gaps</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;font-size:12px;">
+            <div style="width:24px;height:4px;background:var(--forest-light);border-radius:2px;"></div><span style="color:var(--slate-mid);min-width:40px">24px</span><span style="color:var(--slate-light)">Section padding</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;font-size:12px;">
+            <div style="width:48px;height:4px;background:var(--forest-light);border-radius:2px;"></div><span style="color:var(--slate-mid);min-width:40px">48px</span><span style="color:var(--slate-light)">Page margins</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="label">Border radius</div>
+      <div style="background:var(--white);border-radius:12px;border:1px solid var(--cream2);padding:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+        <div style="text-align:center;font-size:11px;color:var(--slate-light)"><div style="width:32px;height:32px;background:var(--forest-pale);border-radius:4px;margin:0 auto 4px;"></div>4px<br>Chips</div>
+        <div style="text-align:center;font-size:11px;color:var(--slate-light)"><div style="width:32px;height:32px;background:var(--forest-pale);border-radius:8px;margin:0 auto 4px;"></div>8px<br>Badges</div>
+        <div style="text-align:center;font-size:11px;color:var(--slate-light)"><div style="width:32px;height:32px;background:var(--forest-pale);border-radius:10px;margin:0 auto 4px;"></div>10px<br>Buttons</div>
+        <div style="text-align:center;font-size:11px;color:var(--slate-light)"><div style="width:32px;height:32px;background:var(--forest-pale);border-radius:14px;margin:0 auto 4px;"></div>14px<br>Cards</div>
+        <div style="text-align:center;font-size:11px;color:var(--slate-light)"><div style="width:32px;height:32px;background:var(--forest-pale);border-radius:18px;margin:0 auto 4px;"></div>18px+<br>Modals</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="label">Do's and don'ts</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="background:var(--forest-pale);border-radius:10px;padding:12px 14px;border-left:3px solid var(--forest-light);">
+          <div style="font-size:12px;font-weight:600;color:var(--forest-mid);margin-bottom:3px;">✓ Do</div>
+          <div style="font-size:12px;color:var(--slate-mid);line-height:1.6;">Use DM Serif Display only for page headings and section titles — never for body text or buttons.</div>
+        </div>
+        <div style="background:var(--coral-pale);border-radius:10px;padding:12px 14px;border-left:3px solid var(--coral);">
+          <div style="font-size:12px;font-weight:600;color:var(--coral);margin-bottom:3px;">✕ Don't</div>
+          <div style="font-size:12px;color:var(--slate-mid);line-height:1.6;">Don't use pure white as a page background — always use the warm cream (#FAF7F2) for a premium feel.</div>
+        </div>
+        <div style="background:var(--forest-pale);border-radius:10px;padding:12px 14px;border-left:3px solid var(--forest-light);">
+          <div style="font-size:12px;font-weight:600;color:var(--forest-mid);margin-bottom:3px;">✓ Do</div>
+          <div style="font-size:12px;color:var(--slate-mid);line-height:1.6;">Use amber (#E8A020) only for the single most important CTA on any given screen.</div>
+        </div>
+        <div style="background:var(--coral-pale);border-radius:10px;padding:12px 14px;border-left:3px solid var(--coral);">
+          <div style="font-size:12px;font-weight:600;color:var(--coral);margin-bottom:3px;">✕ Don't</div>
+          <div style="font-size:12px;color:var(--slate-mid);line-height:1.6;">Never put grey text on a cream background — use var(--slate-mid) (#5C5C54) minimum for readable contrast.</div>
+        </div>
+        <div style="background:var(--forest-pale);border-radius:10px;padding:12px 14px;border-left:3px solid var(--forest-light);">
+          <div style="font-size:12px;font-weight:600;color:var(--forest-mid);margin-bottom:3px;">✓ Do</div>
+          <div style="font-size:12px;color:var(--slate-mid);line-height:1.6;">Forest green sidebar on every authenticated page. It anchors the entire layout and reinforces brand identity.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+var panes=document.querySelectorAll('.pane');
+var tabs=document.querySelectorAll('.tab');
+function sw(i){
+  panes.forEach(function(p,j){p.className=j===i?'pane on':'pane';});
+  tabs.forEach(function(t,j){t.className=j===i?'tab on':'tab';});
+}
+document.querySelectorAll('.slot:not(.taken)').forEach(function(s){
+  s.addEventListener('click',function(){
+    document.querySelectorAll('.slot').forEach(function(x){if(!x.classList.contains('taken'))x.classList.remove('sel');});
+    s.classList.add('sel');
+  });
+});
+</script>

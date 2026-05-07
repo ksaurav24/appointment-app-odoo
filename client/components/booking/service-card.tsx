@@ -33,11 +33,11 @@ export function ServiceCard({ type }: ServiceCardProps) {
       <Card className="h-full transition-shadow group-hover:shadow-md">
         <CardContent className="space-y-4 p-5">
           <div className="space-y-1">
-            <h3 className="font-heading text-lg font-semibold tracking-tight">
+            <h3 className="font-heading text-lg tracking-tight text-foreground">
               {type.name}
             </h3>
             {type.description ? (
-              <p className="line-clamp-2 text-sm text-muted-foreground">
+              <p className="line-clamp-2 text-xs text-muted-foreground leading-relaxed">
                 {type.description}
               </p>
             ) : null}
