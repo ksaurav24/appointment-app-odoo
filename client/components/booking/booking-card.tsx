@@ -34,14 +34,14 @@ export function BookingCard({ appointment }: BookingCardProps) {
       <Card className="transition-shadow hover:shadow-md">
         <CardContent className="space-y-2 p-5">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-heading text-base font-semibold tracking-tight">
+            <h3 className="font-heading text-base tracking-tight text-foreground">
               {appointment.appointmentType.name}
             </h3>
             <Badge variant={STATUS_VARIANT[appointment.status]}>
               {STATUS_LABEL[appointment.status]}
             </Badge>
           </div>
-          <p className="text-sm">{formatDateTimeInZone(appointment.startTime, "UTC")}</p>
+          <p className="text-[13px] text-foreground">{formatDateTimeInZone(appointment.startTime, "UTC")}</p>
           <p className="text-xs text-muted-foreground">
             {formatDuration(appointment.durationMins)} · code {appointment.confirmationCode}
           </p>

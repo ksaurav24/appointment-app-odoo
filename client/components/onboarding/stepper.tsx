@@ -23,9 +23,9 @@ export function Stepper({
               aria-current={active ? "step" : undefined}
               className={cn(
                 "flex size-7 items-center justify-center rounded-full border text-xs font-medium transition-colors",
-                done && "border-primary bg-primary text-primary-foreground",
-                active && "border-primary text-primary",
-                !done && !active && "border-border text-muted-foreground",
+                done && "border-forest bg-forest text-white",
+                active && "border-forest text-forest",
+                !done && !active && "border-cream2 text-muted-foreground",
               )}
             >
               {done ? (
@@ -50,7 +50,7 @@ export function Stepper({
                 aria-hidden
                 className={cn(
                   "ml-1 h-px w-6 transition-colors",
-                  done ? "bg-primary" : "bg-border",
+                  done ? "bg-forest" : "bg-cream2",
                 )}
               />
             ) : null}

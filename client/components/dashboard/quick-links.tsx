@@ -17,14 +17,14 @@ export function QuickLinks({ links }: { links: QuickLink[] }) {
         <Link key={link.href} href={link.href} className="group">
           <Card
             size="sm"
-            className="h-full gap-2 transition-colors group-hover:bg-accent/40"
+            className="h-full gap-2 transition-colors group-hover:border-forest-light"
           >
             <CardContent className="flex h-full flex-col gap-2">
-              <div className="flex size-8 items-center justify-center rounded-md bg-accent text-accent-foreground">
-                <HugeiconsIcon icon={link.icon} className="size-4" />
+              <div className="flex size-10 items-center justify-center rounded-[10px] bg-forest-pale text-forest">
+                <HugeiconsIcon icon={link.icon} className="size-[18px]" />
               </div>
-              <p className="font-medium">{link.label}</p>
-              <p className="text-xs text-muted-foreground">{link.description}</p>
+              <p className="text-sm font-semibold text-foreground">{link.label}</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{link.description}</p>
             </CardContent>
           </Card>
         </Link>

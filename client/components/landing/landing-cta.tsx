@@ -6,7 +6,7 @@ export function LandingCta() {
   return (
     <section className="px-6 py-20">
       <div className="mx-auto max-w-2xl space-y-5 text-center">
-        <h2 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
+        <h2 className="font-heading text-3xl tracking-tight sm:text-4xl">
           Ready to book your next appointment?
         </h2>
         <p className="text-sm text-muted-foreground">

@@ -47,12 +47,12 @@ export function CheckoutShell({
 
   return (
     <div className="flex min-h-svh flex-col">
-      <header className="flex items-center justify-between border-b px-6 py-4">
+      <header className="flex items-center justify-between border-b border-cream2 px-6 py-4">
         <Link
           href="/"
-          className="font-heading text-base font-semibold tracking-tight"
+          className="font-heading text-lg tracking-tight text-foreground"
         >
-          appointly
+          BookEase
         </Link>
 
         <div className="flex-1 px-6">

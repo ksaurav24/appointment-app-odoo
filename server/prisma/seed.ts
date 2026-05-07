@@ -168,7 +168,6 @@ type AppointmentTypeSeed = {
   rescheduleWindowHours?: number;
   maxReschedulesAllowed?: number;
   isPublished?: boolean;
-  isOnline?: boolean;
   personIds?: string[];
   resourceIds?: string[];
   schedule: {
@@ -221,7 +220,6 @@ async function upsertAppointmentType(
     rescheduleWindowHours: seed.rescheduleWindowHours,
     maxReschedulesAllowed: seed.maxReschedulesAllowed,
     isPublished: seed.isPublished ?? true,
-    isOnline: seed.isOnline ?? false,
     shareToken: crypto.randomBytes(16).toString('hex'),
   };
 
@@ -555,7 +553,6 @@ async function seedDemoData(): Promise<void> {
     scheduleType: ScheduleType.WEEKLY,
     durationMode: DurationMode.FIXED,
     durationMinutes: 20,
-    isOnline: true,
     advancePaymentEnabled: true,
     advancePaymentAmount: 800,
     assignmentMode: AssignmentMode.AUTO,
@@ -932,7 +929,6 @@ async function seedDemoData(): Promise<void> {
     scheduleType: ScheduleType.WEEKLY,
     durationMode: DurationMode.FIXED,
     durationMinutes: 45,
-    isOnline: true,
     advancePaymentEnabled: true,
     advancePaymentAmount: 1200,
     personIds: [modelStylist],

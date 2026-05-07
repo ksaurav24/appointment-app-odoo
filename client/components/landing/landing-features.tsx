@@ -34,7 +34,7 @@ export function LandingFeatures() {
     <section className="px-6 py-16">
       <div className="mx-auto max-w-5xl">
         <div className="mb-10 max-w-2xl">
-          <h2 className="font-heading text-3xl font-semibold tracking-tight">
+          <h2 className="font-heading text-3xl tracking-tight">
             Built for both sides of the booking.
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -46,11 +46,11 @@ export function LandingFeatures() {
           {FEATURES.map((f) => (
             <Card key={f.title} size="sm" className="h-full">
               <CardContent className="space-y-3">
-                <div className="flex size-9 items-center justify-center rounded-md bg-accent text-accent-foreground">
-                  <HugeiconsIcon icon={f.icon} className="size-5" />
+                <div className="flex size-10 items-center justify-center rounded-[10px] bg-forest-pale text-forest">
+                  <HugeiconsIcon icon={f.icon} className="size-[18px]" />
                 </div>
-                <h3 className="font-medium">{f.title}</h3>
-                <p className="text-sm text-muted-foreground">{f.body}</p>
+                <h3 className="text-sm font-semibold text-foreground">{f.title}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">{f.body}</p>
               </CardContent>
             </Card>
           ))}

@@ -54,48 +54,52 @@ export function ConfirmationSummary({ appointment }: ConfirmationSummaryProps) {
       <div className="text-center">
         <div
           aria-hidden
-          className="mx-auto flex size-12 items-center justify-center rounded-full bg-foreground/5"
+          className="mx-auto flex size-12 items-center justify-center rounded-full bg-forest-pale"
         >
-          <span className="text-2xl">✓</span>
+          <span className="text-2xl text-forest">✓</span>
         </div>
-        <h1 className="mt-4 font-heading text-3xl font-semibold tracking-tight">
+        <h1 className="mt-4 font-heading text-3xl tracking-tight">
           {headline}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Confirmation code <code>{appointment.confirmationCode}</code>
+          Confirmation code <code className="text-foreground font-medium">{appointment.confirmationCode}</code>
         </p>
       </div>
 
-      <Card>
-        <CardContent className="space-y-3 p-5 text-sm">
-          <div>
-            <p className="text-xs uppercase text-muted-foreground">Service</p>
-            <p>{appointment.appointmentType.name}</p>
+      {/* Booking summary card — matches booking-card spec from design system */}
+      <div className="overflow-hidden rounded-[18px] border border-cream2">
+        <div className="bg-forest px-5 py-5">
+          <p className="font-heading text-xl text-white">{appointment.appointmentType.name}</p>
+          <p className="text-xs text-white/70">
+            Booking confirmation · {appointment.confirmationCode}
+          </p>
+        </div>
+        <div className="bg-white px-5 py-4 divide-y divide-cream2">
+          <div className="flex justify-between items-center py-2.5 text-[13px]">
+            <span className="text-slate-light">When</span>
+            <span className="font-medium text-foreground">{formatDateTimeInZone(appointment.startTime, tz)}</span>
           </div>
-          <div>
-            <p className="text-xs uppercase text-muted-foreground">When</p>
-            <p>{formatDateTimeInZone(appointment.startTime, tz)}</p>
-            <p className="text-xs text-muted-foreground">
-              Duration {formatDuration(appointment.durationMins)}
-            </p>
+          <div className="flex justify-between items-center py-2.5 text-[13px]">
+            <span className="text-slate-light">Duration</span>
+            <span className="font-medium text-foreground">{formatDuration(appointment.durationMins)}</span>
           </div>
-          <div>
-            <p className="text-xs uppercase text-muted-foreground">Payment</p>
-            <p>{paymentLine}</p>
+          <div className="flex justify-between items-center py-2.5 text-[13px]">
+            <span className="text-slate-light">Payment</span>
+            <span className="font-medium text-foreground">{paymentLine}</span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {appointment.paymentStatus === "PENDING" &&
       appointment.appointmentType.advancePaymentEnabled ? (
-        <div className="rounded-md border border-amber-500/40 bg-amber-50 p-3 text-xs dark:bg-amber-950/30">
+        <div className="rounded-[10px] border border-amber bg-amber-pale p-3 text-xs text-amber-deep">
           Payment is being processed. We&apos;ll update this page when it
           confirms.
         </div>
       ) : null}
 
       {isApprovalPending ? (
-        <div className="rounded-md border border-amber-500/40 bg-amber-50 p-3 text-xs dark:bg-amber-950/30">
+        <div className="rounded-[10px] border border-amber bg-amber-pale p-3 text-xs text-amber-deep">
           Other customers may also have requested this slot. The organizer
           will choose who to confirm — you&apos;ll get an email either way.
         </div>

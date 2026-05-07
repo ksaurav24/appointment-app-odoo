@@ -50,7 +50,7 @@ export function DashboardShell({
 
   if (isPending || !user || user.role !== role) {
     return (
-      <div className="flex min-h-svh items-center justify-center">
+      <div className="flex min-h-svh items-center justify-center bg-cream">
         <Spinner className="size-5" />
       </div>
     );
@@ -67,18 +67,19 @@ export function DashboardShell({
 
   return (
     <div className="flex h-svh overflow-hidden bg-background">
-      <aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col border-r border-border/60 px-4 py-6 md:flex">
+      {/* Forest green sidebar — design system spec */}
+      <aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col bg-forest px-4 py-6 md:flex">
         <Link
           href="/"
-          className="px-2 font-heading text-base font-semibold tracking-tight"
+          className="px-2 font-heading text-lg text-white"
         >
-          appointly
+          BookEase
         </Link>
-        <p className="mt-1 px-2 text-xs uppercase tracking-wide text-muted-foreground">
+        <p className="mt-1 px-2 text-[11px] uppercase tracking-wide text-white/50">
           {brand}
         </p>
 
-        <nav className="mt-8 flex flex-col gap-1">
+        <nav className="mt-8 flex flex-col gap-0.5">
           {nav.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -87,10 +88,10 @@ export function DashboardShell({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                  "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors",
                   active
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                    ? "bg-white/12 text-white"
+                    : "text-white/65 hover:bg-white/12 hover:text-white",
                 )}
               >
                 <HugeiconsIcon icon={item.icon} className="size-4" />
@@ -100,19 +101,17 @@ export function DashboardShell({
           })}
         </nav>
 
-        <div className="mt-auto space-y-2 border-t border-border/60 pt-4">
+        <div className="mt-auto space-y-2 border-t border-white/12 pt-4">
           <div className="px-2 text-xs">
-            <p className="truncate font-medium text-foreground">
+            <p className="truncate font-medium text-white">
               {user.fullName}
             </p>
-            <p className="truncate text-muted-foreground">{user.email}</p>
+            <p className="truncate text-white/50">{user.email}</p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
+          <button
             onClick={onLogout}
             disabled={logout.isPending}
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] text-white/65 transition-colors hover:bg-white/12 hover:text-white disabled:opacity-50"
           >
             {logout.isPending ? (
               <Spinner className="size-4" />
@@ -120,17 +119,18 @@ export function DashboardShell({
               <HugeiconsIcon icon={Logout02Icon} className="size-4" />
             )}
             Sign out
-          </Button>
+          </button>
         </div>
       </aside>
 
       <div className="flex h-svh min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex shrink-0 items-center justify-between border-b border-border/60 px-4 py-3 md:hidden">
+        {/* Mobile header */}
+        <header className="flex shrink-0 items-center justify-between border-b border-cream2 bg-white px-4 py-3 md:hidden">
           <Link
             href="/"
-            className="font-heading text-base font-semibold tracking-tight"
+            className="font-heading text-base text-foreground"
           >
-            appointly
+            BookEase
           </Link>
           <Button
             variant="ghost"
@@ -143,7 +143,8 @@ export function DashboardShell({
           </Button>
         </header>
 
-        <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-border/60 px-4 py-2 md:hidden">
+        {/* Mobile nav */}
+        <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-cream2 bg-white px-4 py-2 md:hidden">
           {nav.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -152,9 +153,9 @@ export function DashboardShell({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs",
+                  "flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs",
                   active
-                    ? "bg-accent text-accent-foreground"
+                    ? "bg-forest-pale text-forest"
                     : "text-muted-foreground",
                 )}
               >
