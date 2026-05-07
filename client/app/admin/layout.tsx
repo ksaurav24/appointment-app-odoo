@@ -1,31 +1,19 @@
 import type { ReactNode } from "react";
-import {
-  Analytics01Icon,
-  Building01Icon,
-  Calendar01Icon,
-  DashboardSquare02Icon,
-  Note01Icon,
-  UserMultiple02Icon,
-} from "@hugeicons/core-free-icons";
-
-import {
-  DashboardShell,
-  type NavItem,
-} from "@/components/dashboard/dashboard-shell";
-
-const NAV: NavItem[] = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: DashboardSquare02Icon },
-  { href: "/admin/organizations", label: "Organizations", icon: Building01Icon },
-  { href: "/admin/users", label: "Users", icon: UserMultiple02Icon },
-  { href: "/admin/appointments", label: "Appointments", icon: Calendar01Icon },
-  { href: "/admin/analytics", label: "Analytics", icon: Analytics01Icon },
-  { href: "/admin/audit-logs", label: "Audit logs", icon: Note01Icon },
-];
+import { AdminSidebar } from '@/components/layout/admin-sidebar';
+import { AdminTopbar } from '@/components/layout/admin-topbar';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
-    <DashboardShell brand="Admin console" role="ADMIN" nav={NAV}>
-      {children}
-    </DashboardShell>
+    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950 font-sans">
+      <AdminSidebar />
+      <div className="flex-1 flex flex-col min-w-0">
+        <AdminTopbar />
+        <main className="flex-1 p-6 lg:p-8 overflow-auto">
+          <div className="mx-auto max-w-6xl">
+            {children}
+          </div>
+        </main>
+      </div>
+    </div>
   );
 }
