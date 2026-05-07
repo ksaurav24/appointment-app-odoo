@@ -99,7 +99,7 @@ export function RescheduleStepper({ appointment }: Props) {
     return () => window.removeEventListener("beforeunload", onUnload);
   }, [state.slotLockId]);
 
-  const tz = "UTC";
+  const tz = appointment.appointmentType.organization.timezone;
 
   const availabilityQuery = useAvailability(state.date ? type.id : undefined, {
     date: state.date,

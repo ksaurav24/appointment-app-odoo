@@ -442,6 +442,28 @@ export type AppointmentTypeWithRelations = AppointmentType & {
 
 // ─── Booking: availability (discriminated union) ─────────────────
 
+export type SlotState = "available" | "pending" | "booked";
+
+export type FixedAvailabilitySlot = {
+  startTime: string;
+  endTime: string;
+  remainingCapacity: number;
+  /** CONFIRMED capacity already consumed for this slot. */
+  confirmedCount: number;
+  /**
+   * PENDING capacity awaiting organiser approval. Always 0 unless the
+   * appointment type has `manualConfirmation = true`.
+   */
+  pendingCount: number;
+  /**
+   * `available` — selectable, no PENDING competitors.
+   * `pending`   — selectable, but at least one approval-required request
+   *               is competing for capacity (yellow chip).
+   * `booked`    — fully filled by CONFIRMED bookings (gray chip, disabled).
+   */
+  state: SlotState;
+};
+
 export type FixedAvailability = {
   appointmentTypeId: string;
   date: string;
@@ -449,11 +471,9 @@ export type FixedAvailability = {
   durationMinutes: number;
   timezone: string;
   entityId: string | null;
-  slots: Array<{
-    startTime: string;
-    endTime: string;
-    remainingCapacity: number;
-  }>;
+  /** Mirrors `appointment_type.manualConfirmation` for client-side branching. */
+  manualConfirmation: boolean;
+  slots: FixedAvailabilitySlot[];
 };
 
 export type VariableAvailability = {
@@ -526,6 +546,19 @@ export type CreateAppointmentInput = {
   answers?: AppointmentAnswerInput[];
 };
 
+/**
+ * Body for `POST /public/appointment-types/:id/requests`. Used by the
+ * manual-approval flow where multiple customers may submit competing
+ * PENDING requests for the same slot.
+ */
+export type CreateAppointmentRequestInput = {
+  entityId?: string;
+  startTime: string;
+  endTime: string;
+  capacityBooked?: number;
+  answers?: AppointmentAnswerInput[];
+};
+
 export type AppointmentAnswer = {
   question: BookingQuestion;
   answerText: string | null;
@@ -555,7 +588,7 @@ export type Appointment = {
 };
 
 export type AppointmentWithRelations = Appointment & {
-  appointmentType: AppointmentType;
+  appointmentType: AppointmentType & { organization: Organization };
   bookablePerson: BookablePerson | null;
   bookableResource: BookableResource | null;
   answers?: AppointmentAnswer[];

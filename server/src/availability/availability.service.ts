@@ -18,6 +18,7 @@ import {
   BusyRange,
   computeFixedSlots,
   FixedSlot,
+  SlotState,
 } from './strategies/fixed.strategy';
 import {
   computeVariableOpenRanges,
@@ -51,7 +52,19 @@ export interface FixedAvailabilityResponse {
   durationMinutes: number;
   timezone: string;
   entityId: string | null;
-  slots: { startTime: string; endTime: string; remainingCapacity: number }[];
+  /**
+   * `manualConfirmation` is included so the client can pick the right CTA
+   * ("Book now" vs "Request approval") and interpret per-slot `state`.
+   */
+  manualConfirmation: boolean;
+  slots: {
+    startTime: string;
+    endTime: string;
+    remainingCapacity: number;
+    confirmedCount: number;
+    pendingCount: number;
+    state: SlotState;
+  }[];
 }
 
 export interface VariableAvailabilityResponse {
@@ -182,7 +195,12 @@ export class AvailabilityService {
     req: AvailabilityRequest,
     tz: string,
     windows: TimeRange[],
-    appointments: { startTime: Date; endTime: Date; capacityBooked: number }[],
+    appointments: {
+      startTime: Date;
+      endTime: Date;
+      capacityBooked: number;
+      status: AppointmentStatus;
+    }[],
     locks: { slotStart: Date; slotEnd: Date }[],
   ): FixedAvailabilityResponse {
     if (at.durationMinutes == null) {
@@ -191,15 +209,26 @@ export class AvailabilityService {
       );
     }
     const busy: BusyRange[] = [
-      ...appointments.map((a) => ({
-        start: a.startTime,
-        end: a.endTime,
-        capacity: a.capacityBooked,
-      })),
+      ...appointments.map((a) => {
+        // For manual-approval types, PENDING is a competing approval request:
+        // it must be visible to other customers as `pending` (yellow) but
+        // does NOT block the slot. For non-manual types PENDING is a real
+        // hold (advance payment, organiser-created), so it counts as
+        // confirmed for blocking purposes — preserves pre-existing semantics.
+        const isPending = a.status === AppointmentStatus.PENDING;
+        const showAsPending = at.manualConfirmation && isPending;
+        return {
+          start: a.startTime,
+          end: a.endTime,
+          confirmedCapacity: showAsPending ? 0 : a.capacityBooked,
+          pendingCapacity: showAsPending ? a.capacityBooked : 0,
+        };
+      }),
       ...locks.map((l) => ({
         start: l.slotStart,
         end: l.slotEnd,
-        capacity: 1,
+        confirmedCapacity: 1,
+        pendingCapacity: 0,
       })),
     ];
     const slots: FixedSlot[] = computeFixedSlots({
@@ -215,10 +244,14 @@ export class AvailabilityService {
       durationMinutes: at.durationMinutes,
       timezone: tz,
       entityId: req.entityId ?? null,
+      manualConfirmation: at.manualConfirmation,
       slots: slots.map((s) => ({
         startTime: s.start.toISOString(),
         endTime: s.end.toISOString(),
         remainingCapacity: s.remainingCapacity,
+        confirmedCount: s.confirmedCount,
+        pendingCount: s.pendingCount,
+        state: s.state,
       })),
     };
   }
@@ -228,7 +261,11 @@ export class AvailabilityService {
     req: AvailabilityRequest,
     tz: string,
     windows: TimeRange[],
-    appointments: { startTime: Date; endTime: Date }[],
+    appointments: {
+      startTime: Date;
+      endTime: Date;
+      status: AppointmentStatus;
+    }[],
     locks: { slotStart: Date; slotEnd: Date }[],
   ): VariableAvailabilityResponse {
     if (
@@ -349,7 +386,12 @@ export class AvailabilityService {
         startTime: { lt: dayEnd },
         endTime: { gt: dayStart },
       },
-      select: { startTime: true, endTime: true, capacityBooked: true },
+      select: {
+        startTime: true,
+        endTime: true,
+        capacityBooked: true,
+        status: true,
+      },
     });
   }
 

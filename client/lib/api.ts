@@ -19,6 +19,7 @@ import type {
   ChangePasswordInput,
   ChangeRoleInput,
   CreateAppointmentInput,
+  CreateAppointmentRequestInput,
   CreateAppointmentTypeInput,
   CreateBookablePersonInput,
   CreateBookableResourceInput,
@@ -71,7 +72,7 @@ import type {
 } from "@/types";
 
 const baseURL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL ?? "https://api.appointly.sauravcodes.in";
 
 export const api = axios.create({
   baseURL,
@@ -698,6 +699,21 @@ export async function createAppointment(
   try {
     const { data } = await api.post<AppointmentWithRelations>(
       "/appointments",
+      body,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function submitAppointmentRequest(
+  appointmentTypeId: string,
+  body: CreateAppointmentRequestInput,
+): Promise<AppointmentWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentWithRelations>(
+      `/public/appointment-types/${appointmentTypeId}/requests`,
       body,
     );
     return data;

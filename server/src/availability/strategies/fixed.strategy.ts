@@ -1,29 +1,49 @@
 import { addMinutes, rangesOverlap, TimeRange } from '../helpers/range';
 
+export type SlotState = 'available' | 'pending' | 'booked';
+
 export interface FixedSlot {
   start: Date;
   end: Date;
   remainingCapacity: number;
+  /** Capacity already consumed by CONFIRMED appointments overlapping this slot. */
+  confirmedCount: number;
+  /**
+   * Capacity already consumed by PENDING appointments overlapping this slot.
+   * Always 0 for non-`manualConfirmation` types since PENDING contributes to
+   * `confirmedCount` accounting via `treatPendingAsConfirmed`.
+   */
+  pendingCount: number;
+  state: SlotState;
 }
 
 export interface ComputeFixedSlotsInput {
   windows: TimeRange[];
-  /** Already-acquired ranges (appointments + active slot locks). */
+  /**
+   * Already-acquired ranges. For each entry, callers must classify capacity
+   * into CONFIRMED vs PENDING — pending is shown as a yellow "request
+   * approval" state on the booking page, while booked (gray) is reached only
+   * once `confirmedCapacity >= maxBookingsPerSlot`.
+   */
   busy: BusyRange[];
   durationMinutes: number;
   maxBookingsPerSlot: number;
 }
 
 export interface BusyRange extends TimeRange {
-  /** Capacity already consumed by this booking/lock (>=1). */
-  capacity: number;
+  /** CONFIRMED capacity (and slot_lock holds, which always count as confirmed). */
+  confirmedCapacity: number;
+  /** PENDING capacity (manual-approval requests awaiting organiser action). */
+  pendingCapacity: number;
 }
 
 /**
- * Fixed-duration slot generation per PRD §5.1. Slots step by `durationMinutes`
- * inside each schedule window. A slot is included iff its remaining capacity
- * (maxBookingsPerSlot − overlap-weighted busy) is > 0. For
- * maxBookingsPerSlot=1 this reduces to "no overlap".
+ * Fixed-duration slot generation per PRD §5.1. A slot is included unless it
+ * is fully booked by CONFIRMED capacity. PENDING capacity does NOT remove
+ * the slot from the response — instead, the caller surfaces it as
+ * `state: 'pending'` so the user can submit their own competing request.
+ *
+ * Slots step by `durationMinutes` inside each schedule window.
  */
 export function computeFixedSlots(input: ComputeFixedSlotsInput): FixedSlot[] {
   const { windows, busy, durationMinutes, maxBookingsPerSlot } = input;
@@ -39,15 +59,35 @@ export function computeFixedSlots(input: ComputeFixedSlotsInput): FixedSlot[] {
         start: cursor,
         end: addMinutes(cursor, durationMinutes),
       };
-      const consumed = busy
-        .filter((b) => rangesOverlap(b, slot))
-        .reduce((sum, b) => sum + b.capacity, 0);
-      const remaining = maxBookingsPerSlot - consumed;
+      let confirmed = 0;
+      let pending = 0;
+      for (const b of busy) {
+        if (!rangesOverlap(b, slot)) continue;
+        confirmed += b.confirmedCapacity;
+        pending += b.pendingCapacity;
+      }
+      const remaining = maxBookingsPerSlot - confirmed;
       if (remaining > 0) {
+        const state: SlotState = pending > 0 ? 'pending' : 'available';
         slots.push({
           start: slot.start,
           end: slot.end,
           remainingCapacity: remaining,
+          confirmedCount: confirmed,
+          pendingCount: pending,
+          state,
+        });
+      } else {
+        // Surfacing fully-booked slots as `booked` lets the UI render them as
+        // grayed-out chips instead of silently omitting them, which matches
+        // the user's mental model of "the day's calendar".
+        slots.push({
+          start: slot.start,
+          end: slot.end,
+          remainingCapacity: 0,
+          confirmedCount: confirmed,
+          pendingCount: pending,
+          state: 'booked',
         });
       }
       cursor = addMinutes(cursor, durationMinutes);

@@ -64,7 +64,7 @@ function isReschedulable(a: AppointmentWithRelations, now = Date.now()): boolean
 
 export function BookingDetailView({ appointment }: Props) {
   const [cancelOpen, setCancelOpen] = useState(false);
-  const tz = "UTC";
+  const tz = appointment.appointmentType.organization.timezone;
   const canCancel = isCancellable(appointment);
   const canReschedule = isReschedulable(appointment);
 
