@@ -1,4 +1,5 @@
 import { Bell, Search, User } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export function AdminTopbar() {
   return (
@@ -14,6 +15,7 @@ export function AdminTopbar() {
         </div>
       </div>
       <div className="flex items-center gap-4">
+        <ThemeToggle />
         <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
           <Bell className="w-5 h-5" />
         </button>
