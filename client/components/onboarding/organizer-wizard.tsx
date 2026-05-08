@@ -31,6 +31,11 @@ import {
   useCreateOrganization,
   useMyOrganization,
 } from "@/hooks/useOrganization";
+import {
+  clearPendingSignup,
+  loadPendingSignup,
+  savePendingSignup,
+} from "@/lib/pending-signup";
 import { cn } from "@/lib/utils";
 import type { Organization } from "@/types";
 
@@ -188,6 +193,7 @@ function PersonalStep({
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,6 +201,7 @@ function PersonalStep({
       { email, password, fullName, role: "ORGANIZER" },
       {
         onSuccess: () => {
+          savePendingSignup({ email, password, role: "ORGANIZER" });
           toast.success("Verification code sent to your email.");
           onSuccess(email);
         },
@@ -246,6 +253,24 @@ function PersonalStep({
         <p className="text-xs text-muted-foreground">At least 8 characters.</p>
       </div>
 
+      <div className="space-y-1.5">
+        <Label htmlFor="confirmPassword">Confirm password</Label>
+        <Input
+          id="confirmPassword"
+          type="password"
+          autoComplete="new-password"
+          required
+          minLength={8}
+          maxLength={72}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          disabled={registerMutation.isPending}
+        />
+        {confirmPassword && confirmPassword !== password ? (
+          <p className="text-xs text-destructive">Passwords do not match.</p>
+        ) : null}
+      </div>
+
       <AuthError error={registerMutation.error} />
 
       <Button
@@ -256,7 +281,8 @@ function PersonalStep({
           registerMutation.isPending ||
           !fullName ||
           !email ||
-          password.length < 8
+          password.length < 8 ||
+          confirmPassword !== password
         }
       >
         {registerMutation.isPending ? <Spinner /> : null}
@@ -273,7 +299,7 @@ function PersonalStep({
   );
 }
 
-// --- Step 1b: verify email + log in -----------------------------------------
+// --- Step 1b: verify email ----------------------------------------------------
 
 function VerifyStep({
   email,
@@ -284,12 +310,13 @@ function VerifyStep({
   onAdvance: () => void;
   onBack: () => void;
 }) {
+  const router = useRouter();
   const verifyMutation = useVerifyEmail();
   const loginMutation = useLogin();
   const resendMutation = useResendOtp();
 
   const [code, setCode] = useState("");
-  const [password, setPassword] = useState("");
+  const pendingSignup = loadPendingSignup("ORGANIZER");
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,15 +324,32 @@ function VerifyStep({
       { email, code },
       {
         onSuccess: () => {
+          if (
+            !pendingSignup ||
+            pendingSignup.email.toLowerCase() !== email.toLowerCase()
+          ) {
+            toast.success("Email verified. Please sign in to continue setup.");
+            const next = `/onboarding/organizer?step=details&email=${encodeURIComponent(email)}`;
+            router.replace(
+              `/login?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`,
+            );
+            return;
+          }
+
           loginMutation.mutate(
-            { email, password },
+            { email, password: pendingSignup.password },
             {
               onSuccess: (data) => {
                 if ("user" in data && data.user) {
+                  clearPendingSignup();
                   toast.success("Email verified.");
                   onAdvance();
                 } else {
+                  const next = `/onboarding/organizer?step=details&email=${encodeURIComponent(email)}`;
                   toast.info("Two-factor verification required.");
+                  router.replace(
+                    `/login?email=${encodeURIComponent(email)}&next=${encodeURIComponent(next)}`,
+                  );
                 }
               },
             },
@@ -369,31 +413,13 @@ function VerifyStep({
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="verify-password">Confirm your password</Label>
-        <Input
-          id="verify-password"
-          type="password"
-          autoComplete="current-password"
-          required
-          minLength={8}
-          maxLength={72}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={busy}
-        />
-        <p className="text-xs text-muted-foreground">
-          We use it to sign you in once your email is verified.
-        </p>
-      </div>
-
       <AuthError error={error} />
 
       <Button
         type="submit"
         size="lg"
         className="w-full"
-        disabled={code.length !== 6 || password.length < 8 || busy}
+        disabled={code.length !== 6 || busy}
       >
         {busy ? <Spinner /> : null}
         Verify and continue
