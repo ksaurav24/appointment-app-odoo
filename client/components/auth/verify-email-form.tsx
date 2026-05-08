@@ -8,13 +8,11 @@ import { toast } from "sonner";
 import { AuthError } from "@/components/auth/auth-error";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { useResendOtp, useVerifyEmail } from "@/hooks/useAuth";
 
@@ -24,8 +22,8 @@ export function VerifyEmailForm() {
   const presetEmail = search.get("email") ?? "";
   const nextParam = search.get("next") ?? null;
   const safeNext = nextParam && nextParam.startsWith("/") ? nextParam : null;
+  const email = presetEmail;
 
-  const [email, setEmail] = useState(presetEmail);
   const [code, setCode] = useState("");
 
   const verifyMutation = useVerifyEmail();
@@ -72,21 +70,23 @@ export function VerifyEmailForm() {
         </Link>
       }
     >
-      <form onSubmit={onVerify} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={verifyMutation.isPending}
-          />
+      {!email ? (
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            Missing email. Please start from signup.
+          </div>
+          <Link href="/signup" className="text-sm text-foreground hover:underline">
+            Back to signup
+          </Link>
         </div>
+      ) : null}
 
-        <div className="space-y-1.5">
-          <Label>Verification code</Label>
+      {email ? (
+        <form onSubmit={onVerify} className="space-y-4">
+          <p className="text-center text-sm text-muted-foreground">
+            Code sent to <span className="font-medium text-foreground">{email}</span>
+          </p>
+
           <div className="flex justify-center">
             <InputOTP
               maxLength={6}
@@ -102,29 +102,29 @@ export function VerifyEmailForm() {
               </InputOTPGroup>
             </InputOTP>
           </div>
-        </div>
 
-        <AuthError error={verifyMutation.error} />
+          <AuthError error={verifyMutation.error} />
 
-        <Button
-          type="submit"
-          size="lg"
-          className="w-full"
-          disabled={!email || code.length !== 6 || verifyMutation.isPending}
-        >
-          {verifyMutation.isPending ? <Spinner /> : null}
-          Verify email
-        </Button>
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={code.length !== 6 || verifyMutation.isPending}
+          >
+            {verifyMutation.isPending ? <Spinner /> : null}
+            Verify email
+          </Button>
 
-        <button
-          type="button"
-          onClick={onResend}
-          disabled={!email || resendMutation.isPending}
-          className="block w-full text-center text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
-        >
-          {resendMutation.isPending ? "Sending…" : "Resend code"}
-        </button>
-      </form>
+          <button
+            type="button"
+            onClick={onResend}
+            disabled={resendMutation.isPending}
+            className="block w-full text-center text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
+            {resendMutation.isPending ? "Sending…" : "Resend code"}
+          </button>
+        </form>
+      ) : null}
     </AuthShell>
   );
 }

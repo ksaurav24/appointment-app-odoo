@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { useRegister } from "@/hooks/useAuth";
+import { clearPendingSignup, savePendingSignup } from "@/lib/pending-signup";
 
 export function SignupForm() {
   const router = useRouter();
@@ -23,14 +24,28 @@ export function SignupForm() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const submitEvent = e.nativeEvent as SubmitEvent;
+    const submitter = submitEvent.submitter as HTMLButtonElement | null;
+    const role = submitter?.value === "ORGANIZER" ? "ORGANIZER" : "CUSTOMER";
+
     registerMutation.mutate(
-      { email, password, fullName, role: "CUSTOMER" },
+      { email, password, fullName, role },
       {
         onSuccess: (res) => {
           toast.success(res.message);
+          if (role === "ORGANIZER") {
+            savePendingSignup({ email, password, role: "ORGANIZER" });
+            router.replace(
+              `/onboarding/organizer?step=verify&email=${encodeURIComponent(email)}`,
+            );
+            return;
+          }
+          clearPendingSignup();
+
           const verifyUrl = safeNext
             ? `/verify-email?email=${encodeURIComponent(email)}&next=${encodeURIComponent(safeNext)}`
             : `/verify-email?email=${encodeURIComponent(email)}`;
@@ -103,36 +118,69 @@ export function SignupForm() {
           <p className="text-xs text-muted-foreground">At least 8 characters.</p>
         </div>
 
+        <div className="space-y-1.5">
+          <Label htmlFor="confirmPassword">Confirm password</Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            maxLength={72}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            disabled={registerMutation.isPending}
+          />
+          {confirmPassword && confirmPassword !== password ? (
+            <p className="text-xs text-destructive">Passwords do not match.</p>
+          ) : null}
+        </div>
+
         <AuthError error={registerMutation.error} />
 
-        <Button
-          type="submit"
-          size="lg"
-          className="w-full"
-          disabled={
-            registerMutation.isPending ||
-            !fullName ||
-            !email ||
-            password.length < 8
-          }
-        >
-          {registerMutation.isPending ? <Spinner /> : null}
-          Create account
-        </Button>
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">Choose account type</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Button
+              type="submit"
+              value="CUSTOMER"
+              size="lg"
+              className="w-full"
+              disabled={
+                registerMutation.isPending ||
+                !fullName ||
+                !email ||
+                password.length < 8 ||
+                confirmPassword !== password
+              }
+            >
+              {registerMutation.isPending ? <Spinner /> : null}
+              Sign up as user
+            </Button>
+            <Button
+              type="submit"
+              value="ORGANIZER"
+              variant="outline"
+              size="lg"
+              className="w-full"
+              disabled={
+                registerMutation.isPending ||
+                !fullName ||
+                !email ||
+                password.length < 8 ||
+                confirmPassword !== password
+              }
+            >
+              {registerMutation.isPending ? <Spinner /> : null}
+              Sign up as organizer
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Organizer signup continues with organization setup after email
+            verification.
+          </p>
+        </div>
       </form>
-
-      <div className="rounded-2xl border border-border/60 bg-muted/40 px-4 py-3 text-sm">
-        <p className="font-medium text-foreground">Running an organization?</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Apply for an organizer account — review takes a business day.
-        </p>
-        <Link
-          href="/onboarding/organizer"
-          className="mt-2 inline-block text-xs font-medium text-foreground hover:underline"
-        >
-          Start organizer application →
-        </Link>
-      </div>
     </AuthShell>
   );
 }
