@@ -30,6 +30,18 @@ import type { BookableResource } from "@/types";
 
 import { ResourceFormDialog } from "./resource-form-dialog";
 
+const RESOURCE_TYPE_LABEL: Record<string, string> = {
+  ROOM: "Room",
+  EQUIPMENT: "Equipment",
+  VENUE: "Venue",
+  OTHER: "Other",
+};
+
+function formatResourceType(value: string | null) {
+  if (!value) return "—";
+  return RESOURCE_TYPE_LABEL[value] ?? value;
+}
+
 export function ResourcesTable() {
   const [includeInactive, setIncludeInactive] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -109,7 +121,7 @@ export function ResourcesTable() {
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.name}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {r.resourceType ?? "—"}
+                    {formatResourceType(r.resourceType)}
                   </TableCell>
                   <TableCell>{r.capacity}</TableCell>
                   <TableCell className="text-muted-foreground">

@@ -395,13 +395,38 @@ export type BookableResource = {
   id: string;
   organizationId: string;
   name: string;
-  resourceType: string | null;
+  resourceType: ResourceTypeValue | null;
   description: string | null;
   capacity: number;
   location: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+export type ResourceTypeValue = "ROOM" | "EQUIPMENT" | "VENUE" | "OTHER";
+
+export type ResourceUtilizationReport = {
+  generatedAt: string;
+  items: Array<{
+    resourceId: string;
+    name: string;
+    resourceType: ResourceTypeValue | null;
+    capacity: number;
+    location: string | null;
+    isActive: boolean;
+    utilizationPercent: {
+      day: number;
+      week: number;
+      month: number;
+    };
+    revenue: {
+      day: number;
+      week: number;
+      month: number;
+      total: number;
+    };
+  }>;
 };
 
 export type AppointmentType = {
@@ -685,7 +710,7 @@ export type ListBookablePersonsQuery = {
 
 export type CreateBookableResourceInput = {
   name: string;
-  resourceType?: string;
+  resourceType: ResourceTypeValue;
   description?: string;
   capacity?: number;
   location?: string;

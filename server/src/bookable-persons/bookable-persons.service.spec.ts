@@ -25,8 +25,10 @@ interface AppointmentTypeRow {
 class FakePrisma {
   persons = new Map<string, PersonRow>();
   appointmentTypes = new Map<string, AppointmentTypeRow>();
-  personTypeLinks: Array<{ appointmentTypeId: string; bookablePersonId: string }> =
-    [];
+  personTypeLinks: Array<{
+    appointmentTypeId: string;
+    bookablePersonId: string;
+  }> = [];
   appointmentCount = 0;
   entityLinkCount = 0;
 

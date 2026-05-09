@@ -127,12 +127,7 @@ export class AvailabilityService {
       req.date,
       tz,
     );
-    const windows = await this.resolveWindowsForScope(
-      at,
-      req,
-      tz,
-      orgWindows,
-    );
+    const windows = await this.resolveWindowsForScope(at, req, tz, orgWindows);
 
     const dayStartUtc = wallTimeToUtc(req.date, '00:00', tz);
     const dayEndUtc = new Date(dayStartUtc.getTime() + 24 * 60 * 60_000);
@@ -500,7 +495,11 @@ export class AvailabilityService {
         : [];
       const dateExceptions: Array<{ date: string; reason?: string }> = [];
       for (const exItem of dateExceptionsRaw) {
-        if (exItem == null || typeof exItem !== 'object' || Array.isArray(exItem)) {
+        if (
+          exItem == null ||
+          typeof exItem !== 'object' ||
+          Array.isArray(exItem)
+        ) {
           continue;
         }
         const exception = exItem as Record<string, Prisma.JsonValue>;

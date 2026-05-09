@@ -16,6 +16,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { JwtUserPayload } from '../auth/token.service';
 import { BookableResourcesService } from './bookable-resources.service';
+import type { ResourceUtilizationReport } from './bookable-resources.service';
 import { CreateBookableResourceDto } from './dto/create-bookable-resource.dto';
 import { ListBookableResourcesQuery } from './dto/list-bookable-resources.query';
 import { UpdateBookableResourceDto } from './dto/update-bookable-resource.dto';
@@ -47,6 +48,17 @@ export class BookableResourcesController {
     @Query() query: ListBookableResourcesQuery,
   ): Promise<BookableResource[]> {
     return this.resources.list(user.sub, query.includeInactive ?? false);
+  }
+
+  @Get('utilization-report')
+  @ApiOperation({
+    summary:
+      'Get per-resource utilization (day/week/month) and revenue totals for the current organization',
+  })
+  utilizationReport(
+    @CurrentUser() user: JwtUserPayload,
+  ): Promise<ResourceUtilizationReport> {
+    return this.resources.utilizationReport(user.sub);
   }
 
   @Get(':id')

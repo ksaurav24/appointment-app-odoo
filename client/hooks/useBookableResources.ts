@@ -11,6 +11,7 @@ import {
   createBookableResource,
   deleteBookableResource,
   getBookableResource,
+  getResourceUtilizationReport,
   listBookableResources,
   updateBookableResource,
 } from "@/lib/api";
@@ -18,6 +19,7 @@ import type {
   BookableResource,
   CreateBookableResourceInput,
   DeleteResult,
+  ResourceUtilizationReport,
   UpdateBookableResourceInput,
 } from "@/types";
 
@@ -39,10 +41,20 @@ export function useBookableResource(id: string | undefined) {
   });
 }
 
+export function useResourceUtilizationReport() {
+  return useQuery<ResourceUtilizationReport>({
+    queryKey: [KEY, "utilization-report"],
+    queryFn: getResourceUtilizationReport,
+    staleTime: 60_000,
+  });
+}
+
 export function useBookableResourceMutations() {
   const qc = useQueryClient();
   const invalidateList = () =>
     qc.invalidateQueries({ queryKey: [KEY, "list"] });
+  const invalidateReport = () =>
+    qc.invalidateQueries({ queryKey: [KEY, "utilization-report"] });
 
   const createMutation = useMutation<
     BookableResource,
@@ -50,7 +62,10 @@ export function useBookableResourceMutations() {
     CreateBookableResourceInput
   >({
     mutationFn: createBookableResource,
-    onSuccess: invalidateList,
+    onSuccess: () => {
+      invalidateList();
+      invalidateReport();
+    },
   });
 
   const updateMutation = useMutation<
@@ -62,12 +77,16 @@ export function useBookableResourceMutations() {
     onSuccess: (_data, { id }) => {
       qc.invalidateQueries({ queryKey: [KEY, "list"] });
       qc.invalidateQueries({ queryKey: [KEY, "detail", id] });
+      invalidateReport();
     },
   });
 
   const deleteMutation = useMutation<DeleteResult, ApiError, string>({
     mutationFn: deleteBookableResource,
-    onSuccess: invalidateList,
+    onSuccess: () => {
+      invalidateList();
+      invalidateReport();
+    },
   });
 
   return { createMutation, updateMutation, deleteMutation };

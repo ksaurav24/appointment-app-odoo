@@ -61,6 +61,12 @@ const QUICK_LINKS = [
     icon: UserGroupIcon,
   },
   {
+    href: "/organization/resources",
+    label: "Resources",
+    description: "Track bookable rooms, equipment, and utilization.",
+    icon: Briefcase01Icon,
+  },
+  {
     href: "/organization/settings",
     label: "Organization settings",
     description: "Profile, contact, and policies.",

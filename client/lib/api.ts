@@ -52,6 +52,7 @@ import type {
   RegisterResponse,
   RejectAppointmentInput,
   RejectOrganizationInput,
+  ResourceUtilizationReport,
   ResendOtpInput,
   RescheduleAppointmentInput,
   ResetPasswordInput,
@@ -903,6 +904,17 @@ export async function deleteBookableResource(
   try {
     const { data } = await api.delete<DeleteResult>(
       `/bookable-resources/${id}`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getResourceUtilizationReport(): Promise<ResourceUtilizationReport> {
+  try {
+    const { data } = await api.get<ResourceUtilizationReport>(
+      "/bookable-resources/utilization-report",
     );
     return data;
   } catch (err) {

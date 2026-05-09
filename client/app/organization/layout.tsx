@@ -36,6 +36,7 @@ const NAV: NavItem[] = [
     icon: Briefcase01Icon,
   },
   { href: "/organization/staff", label: "Staff", icon: UserGroupIcon },
+  { href: "/organization/resources", label: "Resources", icon: Briefcase01Icon },
   { href: "/organization/analytics", label: "Analytics", icon: Analytics01Icon },
   { href: "/organization/settings", label: "Settings", icon: Settings01Icon },
 ];

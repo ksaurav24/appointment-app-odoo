@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -8,6 +9,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { RESOURCE_TYPE_VALUES } from './resource-type';
 
 export class UpdateBookableResourceDto {
   @ApiPropertyOptional({
@@ -21,10 +23,13 @@ export class UpdateBookableResourceDto {
   @MaxLength(120)
   name?: string;
 
-  @ApiPropertyOptional({ example: 'treatment-room', maxLength: 80 })
+  @ApiPropertyOptional({
+    example: 'ROOM',
+    enum: RESOURCE_TYPE_VALUES,
+  })
   @IsOptional()
   @IsString()
-  @MaxLength(80)
+  @IsIn(RESOURCE_TYPE_VALUES)
   resourceType?: string;
 
   @ApiPropertyOptional({
