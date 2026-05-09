@@ -1,26 +1,21 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from "react"
+import { toast } from "sonner"
 
-import { ApiError } from "@/lib/api";
+import { ApiError } from "@/lib/api"
 import {
   useAdminOrganizationMutations,
   useAdminOrganizations,
-} from "@/hooks/useAdminOrganizations";
+} from "@/hooks/useAdminOrganizations"
 import type {
   AdminOrganizationStatusFilter,
   OrganizationWithOrganiser,
-} from "@/types";
+} from "@/types"
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -28,10 +23,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Table,
   TableBody,
@@ -39,55 +34,48 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/table"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
 
 const STATUS_TABS: { value: AdminOrganizationStatusFilter; label: string }[] = [
   { value: "PENDING", label: "Pending" },
   { value: "APPROVED", label: "Approved" },
   { value: "REJECTED", label: "Rejected" },
   { value: "ALL", label: "All" },
-];
+]
 
 export default function AdminOrganizationsPage() {
-  const [status, setStatus] = useState<AdminOrganizationStatusFilter>(
-    "PENDING",
-  );
+  const [status, setStatus] = useState<AdminOrganizationStatusFilter>("PENDING")
   const [rejectTarget, setRejectTarget] =
-    useState<OrganizationWithOrganiser | null>(null);
+    useState<OrganizationWithOrganiser | null>(null)
 
-  const orgsQuery = useAdminOrganizations(status);
-  const {
-    approveMutation,
-    activateMutation,
-    deactivateMutation,
-  } = useAdminOrganizationMutations();
+  const orgsQuery = useAdminOrganizations(status)
+  const { approveMutation, activateMutation, deactivateMutation } =
+    useAdminOrganizationMutations()
 
-  const items = orgsQuery.data ?? [];
+  const items = orgsQuery.data ?? []
 
   const onApprove = (org: OrganizationWithOrganiser) => {
     approveMutation.mutate(org.id, {
       onSuccess: () => toast.success(`${org.name} approved`),
       onError: (err) =>
         toast.error(err instanceof ApiError ? err.messages[0] : "Failed"),
-    });
-  };
+    })
+  }
 
   const onToggleActive = (org: OrganizationWithOrganiser) => {
-    const action = org.isActive ? deactivateMutation : activateMutation;
+    const action = org.isActive ? deactivateMutation : activateMutation
     action.mutate(org.id, {
       onSuccess: (updated) => {
         toast.success(
-          updated.isActive
-            ? `${org.name} activated`
-            : `${org.name} deactivated`,
-        );
+          updated.isActive ? `${org.name} activated` : `${org.name} deactivated`
+        )
       },
       onError: (err) =>
         toast.error(err instanceof ApiError ? err.messages[0] : "Failed"),
-    });
-  };
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -107,9 +95,7 @@ export default function AdminOrganizationsPage() {
           </CardTitle>
           <Tabs
             value={status}
-            onValueChange={(v) =>
-              setStatus(v as AdminOrganizationStatusFilter)
-            }
+            onValueChange={(v) => setStatus(v as AdminOrganizationStatusFilter)}
           >
             <TabsList>
               {STATUS_TABS.map((t) => (
@@ -161,6 +147,9 @@ export default function AdminOrganizationsPage() {
                         <div className="text-xs text-muted-foreground">
                           /{org.slug}
                         </div>
+                        <div className="text-xs text-muted-foreground">
+                          {org.city ?? "—"}, {org.state ?? "—"}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -169,15 +158,16 @@ export default function AdminOrganizationsPage() {
                         <div className="text-xs text-muted-foreground">
                           {org.organiser.email}
                         </div>
+                        <div className="text-xs text-muted-foreground">
+                          {org.contactPhone ?? "No phone"}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={org.approvalStatus} />
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={org.isActive ? "default" : "destructive"}
-                      >
+                      <Badge variant={org.isActive ? "default" : "destructive"}>
                         {org.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
@@ -206,9 +196,7 @@ export default function AdminOrganizationsPage() {
                         ) : (
                           <Button
                             size="sm"
-                            variant={
-                              org.isActive ? "destructive" : "default"
-                            }
+                            variant={org.isActive ? "destructive" : "default"}
                             onClick={() => onToggleActive(org)}
                             disabled={
                               activateMutation.isPending ||
@@ -228,47 +216,47 @@ export default function AdminOrganizationsPage() {
         </CardContent>
       </Card>
 
-      <RejectDialog
-        org={rejectTarget}
-        onClose={() => setRejectTarget(null)}
-      />
+      <RejectDialog org={rejectTarget} onClose={() => setRejectTarget(null)} />
     </div>
-  );
+  )
 }
 
 function StatusBadge({
   status,
 }: {
-  status: OrganizationWithOrganiser["approvalStatus"];
+  status: OrganizationWithOrganiser["approvalStatus"]
 }) {
   const map: Record<
     typeof status,
-    { variant: "default" | "secondary" | "destructive" | "outline"; label: string }
+    {
+      variant: "default" | "secondary" | "destructive" | "outline"
+      label: string
+    }
   > = {
     PENDING: { variant: "secondary", label: "Pending" },
     APPROVED: { variant: "default", label: "Approved" },
     REJECTED: { variant: "destructive", label: "Rejected" },
-  };
-  const { variant, label } = map[status];
-  return <Badge variant={variant}>{label}</Badge>;
+  }
+  const { variant, label } = map[status]
+  return <Badge variant={variant}>{label}</Badge>
 }
 
 function RejectDialog({
   org,
   onClose,
 }: {
-  org: OrganizationWithOrganiser | null;
-  onClose: () => void;
+  org: OrganizationWithOrganiser | null
+  onClose: () => void
 }) {
-  const { rejectMutation } = useAdminOrganizationMutations();
-  const [reason, setReason] = useState("");
+  const { rejectMutation } = useAdminOrganizationMutations()
+  const [reason, setReason] = useState("")
 
   useEffect(() => {
-    if (org) setReason("");
-  }, [org]);
+    if (org) setReason("")
+  }, [org])
 
   const submit = () => {
-    if (!org) return;
+    if (!org) return
     rejectMutation.mutate(
       {
         organizationId: org.id,
@@ -276,17 +264,15 @@ function RejectDialog({
       },
       {
         onSuccess: () => {
-          toast.success(`${org.name} rejected`);
-          onClose();
+          toast.success(`${org.name} rejected`)
+          onClose()
         },
         onError: (err) => {
-          toast.error(
-            err instanceof ApiError ? err.messages[0] : "Failed",
-          );
+          toast.error(err instanceof ApiError ? err.messages[0] : "Failed")
         },
-      },
-    );
-  };
+      }
+    )
+  }
 
   return (
     <Dialog open={!!org} onOpenChange={(open) => !open && onClose()}>
@@ -331,5 +317,5 @@ function RejectDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

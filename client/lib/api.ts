@@ -34,6 +34,7 @@ import type {
   GenericMessage,
   ListAdminAppointmentsQuery,
   ListAppointmentTypesQuery,
+  ListBookablePersonsQuery,
   ListAuditLogsQuery,
   ListMyAppointmentsQuery,
   ListOrgAppointmentsQuery,
@@ -783,11 +784,11 @@ export async function verifyPayment(
 // ─── Bookable persons ──────────────────────────────────────────
 
 export async function listBookablePersons(
-  includeInactive = false,
+  query: ListBookablePersonsQuery = {},
 ): Promise<BookablePerson[]> {
   try {
     const { data } = await api.get<BookablePerson[]>("/bookable-persons", {
-      params: { includeInactive },
+      params: query,
     });
     return data;
   } catch (err) {

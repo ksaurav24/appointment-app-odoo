@@ -55,9 +55,9 @@ const QUICK_LINKS = [
     icon: Briefcase01Icon,
   },
   {
-    href: "/organization/inventory",
-    label: "Inventory",
-    description: "Manage staff, rooms, and resources.",
+    href: "/organization/staff",
+    label: "Staff",
+    description: "Manage staff availability and assignments.",
     icon: UserGroupIcon,
   },
   {

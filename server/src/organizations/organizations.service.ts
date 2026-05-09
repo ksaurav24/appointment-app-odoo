@@ -23,8 +23,19 @@ export interface CreateOrganizationInput {
   contactEmail: string;
   description?: string;
   contactPhone?: string;
+  city?: string;
+  state?: string;
   address?: string;
+  latitude?: number;
+  longitude?: number;
+  googlePlaceId?: string;
   timezone?: string;
+  logoUrl?: string;
+  galleryImageUrls?: string[];
+  instagramUrl?: string;
+  facebookUrl?: string;
+  twitterUrl?: string;
+  websiteUrl?: string;
 }
 
 export interface OrganizationWithOrganiser extends Organization {
@@ -81,7 +92,18 @@ export class OrganizationsService {
         contactEmail: input.contactEmail.toLowerCase(),
         description: input.description,
         contactPhone: input.contactPhone,
+        city: input.city,
+        state: input.state,
         address: input.address,
+        latitude: input.latitude,
+        longitude: input.longitude,
+        googlePlaceId: input.googlePlaceId,
+        logoUrl: input.logoUrl,
+        galleryImageUrls: input.galleryImageUrls ?? [],
+        instagramUrl: input.instagramUrl,
+        facebookUrl: input.facebookUrl,
+        twitterUrl: input.twitterUrl,
+        websiteUrl: input.websiteUrl,
         timezone: input.timezone ?? 'UTC',
         approvalStatus: OrganizationApprovalStatus.PENDING,
       },

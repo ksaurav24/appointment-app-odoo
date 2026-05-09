@@ -9,6 +9,7 @@ import { Logout02Icon } from "@hugeicons/core-free-icons";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useMyOrganization } from "@/hooks/useOrganization";
 import { cn } from "@/lib/utils";
 import { useCurrentUser, useLogout } from "@/hooks/useAuth";
 import type { Role } from "@/types";
@@ -35,7 +36,10 @@ export function DashboardShell({
   const pathname = usePathname();
   const router = useRouter();
   const { data: user, isPending } = useCurrentUser();
+  const orgQuery = useMyOrganization(role === "ORGANIZER");
   const logout = useLogout();
+  const organizerLogoUrl =
+    role === "ORGANIZER" ? orgQuery.data?.logoUrl ?? null : null;
 
   useEffect(() => {
     if (isPending) return;
@@ -47,6 +51,12 @@ export function DashboardShell({
       router.replace("/");
     }
   }, [user, isPending, role, router]);
+
+  useEffect(() => {
+    if (role !== "ORGANIZER") return;
+    if (!organizerLogoUrl) return;
+    localStorage.setItem("bookease:organizer-logo-url", organizerLogoUrl);
+  }, [role, organizerLogoUrl]);
 
   if (isPending || !user || user.role !== role) {
     return (
@@ -71,8 +81,15 @@ export function DashboardShell({
       <aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col bg-forest px-4 py-6 md:flex">
         <Link
           href="/"
-          className="px-2 font-heading text-lg text-white"
+          className="flex items-center gap-2 px-2 font-heading text-lg text-white"
         >
+          {organizerLogoUrl ? (
+            <img
+              src={organizerLogoUrl}
+              alt="Organization logo"
+              className="size-7 rounded-md border border-white/30 object-cover"
+            />
+          ) : null}
           BookEase
         </Link>
         <p className="mt-1 px-2 text-[11px] uppercase tracking-wide text-white/50">
@@ -128,8 +145,15 @@ export function DashboardShell({
         <header className="flex shrink-0 items-center justify-between border-b border-cream2 bg-white px-4 py-3 md:hidden">
           <Link
             href="/"
-            className="font-heading text-base text-foreground"
+            className="flex items-center gap-2 font-heading text-base text-foreground"
           >
+            {organizerLogoUrl ? (
+              <img
+                src={organizerLogoUrl}
+                alt="Organization logo"
+                className="size-6 rounded border border-border/70 object-cover"
+              />
+            ) : null}
             BookEase
           </Link>
           <Button

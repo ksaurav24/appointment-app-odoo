@@ -100,6 +100,30 @@ export function organizerRejectedEmail(
   return { subject, text, html };
 }
 
+export function adminOrganizationPendingEmail(
+  adminName: string,
+  organizerName: string,
+  organizerEmail: string,
+  organizationName: string,
+  reviewUrl: string,
+): RenderedEmail {
+  const subject = `New organization awaiting approval: ${organizationName}`;
+  const text = `Hi ${adminName}, ${organizerName} (${organizerEmail}) submitted "${organizationName}" for approval. Review it here: ${reviewUrl}`;
+  const html = wrap(
+    'Organization approval needed',
+    `<p>Hi ${adminName},</p>
+     <p>A new organization is waiting for admin approval.</p>
+     <ul>
+       <li>Organization: <strong>${organizationName}</strong></li>
+       <li>Organizer: ${organizerName}</li>
+       <li>Email: ${organizerEmail}</li>
+     </ul>
+     <p><a href="${reviewUrl}" style="display: inline-block; padding: 10px 16px; background: #2563eb; color: #fff; text-decoration: none; border-radius: 6px;">Review organization</a></p>
+     <p style="font-size: 12px; color: #6b7280;">Or paste this URL: ${reviewUrl}</p>`,
+  );
+  return { subject, text, html };
+}
+
 export function welcomeEmail(fullName: string): RenderedEmail {
   const subject = 'Welcome aboard';
   const text = `Hi ${fullName}, your email has been verified.`;

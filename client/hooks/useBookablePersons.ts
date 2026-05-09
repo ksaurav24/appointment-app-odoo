@@ -18,15 +18,16 @@ import type {
   BookablePerson,
   CreateBookablePersonInput,
   DeleteResult,
+  ListBookablePersonsQuery,
   UpdateBookablePersonInput,
 } from "@/types";
 
 const KEY = "bookable-persons" as const;
 
-export function useBookablePersons(includeInactive = false) {
+export function useBookablePersons(query: ListBookablePersonsQuery = {}) {
   return useQuery<BookablePerson[]>({
-    queryKey: [KEY, "list", { includeInactive }],
-    queryFn: () => listBookablePersons(includeInactive),
+    queryKey: [KEY, "list", query],
+    queryFn: () => listBookablePersons(query),
     staleTime: 30_000,
   });
 }

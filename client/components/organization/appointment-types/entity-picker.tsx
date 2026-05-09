@@ -16,7 +16,7 @@ type Props = {
 };
 
 export function EntityPicker({ entityType, selectedIds, onChange }: Props) {
-  const personsQuery = useBookablePersons(false);
+  const personsQuery = useBookablePersons({});
   const resourcesQuery = useBookableResources(false);
   const query = entityType === "PERSON" ? personsQuery : resourcesQuery;
   const items = query.data ?? [];
@@ -42,9 +42,10 @@ export function EntityPicker({ entityType, selectedIds, onChange }: Props) {
   if (items.length === 0) {
     return (
       <div className="rounded-md border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-        No {entityType === "PERSON" ? "persons" : "resources"} yet.{" "}
+        No {entityType === "PERSON" ? "persons" : "resources"} yet. You can
+        still save this as draft and assign later.{" "}
         <Link
-          href="/organization/inventory"
+          href="/organization/staff"
           className="text-primary hover:underline"
         >
           Add some →

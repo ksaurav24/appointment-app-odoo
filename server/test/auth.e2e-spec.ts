@@ -645,8 +645,17 @@ describe('Auth (e2e)', () => {
           name: 'Sequential Inc',
           slug: 'sequential-inc',
           description: 'Created after email verification',
-          contactPhone: '+91-9000000000',
-          address: '1 Main St',
+          contactPhone: '9000000000',
+          city: 'Pune',
+          state: 'Maharashtra',
+          address: 'Akurdi, Pune, Maharashtra 411035',
+          latitude: 18.6505,
+          longitude: 73.7656,
+          logoUrl:
+            'https://res.cloudinary.com/demo/image/upload/v1234567890/organizations/logo.png',
+          galleryImageUrls: [
+            'https://res.cloudinary.com/demo/image/upload/v1234567890/organizations/gallery-1.png',
+          ],
           timezone: 'Asia/Kolkata',
         })
         .expect(201);
@@ -662,12 +671,36 @@ describe('Auth (e2e)', () => {
       await request(app.getHttpServer())
         .post('/organizations')
         .set('Cookie', cookieHeader(cookies))
-        .send({ name: 'First Co', slug: 'first-co' })
+        .send({
+          name: 'First Co',
+          slug: 'first-co',
+          description: 'First org',
+          contactPhone: '9876543210',
+          city: 'Pune',
+          state: 'Maharashtra',
+          address: 'First address, Pune',
+          latitude: 18.5204,
+          longitude: 73.8567,
+          logoUrl:
+            'https://res.cloudinary.com/demo/image/upload/v1234567890/organizations/first-logo.png',
+        })
         .expect(201);
       await request(app.getHttpServer())
         .post('/organizations')
         .set('Cookie', cookieHeader(cookies))
-        .send({ name: 'Second Co', slug: 'second-co' })
+        .send({
+          name: 'Second Co',
+          slug: 'second-co',
+          description: 'Second org',
+          contactPhone: '9123456789',
+          city: 'Pune',
+          state: 'Maharashtra',
+          address: 'Second address, Pune',
+          latitude: 18.521,
+          longitude: 73.857,
+          logoUrl:
+            'https://res.cloudinary.com/demo/image/upload/v1234567890/organizations/second-logo.png',
+        })
         .expect(409);
     });
 
@@ -677,12 +710,36 @@ describe('Auth (e2e)', () => {
       await request(app.getHttpServer())
         .post('/organizations')
         .set('Cookie', cookieHeader(a))
-        .send({ name: 'Aco', slug: 'shared-slug' })
+        .send({
+          name: 'Aco',
+          slug: 'shared-slug',
+          description: 'A org',
+          contactPhone: '9012345678',
+          city: 'Pune',
+          state: 'Maharashtra',
+          address: 'A address, Pune',
+          latitude: 18.53,
+          longitude: 73.84,
+          logoUrl:
+            'https://res.cloudinary.com/demo/image/upload/v1234567890/organizations/a-logo.png',
+        })
         .expect(201);
       await request(app.getHttpServer())
         .post('/organizations')
         .set('Cookie', cookieHeader(b))
-        .send({ name: 'Bco', slug: 'shared-slug' })
+        .send({
+          name: 'Bco',
+          slug: 'shared-slug',
+          description: 'B org',
+          contactPhone: '9012345679',
+          city: 'Pune',
+          state: 'Maharashtra',
+          address: 'B address, Pune',
+          latitude: 18.54,
+          longitude: 73.85,
+          logoUrl:
+            'https://res.cloudinary.com/demo/image/upload/v1234567890/organizations/b-logo.png',
+        })
         .expect(409);
     });
 
@@ -696,7 +753,19 @@ describe('Auth (e2e)', () => {
       await request(app.getHttpServer())
         .post('/organizations')
         .set('Cookie', cookieHeader(cookies))
-        .send({ name: 'Nope', slug: 'nope-co' })
+        .send({
+          name: 'Nope',
+          slug: 'nope-co',
+          description: 'Nope org',
+          contactPhone: '9988776655',
+          city: 'Pune',
+          state: 'Maharashtra',
+          address: 'Nope address, Pune',
+          latitude: 18.52,
+          longitude: 73.85,
+          logoUrl:
+            'https://res.cloudinary.com/demo/image/upload/v1234567890/organizations/nope-logo.png',
+        })
         .expect(403);
     });
   });

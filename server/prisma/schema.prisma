@@ -169,9 +169,19 @@ model Organization {
   slug           String                     @unique
   description    String?
   logoUrl        String?
+  galleryImageUrls String[]                 @default([])
   contactEmail   String
   contactPhone   String?
+  city           String?
+  state          String?
   address        String?
+  latitude       Float?
+  longitude      Float?
+  googlePlaceId  String?
+  instagramUrl   String?
+  facebookUrl    String?
+  twitterUrl     String?
+  websiteUrl     String?
   timezone       String                     @default("UTC")
   isActive       Boolean                    @default(true)
 
@@ -253,6 +263,7 @@ model BookablePerson {
   contactEmail   String?
   phone          String?
   designation    String?
+  availabilityOverrides Json?
   isActive       Boolean      @default(true)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

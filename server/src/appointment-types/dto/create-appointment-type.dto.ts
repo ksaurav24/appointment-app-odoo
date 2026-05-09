@@ -125,17 +125,17 @@ export class CreateAppointmentTypeDto {
   @IsEnum(AssignmentMode)
   assignmentMode!: AssignmentMode;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: [String],
     example: ['12', '15'],
     description:
-      'Bookable person/resource ids (numeric, string-encoded) linked to this type — must match entityType',
+      'Bookable person/resource ids linked to this type — can be empty at creation and assigned later',
   })
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @ArrayUnique()
   @IsString({ each: true })
-  entityIds!: string[];
+  entityIds?: string[];
 
   // Step 5: schedule (cross-validated in service)
   @ApiProperty({ enum: ScheduleType, example: ScheduleType.WEEKLY })

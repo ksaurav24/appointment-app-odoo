@@ -79,4 +79,19 @@ export class UsersService {
       data: { twoFactorEnabled: enabled },
     });
   }
+
+  listActiveAdmins(): Promise<Array<{ email: string; fullName: string }>> {
+    return this.prisma.user.findMany({
+      where: {
+        role: Role.ADMIN,
+        isActive: true,
+        emailVerified: true,
+      },
+      select: {
+        email: true,
+        fullName: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
 }

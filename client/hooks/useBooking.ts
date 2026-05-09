@@ -35,6 +35,11 @@ export function appointmentKey(publicId: string) {
   return ["appointments", "me", publicId] as const;
 }
 
+type UseAppointmentOptions = {
+  enabled?: boolean;
+  refetchInterval?: number;
+};
+
 export function useAcquireSlotLock() {
   return useMutation<SlotLock, ApiError, AcquireSlotLockInput>({
     mutationFn: acquireSlotLock,
@@ -82,12 +87,17 @@ export function useSubmitAppointmentRequest(appointmentTypeId: string) {
   });
 }
 
-export function useAppointment(publicId: string | undefined) {
+export function useAppointment(
+  publicId: string | undefined,
+  options?: UseAppointmentOptions,
+) {
+  const enabled = options?.enabled ?? !!publicId;
   return useQuery<AppointmentWithRelations>({
     queryKey: publicId ? appointmentKey(publicId) : ["appointments", "me", "none"],
     queryFn: () => getMyAppointment(publicId!),
-    enabled: !!publicId,
+    enabled,
     refetchOnWindowFocus: false,
+    refetchInterval: options?.refetchInterval,
   });
 }
 

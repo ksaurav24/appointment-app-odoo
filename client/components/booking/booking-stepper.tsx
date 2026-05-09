@@ -27,6 +27,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useCurrentUser } from "@/hooks/useAuth";
 import {
   useAcquireSlotLock,
+  useAppointment,
   useCancelAppointment,
   useCreateAppointment,
   useCreatePaymentIntent,
@@ -306,6 +307,12 @@ export function BookingStepper({ type }: BookingStepperProps) {
   const [paymentIntent, setPaymentIntent] =
     useState<CreatePaymentIntentResult | null>(null);
   const [paymentDismissed, setPaymentDismissed] = useState(false);
+  const paymentResolvedRef = useRef(false);
+
+  const paymentAppointment = useAppointment(state.appointmentPublicId, {
+    enabled: state.step === "payment" && !!state.appointmentPublicId,
+    refetchInterval: state.step === "payment" ? 3000 : undefined,
+  });
 
   const handleConfirm = () => {
     const answersArr = type.bookingQuestions.map((q) => ({
@@ -405,8 +412,39 @@ export function BookingStepper({ type }: BookingStepperProps) {
   useEffect(() => {
     if (state.step !== "payment") {
       createIntentRequestedRef.current = false;
+      paymentResolvedRef.current = false;
     }
   }, [state.step]);
+
+  useEffect(() => {
+    if (state.step !== "payment") return;
+    if (!state.appointmentPublicId) return;
+    if (!paymentAppointment.data) return;
+    if (paymentResolvedRef.current) return;
+
+    const appt = paymentAppointment.data;
+    if (appt.paymentStatus === "PAID") {
+      paymentResolvedRef.current = true;
+      router.push(
+        `/book/${type.id}/confirmed?appointment=${encodeURIComponent(
+          state.appointmentPublicId,
+        )}`,
+      );
+      return;
+    }
+
+    if (appt.paymentStatus === "FAILED" || appt.status === "CANCELLED") {
+      paymentResolvedRef.current = true;
+      toast.error("Payment failed or booking was cancelled. Please retry.");
+      router.push("/browse");
+    }
+  }, [
+    paymentAppointment.data,
+    router,
+    state.appointmentPublicId,
+    state.step,
+    type.id,
+  ]);
 
   useEffect(() => {
     if (state.step !== "payment") return;

@@ -19,9 +19,7 @@ export class AppointmentTypeEntitiesService {
     entityIds: string[],
     tx?: PrismaTx,
   ): Promise<void> {
-    if (entityIds.length === 0) {
-      throw new BadRequestException('At least one entity must be assigned');
-    }
+    if (entityIds.length === 0) return;
     const client = tx ?? this.prisma;
     const unique = Array.from(new Set(entityIds));
 
