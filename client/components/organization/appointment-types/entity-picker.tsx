@@ -40,14 +40,13 @@ export function EntityPicker({ entityType, selectedIds, onChange }: Props) {
   }
 
   if (items.length === 0) {
+    const addEntityHref =
+      entityType === "PERSON" ? "/organization/staff" : "/organization/resources";
     return (
       <div className="rounded-md border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
         No {entityType === "PERSON" ? "persons" : "resources"} yet. You can
         still save this as draft and assign later.{" "}
-        <Link
-          href="/organization/staff"
-          className="text-primary hover:underline"
-        >
+        <Link href={addEntityHref} className="text-primary hover:underline">
           Add some →
         </Link>
       </div>

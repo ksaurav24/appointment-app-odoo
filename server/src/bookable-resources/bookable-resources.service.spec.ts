@@ -107,25 +107,38 @@ describe('BookableResourcesService', () => {
   });
 
   it('creates a resource scoped to the organiser organization with default capacity 1', async () => {
-    const r = await service.create('u1', { name: 'Turf A' });
+    const r = await service.create('u1', {
+      name: 'Turf A',
+      resourceType: 'VENUE',
+    });
     expect(r.organizationId).toBe('org_a');
     expect(r.capacity).toBe(1);
   });
 
   it('honors explicit capacity', async () => {
-    const r = await service.create('u1', { name: 'Turf A', capacity: 22 });
+    const r = await service.create('u1', {
+      name: 'Turf A',
+      resourceType: 'VENUE',
+      capacity: 22,
+    });
     expect(r.capacity).toBe(22);
   });
 
   it('refuses cross-tenant fetch (404)', async () => {
-    const r = await service.create('u1', { name: 'Turf A' });
+    const r = await service.create('u1', {
+      name: 'Turf A',
+      resourceType: 'VENUE',
+    });
     await expect(service.findOneForOrganiser('u2', r.id)).rejects.toThrow(
       NotFoundException,
     );
   });
 
   it('soft-deletes when references exist', async () => {
-    const r = await service.create('u1', { name: 'Turf A' });
+    const r = await service.create('u1', {
+      name: 'Turf A',
+      resourceType: 'VENUE',
+    });
     prisma.entityLinkCount = 1;
     const result = await service.remove('u1', r.id);
     expect(result.deleted).toBe('soft');
@@ -133,14 +146,20 @@ describe('BookableResourcesService', () => {
   });
 
   it('hard-deletes when clean', async () => {
-    const r = await service.create('u1', { name: 'Turf A' });
+    const r = await service.create('u1', {
+      name: 'Turf A',
+      resourceType: 'VENUE',
+    });
     const result = await service.remove('u1', r.id);
     expect(result.deleted).toBe('hard');
     expect(prisma.resources.get(r.id)).toBeUndefined();
   });
 
   it('refuses redundant soft-delete on inactive resource with references', async () => {
-    const r = await service.create('u1', { name: 'Turf A' });
+    const r = await service.create('u1', {
+      name: 'Turf A',
+      resourceType: 'VENUE',
+    });
     await service.update('u1', r.id, { isActive: false });
     prisma.appointmentCount = 1;
     await expect(service.remove('u1', r.id)).rejects.toThrow(ConflictException);

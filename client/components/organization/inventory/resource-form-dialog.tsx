@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
 import { useBookableResourceMutations } from "@/hooks/useBookableResources";
-import type { BookableResource } from "@/types";
+import type { BookableResource, ResourceTypeValue } from "@/types";
 
 type Props = {
   open: boolean;
@@ -26,12 +26,22 @@ type Props = {
   resource?: BookableResource | null;
 };
 
+const RESOURCE_TYPE_OPTIONS: Array<{
+  value: ResourceTypeValue;
+  label: string;
+}> = [
+  { value: "ROOM", label: "Room" },
+  { value: "EQUIPMENT", label: "Equipment" },
+  { value: "VENUE", label: "Venue" },
+  { value: "OTHER", label: "Other" },
+];
+
 export function ResourceFormDialog({ open, onOpenChange, resource }: Props) {
   const isEdit = !!resource;
   const { createMutation, updateMutation } = useBookableResourceMutations();
 
   const [name, setName] = useState("");
-  const [resourceType, setResourceType] = useState("");
+  const [resourceType, setResourceType] = useState<ResourceTypeValue>("ROOM");
   const [description, setDescription] = useState("");
   const [capacity, setCapacity] = useState(1);
   const [location, setLocation] = useState("");
@@ -41,7 +51,7 @@ export function ResourceFormDialog({ open, onOpenChange, resource }: Props) {
   useEffect(() => {
     if (open) {
       setName(resource?.name ?? "");
-      setResourceType(resource?.resourceType ?? "");
+      setResourceType(resource?.resourceType ?? "ROOM");
       setDescription(resource?.description ?? "");
       setCapacity(resource?.capacity ?? 1);
       setLocation(resource?.location ?? "");
@@ -54,7 +64,7 @@ export function ResourceFormDialog({ open, onOpenChange, resource }: Props) {
     e.preventDefault();
     const body = {
       name: name.trim(),
-      resourceType: resourceType.trim() || undefined,
+      resourceType,
       description: description.trim() || undefined,
       capacity,
       location: location.trim() || undefined,
@@ -113,14 +123,21 @@ export function ResourceFormDialog({ open, onOpenChange, resource }: Props) {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="res-type">Type (optional)</Label>
-              <Input
+              <Label htmlFor="res-type">Type</Label>
+              <select
                 id="res-type"
                 value={resourceType}
-                onChange={(e) => setResourceType(e.target.value)}
-                placeholder="e.g. treatment-room"
-                maxLength={80}
-              />
+                onChange={(e) =>
+                  setResourceType(e.target.value as ResourceTypeValue)
+                }
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {RESOURCE_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="res-capacity">Capacity</Label>
@@ -136,7 +153,7 @@ export function ResourceFormDialog({ open, onOpenChange, resource }: Props) {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="res-location">Location (optional)</Label>
+              <Label htmlFor="res-location">Location / room number</Label>
               <Input
                 id="res-location"
                 value={location}

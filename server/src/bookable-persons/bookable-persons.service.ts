@@ -338,7 +338,11 @@ export class BookablePersonsService {
         : [];
       const dateExceptions: StaffDateException[] = [];
       for (const exItem of dateExceptionsRaw) {
-        if (exItem == null || typeof exItem !== 'object' || Array.isArray(exItem)) {
+        if (
+          exItem == null ||
+          typeof exItem !== 'object' ||
+          Array.isArray(exItem)
+        ) {
           continue;
         }
         const exception = exItem as Record<string, Prisma.JsonValue>;
