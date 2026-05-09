@@ -26,6 +26,16 @@ export class BookingQuestionDto {
   @MaxLength(500)
   questionText!: string;
 
+  @ApiPropertyOptional({
+    example: 'Please be brief — we will discuss details during the appointment',
+    description: 'Optional helper text shown below the question on the booking form',
+    maxLength: 500,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  helpText?: string;
+
   @ApiProperty({ enum: QuestionType, example: QuestionType.TEXT })
   @IsEnum(QuestionType)
   questionType!: QuestionType;

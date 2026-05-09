@@ -32,6 +32,7 @@ export class BookingQuestionsService {
       data: normalized.map((q) => ({
         appointmentTypeId,
         questionText: q.questionText,
+        helpText: q.helpText ?? null,
         questionType: q.questionType,
         isRequired: q.isRequired,
         options: q.options ?? Prisma.JsonNull,

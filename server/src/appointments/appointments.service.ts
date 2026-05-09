@@ -10,6 +10,7 @@ import {
 import {
   AppointmentStatus,
   AppointmentType,
+  AppointmentTypeVisibility,
   EntityType,
   PaymentStatus,
   Prisma,
@@ -181,6 +182,7 @@ export class AppointmentsService {
         {
           id: appointmentType.id,
           entityType: appointmentType.entityType,
+          bufferMinutes: appointmentType.bufferMinutes,
         },
         entityIdForLock,
         { start: lock.slotStart, end: lock.slotEnd },
@@ -286,6 +288,7 @@ export class AppointmentsService {
     const appointmentType = await this.prisma.appointmentType.findFirst({
       where: {
         id: appointmentTypeId,
+        visibility: { not: AppointmentTypeVisibility.ARCHIVED },
         organization: { approvalStatus: 'APPROVED', isActive: true },
       },
       include: {
@@ -348,6 +351,7 @@ export class AppointmentsService {
         {
           id: appointmentType.id,
           entityType: appointmentType.entityType,
+          bufferMinutes: appointmentType.bufferMinutes,
         },
         entityId,
         { start: slotStart, end: slotEnd },
@@ -543,7 +547,11 @@ export class AppointmentsService {
       // about to approve is automatically excluded — no need to filter by id.
       const confirmed = await countConsumedCapacity(
         tx,
-        { id: at.id, entityType: at.entityType },
+        {
+          id: at.id,
+          entityType: at.entityType,
+          bufferMinutes: at.bufferMinutes,
+        },
         entityId,
         { start: existing.startTime, end: existing.endTime },
         {},
@@ -947,6 +955,7 @@ export class AppointmentsService {
         {
           id: existing.appointmentTypeId,
           entityType: existing.appointmentType.entityType,
+          bufferMinutes: existing.appointmentType.bufferMinutes,
         },
         rescheduleEntityId,
         { start: lock.slotStart, end: lock.slotEnd },

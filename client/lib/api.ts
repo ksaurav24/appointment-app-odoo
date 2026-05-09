@@ -1071,6 +1071,32 @@ export async function regenerateShareToken(
   }
 }
 
+export async function archiveAppointmentType(
+  id: string,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}/archive`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function unarchiveAppointmentType(
+  id: string,
+): Promise<AppointmentTypeWithRelations> {
+  try {
+    const { data } = await api.post<AppointmentTypeWithRelations>(
+      `/appointment-types/${id}/unarchive`,
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
 // ─── Organizer appointments ────────────────────────────────────
 
 export async function listOrgAppointments(

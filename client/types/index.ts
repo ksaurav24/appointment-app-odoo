@@ -350,6 +350,7 @@ export type ListAuditLogsQuery = {
 
 export type EntityType = "PERSON" | "RESOURCE";
 export type AssignmentMode = "AUTO" | "MANUAL";
+export type AppointmentTypeVisibility = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 export type ScheduleType = "WEEKLY" | "FLEXIBLE";
 export type DurationMode = "FIXED" | "VARIABLE";
 export type QuestionType =
@@ -435,6 +436,7 @@ export type AppointmentType = {
   name: string;
   slug: string;
   description: string | null;
+  category: string | null;
   entityType: EntityType;
   scheduleType: ScheduleType;
   durationMode: DurationMode;
@@ -448,11 +450,17 @@ export type AppointmentType = {
   advancePaymentEnabled: boolean;
   advancePaymentAmount: string | null;
   assignmentMode: AssignmentMode;
+  bufferMinutes: number;
   cancellationAllowed: boolean;
   cancellationWindowHours: number | null;
   rescheduleAllowed: boolean;
   rescheduleWindowHours: number | null;
   maxReschedulesAllowed: number | null;
+  advanceBookingWindowDays: number | null;
+  minimumNoticePeriodHours: number | null;
+  price: string | null;
+  reminderIntervals: number[];
+  visibility: AppointmentTypeVisibility;
   isPublished: boolean;
   shareToken: string | null;
   createdAt: string;
@@ -493,6 +501,7 @@ export type BookingQuestion = {
   id: string;
   appointmentTypeId: string;
   questionText: string;
+  helpText: string | null;
   questionType: QuestionType;
   isRequired: boolean;
   options: string[] | null;
@@ -726,8 +735,10 @@ export type CreateAppointmentTypeInput = {
   name: string;
   slug?: string;
   description?: string;
+  category?: string;
   entityType: EntityType;
   assignmentMode: AssignmentMode;
+  bufferMinutes?: number;
   entityIds?: string[];
   durationMode: DurationMode;
   durationMinutes?: number;
@@ -747,6 +758,10 @@ export type CreateAppointmentTypeInput = {
   rescheduleAllowed?: boolean;
   rescheduleWindowHours?: number;
   maxReschedulesAllowed?: number;
+  advanceBookingWindowDays?: number;
+  minimumNoticePeriodHours?: number;
+  price?: number;
+  reminderIntervals?: number[];
   bookingQuestions?: BookingQuestionInput[];
 };
 
@@ -767,6 +782,7 @@ export type ScheduleRuleInput = {
 
 export type BookingQuestionInput = {
   questionText: string;
+  helpText?: string;
   questionType: QuestionType;
   isRequired?: boolean;
   options?: string[];
@@ -780,7 +796,10 @@ export type SetScheduleInput = {
   rules: ScheduleRuleInput[];
 };
 export type SetBookingQuestionsInput = { questions: BookingQuestionInput[] };
-export type ListAppointmentTypesQuery = { published?: boolean };
+export type ListAppointmentTypesQuery = {
+  published?: boolean;
+  visibility?: AppointmentTypeVisibility;
+};
 
 // ─── Organizer appointments ────────────────────────────────────
 // Cross-check shape against `docs/api/modules/booking-flow.md` (organizer

@@ -20,15 +20,31 @@ interface PrismaMockState {
 }
 
 function makePrismaMock(state: PrismaMockState): PrismaService {
+  const activeResourcesFindMany = jest
+    .fn()
+    .mockImplementation((args: { where: { id: Record<string, string[]> } }) => {
+      const ids = args.where.id['in'] ?? [];
+      return Promise.resolve(ids.map((id) => ({ id })));
+    });
+  const activePersonsFindMany = jest
+    .fn()
+    .mockImplementation((args: { where: { id: Record<string, string[]> } }) => {
+      const ids = args.where.id['in'] ?? [];
+      return Promise.resolve(ids.map((id) => ({ id })));
+    });
   const tx = {
     appointment: { aggregate: state.appointmentAggregate },
     slotLock: { count: state.slotLockCount, create: state.slotLockCreate },
+    bookablePerson: { findMany: activePersonsFindMany },
+    bookableResource: { findMany: activeResourcesFindMany },
     $executeRaw: state.txExecuteRaw,
   };
   return {
     appointmentType: { findFirst: state.appointmentTypeFindFirst },
     appointment: { aggregate: state.appointmentAggregate },
     slotLock: { count: state.slotLockCount, create: state.slotLockCreate },
+    bookablePerson: { findMany: activePersonsFindMany },
+    bookableResource: { findMany: activeResourcesFindMany },
     $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
   } as unknown as PrismaService;
 }

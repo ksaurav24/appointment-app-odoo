@@ -249,6 +249,7 @@ export function validateScheduleRules(
 
 export interface BookingQuestionInput {
   questionText: string;
+  helpText?: string | null;
   questionType: QuestionType;
   isRequired?: boolean;
   options?: string[] | null;
@@ -257,6 +258,7 @@ export interface BookingQuestionInput {
 
 export interface NormalizedBookingQuestion {
   questionText: string;
+  helpText: string | null;
   questionType: QuestionType;
   isRequired: boolean;
   options: string[] | null;
@@ -279,6 +281,7 @@ export function validateBookingQuestions(
     }
     return {
       questionText: q.questionText.trim(),
+      helpText: q.helpText?.trim() || null,
       questionType: q.questionType,
       isRequired: q.isRequired === true,
       options: requiresOptions ? q.options! : null,

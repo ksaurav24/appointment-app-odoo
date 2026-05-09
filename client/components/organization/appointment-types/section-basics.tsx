@@ -30,23 +30,17 @@ export function SectionBasics({ type }: Props) {
   const [name, setName] = useState(type.name);
   const [slug, setSlug] = useState(type.slug);
   const [description, setDescription] = useState(type.description ?? "");
+  const [category, setCategory] = useState(type.category ?? "");
   const [manualConfirmation, setManualConfirmation] = useState(
     type.manualConfirmation,
-  );
-  const [advancePaymentEnabled, setAdvancePaymentEnabled] = useState(
-    type.advancePaymentEnabled,
-  );
-  const [advancePaymentAmount, setAdvancePaymentAmount] = useState<string>(
-    type.advancePaymentAmount ?? "",
   );
 
   const handleEdit = () => {
     setName(type.name);
     setSlug(type.slug);
     setDescription(type.description ?? "");
+    setCategory(type.category ?? "");
     setManualConfirmation(type.manualConfirmation);
-    setAdvancePaymentEnabled(type.advancePaymentEnabled);
-    setAdvancePaymentAmount(type.advancePaymentAmount ?? "");
     setEditing(true);
   };
 
@@ -61,11 +55,8 @@ export function SectionBasics({ type }: Props) {
           name: name.trim(),
           slug: slug.trim(),
           description: description.trim() || undefined,
+          category: category.trim() || undefined,
           manualConfirmation,
-          advancePaymentEnabled,
-          advancePaymentAmount: advancePaymentEnabled
-            ? Number(advancePaymentAmount)
-            : undefined,
         },
       },
       {
@@ -101,14 +92,10 @@ export function SectionBasics({ type }: Props) {
             <dd className="font-mono text-xs">{type.slug}</dd>
             <dt className="text-muted-foreground">Description</dt>
             <dd>{type.description ?? <span className="text-muted-foreground">—</span>}</dd>
+            <dt className="text-muted-foreground">Category</dt>
+            <dd>{type.category ?? <span className="text-muted-foreground">—</span>}</dd>
             <dt className="text-muted-foreground">Manual confirmation</dt>
             <dd>{type.manualConfirmation ? "Yes" : "No"}</dd>
-            <dt className="text-muted-foreground">Advance payment</dt>
-            <dd>
-              {type.advancePaymentEnabled
-                ? `Enabled — ${type.advancePaymentAmount ?? "—"}`
-                : "Disabled"}
-            </dd>
           </dl>
         </CardContent>
       </Card>
@@ -152,6 +139,16 @@ export function SectionBasics({ type }: Props) {
             />
           </div>
 
+          <div className="space-y-1.5">
+            <Label htmlFor="basics-category">Category</Label>
+            <Input
+              id="basics-category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              maxLength={120}
+            />
+          </div>
+
           <div className="flex items-center gap-3">
             <Switch
               id="basics-manual-confirm"
@@ -161,33 +158,6 @@ export function SectionBasics({ type }: Props) {
             <Label htmlFor="basics-manual-confirm">
               Require manual confirmation
             </Label>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <Switch
-                id="basics-advance-payment"
-                checked={advancePaymentEnabled}
-                onCheckedChange={setAdvancePaymentEnabled}
-              />
-              <Label htmlFor="basics-advance-payment">
-                Advance payment required
-              </Label>
-            </div>
-            {advancePaymentEnabled && (
-              <div className="space-y-1.5 pl-9">
-                <Label htmlFor="basics-payment-amount">Amount</Label>
-                <Input
-                  id="basics-payment-amount"
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={advancePaymentAmount}
-                  onChange={(e) => setAdvancePaymentAmount(e.target.value)}
-                  required
-                />
-              </div>
-            )}
           </div>
 
           <div className="flex gap-2 pt-2">

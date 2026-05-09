@@ -48,7 +48,7 @@ function formatRule(rule: ScheduleRuleInput): string {
 
 export function SectionSchedule({ type }: Props) {
   const [editing, setEditing] = useState(false);
-  const { setScheduleMutation } = useAppointmentTypeMutations();
+  const { setScheduleMutation, updateMutation } = useAppointmentTypeMutations();
 
   const initialSchedule = type.schedules[0];
 
@@ -65,6 +65,12 @@ export function SectionSchedule({ type }: Props) {
       isAvailable: r.isAvailable,
     })),
   );
+  const [advanceBookingWindowDays, setAdvanceBookingWindowDays] = useState<string>(
+    type.advanceBookingWindowDays?.toString() ?? "30",
+  );
+  const [minimumNoticePeriodHours, setMinimumNoticePeriodHours] = useState<string>(
+    type.minimumNoticePeriodHours?.toString() ?? "0",
+  );
 
   const handleEdit = () => {
     const sched = type.schedules[0];
@@ -79,6 +85,8 @@ export function SectionSchedule({ type }: Props) {
         isAvailable: r.isAvailable,
       })),
     );
+    setAdvanceBookingWindowDays(type.advanceBookingWindowDays?.toString() ?? "30");
+    setMinimumNoticePeriodHours(type.minimumNoticePeriodHours?.toString() ?? "0");
     setEditing(true);
   };
 
@@ -142,8 +150,27 @@ export function SectionSchedule({ type }: Props) {
       },
       {
         onSuccess: () => {
-          toast.success("Saved");
-          setEditing(false);
+          // Also persist advance booking window + notice period via update
+          updateMutation.mutate(
+            {
+              id: type.id,
+              body: {
+                advanceBookingWindowDays: Number(advanceBookingWindowDays) || 30,
+                minimumNoticePeriodHours: Number(minimumNoticePeriodHours) || 0,
+              },
+            },
+            {
+              onSuccess: () => {
+                toast.success("Saved");
+                setEditing(false);
+              },
+              onError: (err) => {
+                const msg =
+                  err instanceof ApiError ? err.messages[0] : "Failed to save booking window";
+                toast.error(msg);
+              },
+            },
+          );
         },
         onError: (err) => {
           const msg =
@@ -179,6 +206,18 @@ export function SectionSchedule({ type }: Props) {
             <dd>{initialSchedule?.scheduleType ?? type.scheduleType}</dd>
             <dt className="text-muted-foreground">Timezone</dt>
             <dd>{initialSchedule?.timezone || <span className="text-muted-foreground">—</span>}</dd>
+            <dt className="text-muted-foreground">Advance booking window</dt>
+            <dd>
+              {type.advanceBookingWindowDays != null
+                ? `${type.advanceBookingWindowDays} days`
+                : "Unlimited"}
+            </dd>
+            <dt className="text-muted-foreground">Minimum notice</dt>
+            <dd>
+              {type.minimumNoticePeriodHours != null
+                ? `${type.minimumNoticePeriodHours}h`
+                : "None"}
+            </dd>
           </dl>
           {displayRules.length === 0 ? (
             <p className="mt-3 text-sm text-muted-foreground">
@@ -255,13 +294,50 @@ export function SectionSchedule({ type }: Props) {
             )}
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="schedule-advance-window">
+                Advance booking window (days)
+              </Label>
+              <Input
+                id="schedule-advance-window"
+                type="number"
+                min={0}
+                step={1}
+                value={advanceBookingWindowDays}
+                onChange={(e) => setAdvanceBookingWindowDays(e.target.value)}
+                placeholder="30"
+              />
+              <p className="text-xs text-muted-foreground">
+                How many days ahead customers can book. Leave 0 for unlimited.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="schedule-notice-period">
+                Minimum notice period (hours)
+              </Label>
+              <Input
+                id="schedule-notice-period"
+                type="number"
+                min={0}
+                step={1}
+                value={minimumNoticePeriodHours}
+                onChange={(e) => setMinimumNoticePeriodHours(e.target.value)}
+                placeholder="0"
+              />
+              <p className="text-xs text-muted-foreground">
+                How many hours before slot a booking can be made.
+              </p>
+            </div>
+          </div>
+
           <div className="flex gap-2 pt-2">
             <Button
               type="submit"
               size="sm"
-              disabled={setScheduleMutation.isPending}
+              disabled={setScheduleMutation.isPending || updateMutation.isPending}
             >
-              {setScheduleMutation.isPending ? "Saving..." : "Save"}
+              {setScheduleMutation.isPending || updateMutation.isPending ? "Saving..." : "Save"}
             </Button>
             <Button
               type="button"

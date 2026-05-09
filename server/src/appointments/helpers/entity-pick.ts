@@ -10,6 +10,7 @@ interface PickableAppointmentType {
   entityType: EntityType;
   assignmentMode: AssignmentMode;
   maxBookingsPerSlot: number;
+  bufferMinutes?: number | null;
   entities: {
     bookablePersonId: string | null;
     bookableResourceId: string | null;

@@ -7,7 +7,9 @@ import {
 } from "@tanstack/react-query";
 
 import {
+  archiveAppointmentType,
   ApiError,
+  unarchiveAppointmentType,
   createAppointmentType,
   deleteAppointmentType,
   getAppointmentType,
@@ -135,6 +137,24 @@ export function useAppointmentTypeMutations() {
     onSuccess: (_data, id) => invalidateDetail(id),
   });
 
+  const archiveMutation = useMutation<
+    AppointmentTypeWithRelations,
+    ApiError,
+    string
+  >({
+    mutationFn: archiveAppointmentType,
+    onSuccess: (_data, id) => invalidateDetail(id),
+  });
+
+  const unarchiveMutation = useMutation<
+    AppointmentTypeWithRelations,
+    ApiError,
+    string
+  >({
+    mutationFn: unarchiveAppointmentType,
+    onSuccess: (_data, id) => invalidateDetail(id),
+  });
+
   return {
     createMutation,
     updateMutation,
@@ -145,5 +165,7 @@ export function useAppointmentTypeMutations() {
     publishMutation,
     unpublishMutation,
     regenerateShareTokenMutation,
+    archiveMutation,
+    unarchiveMutation,
   };
 }

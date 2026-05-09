@@ -20,18 +20,25 @@ type Props = {
 };
 
 export function PublishBar({ type }: Props) {
-  const { publishMutation, unpublishMutation, regenerateShareTokenMutation } =
-    useAppointmentTypeMutations();
+  const {
+    publishMutation,
+    unpublishMutation,
+    regenerateShareTokenMutation,
+    archiveMutation,
+    unarchiveMutation,
+  } = useAppointmentTypeMutations();
   const [copying, setCopying] = useState(false);
 
   const missing: string[] = [];
   if (type.entities.length === 0) missing.push("at least one entity");
   if ((type.schedules[0]?.rules.length ?? 0) === 0)
     missing.push("at least one schedule rule");
-  const canPublish = missing.length === 0;
+  const canPublish = missing.length === 0 && type.visibility !== "ARCHIVED";
+  const isPublished = type.visibility === "PUBLISHED";
+  const isArchived = type.visibility === "ARCHIVED";
 
   const shareUrl =
-    type.shareToken
+    type.shareToken && !isArchived
       ? `${typeof window !== "undefined" ? window.location.origin : ""}/book/share/${type.shareToken}`
       : null;
 
@@ -89,13 +96,17 @@ export function PublishBar({ type }: Props) {
 
   const isPublishPending =
     publishMutation.isPending || unpublishMutation.isPending;
+  const isArchivePending =
+    archiveMutation.isPending || unarchiveMutation.isPending;
+  const statusLabel =
+    type.visibility.charAt(0) + type.visibility.slice(1).toLowerCase();
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-card px-6 py-4 ring-1 ring-foreground/10">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <h1 className="truncate text-lg font-semibold">{type.name}</h1>
-        <Badge variant={type.isPublished ? "default" : "secondary"}>
-          {type.isPublished ? "Published" : "Draft"}
+        <Badge variant={isPublished ? "default" : "secondary"}>
+          {statusLabel}
         </Badge>
       </div>
 
@@ -121,12 +132,32 @@ export function PublishBar({ type }: Props) {
           </>
         ) : null}
 
-        {type.isPublished ? (
+        {isArchived ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              unarchiveMutation.mutate(type.id, {
+                onSuccess: () => toast.success("Restored as draft"),
+                onError: (err) => {
+                  const msg =
+                    err instanceof ApiError
+                      ? err.messages[0]
+                      : "Failed to restore";
+                  toast.error(msg);
+                },
+              })
+            }
+            disabled={isArchivePending}
+          >
+            Restore draft
+          </Button>
+        ) : isPublished ? (
           <Button
             variant="outline"
             size="sm"
             onClick={handleUnpublish}
-            disabled={isPublishPending}
+            disabled={isPublishPending || isArchivePending}
           >
             Unpublish
           </Button>
@@ -134,7 +165,7 @@ export function PublishBar({ type }: Props) {
           <Button
             size="sm"
             onClick={handlePublish}
-            disabled={isPublishPending}
+            disabled={isPublishPending || isArchivePending}
           >
             Publish
           </Button>
@@ -156,6 +187,26 @@ export function PublishBar({ type }: Props) {
             </Tooltip>
           </TooltipProvider>
         )}
+
+        {!isArchived ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              archiveMutation.mutate(type.id, {
+                onSuccess: () => toast.success("Archived"),
+                onError: (err) => {
+                  const msg =
+                    err instanceof ApiError ? err.messages[0] : "Failed to archive";
+                  toast.error(msg);
+                },
+              })
+            }
+            disabled={isArchivePending || isPublishPending}
+          >
+            Archive
+          </Button>
+        ) : null}
       </div>
     </div>
   );

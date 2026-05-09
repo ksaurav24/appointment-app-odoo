@@ -5,7 +5,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EntityType, Prisma, SlotLock } from '@prisma/client';
+import {
+  AppointmentTypeVisibility,
+  EntityType,
+  Prisma,
+  SlotLock,
+} from '@prisma/client';
 import { countConsumedCapacity } from '../appointments/helpers/capacity';
 import { pickEntityForSlot } from '../appointments/helpers/entity-pick';
 import { PrismaService } from '../prisma/prisma.service';
@@ -240,6 +245,7 @@ export class SlotLocksService {
     const at = await this.prisma.appointmentType.findFirst({
       where: {
         id,
+        visibility: { not: AppointmentTypeVisibility.ARCHIVED },
         organization: { approvalStatus: 'APPROVED', isActive: true },
       },
       include: APPOINTMENT_TYPE_INCLUDE,

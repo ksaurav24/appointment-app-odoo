@@ -53,6 +53,12 @@ enum AssignmentMode {
   MANUAL
 }
 
+enum AppointmentTypeVisibility {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 enum QuestionType {
   TEXT
   SINGLE_CHOICE
@@ -183,6 +189,7 @@ model Organization {
   twitterUrl     String?
   websiteUrl     String?
   timezone       String                     @default("UTC")
+  defaultAppointmentTypeCategory String?
   isActive       Boolean                    @default(true)
 
   approvalStatus OrganizationApprovalStatus @default(PENDING)
@@ -310,6 +317,7 @@ model AppointmentType {
   name                     String
   slug                     String
   description              String?
+  category                 String?
   entityType               EntityType
   scheduleType             ScheduleType
   durationMode             DurationMode   @default(FIXED)
@@ -322,12 +330,18 @@ model AppointmentType {
   manualConfirmation       Boolean        @default(false)
   advancePaymentEnabled    Boolean        @default(false)
   advancePaymentAmount     Decimal?       @db.Decimal(12, 2)
+  price                    Decimal?       @db.Decimal(12, 2)
   assignmentMode           AssignmentMode @default(AUTO)
+  bufferMinutes            Int            @default(0)
   cancellationAllowed      Boolean        @default(true)
   cancellationWindowHours  Int?
   rescheduleAllowed        Boolean        @default(true)
   rescheduleWindowHours    Int?
   maxReschedulesAllowed    Int?
+  advanceBookingWindowDays Int?           @default(30)
+  minimumNoticePeriodHours Int?           @default(0)
+  reminderIntervals        Int[]          @default([])
+  visibility               AppointmentTypeVisibility @default(DRAFT)
   isPublished              Boolean        @default(false)
   shareToken               String?        @unique
   createdAt                DateTime       @default(now())
@@ -396,6 +410,7 @@ model BookingQuestion {
   appointmentTypeId String          @db.Uuid
   appointmentType   AppointmentType @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
   questionText      String
+  helpText          String?
   questionType      QuestionType
   isRequired        Boolean         @default(false)
   options           Json?

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import {
   AppointmentStatus,
+  AppointmentTypeVisibility,
   AssignmentMode,
   DurationMode,
   EntityType,
@@ -131,10 +132,13 @@ export class AvailabilityService {
 
     const dayStartUtc = wallTimeToUtc(req.date, '00:00', tz);
     const dayEndUtc = new Date(dayStartUtc.getTime() + 24 * 60 * 60_000);
+    const bufferMs = (at.bufferMinutes ?? 0) * 60_000;
+    const queryStart = new Date(dayStartUtc.getTime() - bufferMs);
+    const queryEnd = new Date(dayEndUtc.getTime() + bufferMs);
 
     const [appointments, locks] = await Promise.all([
-      this.fetchOverlappingAppointments(at, entityIds, dayStartUtc, dayEndUtc),
-      this.fetchActiveLocks(at, entityIds, dayStartUtc, dayEndUtc),
+      this.fetchOverlappingAppointments(at, entityIds, queryStart, queryEnd),
+      this.fetchActiveLocks(at, entityIds, queryStart, queryEnd),
     ]);
 
     if (at.durationMode === DurationMode.FIXED) {
@@ -230,15 +234,15 @@ export class AvailabilityService {
         const isPending = a.status === AppointmentStatus.PENDING;
         const showAsPending = at.manualConfirmation && isPending;
         return {
-          start: a.startTime,
-          end: a.endTime,
+          start: this.withBuffer(a.startTime, at.bufferMinutes ?? 0, 'start'),
+          end: this.withBuffer(a.endTime, at.bufferMinutes ?? 0, 'end'),
           confirmedCapacity: showAsPending ? 0 : a.capacityBooked,
           pendingCapacity: showAsPending ? a.capacityBooked : 0,
         };
       }),
       ...locks.map((l) => ({
-        start: l.slotStart,
-        end: l.slotEnd,
+        start: this.withBuffer(l.slotStart, at.bufferMinutes ?? 0, 'start'),
+        end: this.withBuffer(l.slotEnd, at.bufferMinutes ?? 0, 'end'),
         confirmedCapacity: 1,
         pendingCapacity: 0,
       })),
@@ -290,8 +294,14 @@ export class AvailabilityService {
       );
     }
     const busy = [
-      ...appointments.map((a) => ({ start: a.startTime, end: a.endTime })),
-      ...locks.map((l) => ({ start: l.slotStart, end: l.slotEnd })),
+      ...appointments.map((a) => ({
+        start: this.withBuffer(a.startTime, at.bufferMinutes ?? 0, 'start'),
+        end: this.withBuffer(a.endTime, at.bufferMinutes ?? 0, 'end'),
+      })),
+      ...locks.map((l) => ({
+        start: this.withBuffer(l.slotStart, at.bufferMinutes ?? 0, 'start'),
+        end: this.withBuffer(l.slotEnd, at.bufferMinutes ?? 0, 'end'),
+      })),
     ];
     const ranges: VariableOpenRange[] = computeVariableOpenRanges({
       windows,
@@ -325,6 +335,7 @@ export class AvailabilityService {
     const at = await this.prisma.appointmentType.findFirst({
       where: {
         id,
+        visibility: { not: AppointmentTypeVisibility.ARCHIVED },
         organization: { approvalStatus: 'APPROVED', isActive: true },
       },
       include: APPOINTMENT_TYPE_INCLUDE,
@@ -576,5 +587,15 @@ export class AvailabilityService {
       },
       select: { slotStart: true, slotEnd: true },
     });
+  }
+
+  private withBuffer(
+    value: Date,
+    minutes: number,
+    side: 'start' | 'end',
+  ): Date {
+    if (minutes <= 0) return value;
+    const delta = minutes * 60_000 * (side === 'start' ? -1 : 1);
+    return new Date(value.getTime() + delta);
   }
 }
