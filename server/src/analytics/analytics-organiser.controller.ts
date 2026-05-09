@@ -48,4 +48,13 @@ export class AnalyticsOrganiserController {
   busyHours(@CurrentUser() user: JwtUserPayload) {
     return this.analytics.organiserBusyHours(user.sub);
   }
+
+  @Get('staff-performance')
+  @ApiOperation({
+    summary:
+      'Organiser: performance metrics grouped by bookable person (staff)',
+  })
+  staffPerformance(@CurrentUser() user: JwtUserPayload) {
+    return this.analytics.organiserStaffPerformance(user.sub);
+  }
 }

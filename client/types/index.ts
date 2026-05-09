@@ -220,6 +220,14 @@ export type OrgBusyHours = {
   matrix: number[][];
 };
 
+export type OrgStaffPerformance = {
+  personId: string;
+  name: string;
+  bookings: number;
+  cancellations: number;
+  revenue: number;
+};
+
 // ─── Admin: users ────────────────────────────────────────────────
 
 export type AdminUserDetail = SafeUser & {

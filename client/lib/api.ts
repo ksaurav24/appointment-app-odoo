@@ -44,6 +44,7 @@ import type {
   OrgByAppointmentType,
   OrgBusyHours,
   OrgDashboard,
+  OrgStaffPerformance,
   OrgTimeseriesQuery,
   Organization,
   OrganizationWithOrganiser,
@@ -408,6 +409,17 @@ export async function getOrgBusyHours(): Promise<OrgBusyHours> {
   try {
     const { data } = await api.get<OrgBusyHours>(
       "/organizations/me/analytics/busy-hours",
+    );
+    return data;
+  } catch (err) {
+    extractApiError(err);
+  }
+}
+
+export async function getOrgStaffPerformance(): Promise<OrgStaffPerformance[]> {
+  try {
+    const { data } = await api.get<OrgStaffPerformance[]>(
+      "/organizations/me/analytics/staff-performance",
     );
     return data;
   } catch (err) {
