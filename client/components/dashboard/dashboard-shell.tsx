@@ -6,6 +6,7 @@ import { useEffect, type ReactNode } from "react";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Logout02Icon } from "@hugeicons/core-free-icons";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -125,6 +126,10 @@ export function DashboardShell({
             </p>
             <p className="truncate text-white/50">{user.email}</p>
           </div>
+          <div className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-2.5 py-2">
+            <span className="text-[13px] text-white/65">Appearance</span>
+            <ThemeToggle />
+          </div>
           <button
             onClick={onLogout}
             disabled={logout.isPending}
@@ -156,15 +161,18 @@ export function DashboardShell({
             ) : null}
             BookEase
           </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onLogout}
-            disabled={logout.isPending}
-          >
-            {logout.isPending ? <Spinner className="size-4" /> : null}
-            Sign out
-          </Button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onLogout}
+              disabled={logout.isPending}
+            >
+              {logout.isPending ? <Spinner className="size-4" /> : null}
+              Sign out
+            </Button>
+          </div>
         </header>
 
         {/* Mobile nav */}

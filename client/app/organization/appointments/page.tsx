@@ -1,5 +1,8 @@
+
 import { AppointmentsTable } from "@/components/organization/appointments/appointments-table";
+import { CalendarView } from "@/components/organization/appointments/calendar-view";
 import { StatusFilterBar } from "@/components/organization/appointments/status-filter-bar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AppointmentsPage() {
   return (
@@ -13,7 +16,19 @@ export default function AppointmentsPage() {
         </p>
       </header>
       <StatusFilterBar />
-      <AppointmentsTable />
+      
+      <Tabs defaultValue="list" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="list">List View</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+        </TabsList>
+        <TabsContent value="list" className="mt-0">
+          <AppointmentsTable />
+        </TabsContent>
+        <TabsContent value="calendar" className="mt-0">
+          <CalendarView />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

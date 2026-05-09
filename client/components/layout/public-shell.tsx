@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useCurrentUser, useLogout } from "@/hooks/useAuth";
 
 type PublicShellProps = {
@@ -48,6 +49,7 @@ export function PublicShell({ children, showBrowseLink = true }: PublicShellProp
               Browse services
             </Button>
           ) : null}
+          <ThemeToggle />
 
           {isPending ? (
             <Spinner className="size-4" />

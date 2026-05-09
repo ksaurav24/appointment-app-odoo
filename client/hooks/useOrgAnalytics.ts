@@ -6,12 +6,14 @@ import {
   getOrgByAppointmentType,
   getOrgBusyHours,
   getOrgDashboard,
+  getOrgStaffPerformance,
   getOrgTimeseries,
 } from "@/lib/api";
 import type {
   OrgByAppointmentType,
   OrgBusyHours,
   OrgDashboard,
+  OrgStaffPerformance,
   OrgTimeseriesQuery,
   TimeBucket,
 } from "@/types";
@@ -47,5 +49,13 @@ export function useOrgBusyHours() {
     queryKey: [KEY, "busy-hours"],
     queryFn: getOrgBusyHours,
     staleTime: 5 * 60_000,
+  });
+}
+
+export function useOrgStaffPerformance() {
+  return useQuery<OrgStaffPerformance[]>({
+    queryKey: [KEY, "staff-performance"],
+    queryFn: getOrgStaffPerformance,
+    staleTime: 60_000,
   });
 }

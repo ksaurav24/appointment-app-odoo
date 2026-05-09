@@ -625,6 +625,46 @@ export class AnalyticsService {
     return { since: since.toISOString(), matrix };
   }
 
+  async organiserStaffPerformance(organiserId: string): Promise<unknown> {
+    const org = await this.organizations.requireForOrganiser(organiserId);
+    return this.cache.getOrSet(
+      `analytics:org:${org.id}:staff-performance`,
+      ORG_DASHBOARD_TTL_SECONDS,
+      () => this.computeStaffPerformance(org.id),
+    );
+  }
+
+  private async computeStaffPerformance(organizationId: string): Promise<unknown> {
+    const rows = await this.prisma.$queryRaw<
+      {
+        personId: string;
+        name: string;
+        bookings: bigint;
+        revenue: Prisma.Decimal | null;
+        cancellations: bigint;
+      }[]
+    >`
+      SELECT bp.id AS "personId",
+             bp.name,
+             COUNT(a.id)::bigint AS bookings,
+             COUNT(CASE WHEN a.status = 'CANCELLED' THEN 1 END)::bigint AS cancellations,
+             COALESCE(SUM(CASE WHEN p.status = 'PAID' THEN p.amount ELSE 0 END), 0) AS revenue
+      FROM bookable_persons bp
+      LEFT JOIN appointments a ON a."bookablePersonId" = bp.id AND a."organizationId"::text = ${organizationId}
+      LEFT JOIN payments p ON p."appointmentId" = a.id
+      WHERE bp."organizationId"::text = ${organizationId}
+      GROUP BY bp.id, bp.name
+      ORDER BY bookings DESC
+    `;
+    return rows.map((r) => ({
+      personId: r.personId,
+      name: r.name,
+      bookings: Number(r.bookings),
+      cancellations: Number(r.cancellations),
+      revenue: Number(r.revenue ?? 0),
+    }));
+  }
+
   // ---------------------------------------------------------------------------
   // Cache invalidation entrypoints used by write paths
   // ---------------------------------------------------------------------------

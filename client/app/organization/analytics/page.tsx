@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { ExportButtons } from "@/components/organization/analytics/export-buttons";
 import { BusyHoursHeatmap } from "@/components/dashboard/busy-hours-heatmap";
 import { TimeseriesChart } from "@/components/dashboard/timeseries-chart";
 import {
@@ -25,6 +26,7 @@ import {
   useOrgBusyHours,
   useOrgByAppointmentType,
   useOrgTimeseries,
+  useOrgStaffPerformance,
 } from "@/hooks/useOrgAnalytics";
 import type {
   OrgTimeseriesMetric,
@@ -72,6 +74,7 @@ export default function AnalyticsPage() {
   });
   const byTypeQuery = useOrgByAppointmentType();
   const busyQuery = useOrgBusyHours();
+  const staffPerfQuery = useOrgStaffPerformance();
 
   return (
     <div className="space-y-6">
@@ -83,6 +86,9 @@ export default function AnalyticsPage() {
           <p className="text-sm text-muted-foreground">
             Drill into bookings, revenue, and demand patterns.
           </p>
+        </div>
+        <div className="mb-4">
+          <ExportButtons />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="space-y-1">
@@ -196,6 +202,45 @@ export default function AnalyticsPage() {
             matrix={busyQuery.data?.matrix}
             loading={busyQuery.isPending}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Staff Performance</CardTitle>
+          <CardDescription>
+            Performance metrics across bookable persons.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {staffPerfQuery.isPending ? (
+            <Skeleton className="h-40 w-full" />
+          ) : staffPerfQuery.data && staffPerfQuery.data.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
+                  <tr>
+                    <th className="px-4 py-2">Staff Member</th>
+                    <th className="px-4 py-2 text-right">Bookings</th>
+                    <th className="px-4 py-2 text-right">Cancellations</th>
+                    <th className="px-4 py-2 text-right">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {staffPerfQuery.data.map((staff) => (
+                    <tr key={staff.personId} className="border-b last:border-0">
+                      <td className="px-4 py-3 font-medium">{staff.name}</td>
+                      <td className="px-4 py-3 text-right">{staff.bookings}</td>
+                      <td className="px-4 py-3 text-right">{staff.cancellations}</td>
+                      <td className="px-4 py-3 text-right">{staff.revenue.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No staff data available.</p>
+          )}
         </CardContent>
       </Card>
     </div>
