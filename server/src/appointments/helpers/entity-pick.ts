@@ -43,10 +43,29 @@ export async function pickEntityForSlot(
     throw new BadRequestException('Appointment type has no linked entities');
   }
 
+  const activeLinkedIds =
+    at.entityType === EntityType.PERSON
+      ? (
+          await client.bookablePerson.findMany({
+            where: { id: { in: linkedIds }, isActive: true },
+            select: { id: true },
+          })
+        ).map((p) => p.id)
+      : (
+          await client.bookableResource.findMany({
+            where: { id: { in: linkedIds }, isActive: true },
+            select: { id: true },
+          })
+        ).map((r) => r.id);
+
+  if (activeLinkedIds.length === 0) {
+    throw new BadRequestException('No active entities linked to this type');
+  }
+
   if (requested) {
-    if (!linkedIds.includes(requested)) {
+    if (!activeLinkedIds.includes(requested)) {
       throw new BadRequestException(
-        'entityId is not linked to this appointment type',
+        'entityId is not linked to this appointment type or is inactive',
       );
     }
     return requested;
@@ -56,7 +75,7 @@ export async function pickEntityForSlot(
     throw new BadRequestException('entityId is required for MANUAL assignment');
   }
 
-  for (const candidate of linkedIds) {
+  for (const candidate of activeLinkedIds) {
     const consumed = await countConsumedCapacity(
       client,
       at,

@@ -8,11 +8,14 @@ import {
   NotFoundException,
   Post,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Organization, Role } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { JwtUserPayload } from '../auth/token.service';
+import { EnvVars } from '../config/env.validation';
+import { MailerService } from '../mailer/mailer.service';
 import { UsersService } from '../users/users.service';
 import { SkipOrganizationApproval } from './decorators/skip-organization-approval.decorator';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
@@ -21,10 +24,16 @@ import { OrganizationsService } from './organizations.service';
 @ApiTags('organizations')
 @Controller('organizations')
 export class OrganizationsController {
+  private readonly appBaseUrl: string;
+
   constructor(
     private readonly organizations: OrganizationsService,
     private readonly users: UsersService,
-  ) {}
+    private readonly mailer: MailerService,
+    config: ConfigService<EnvVars, true>,
+  ) {
+    this.appBaseUrl = config.get('APP_BASE_URL', { infer: true });
+  }
 
   @SkipOrganizationApproval()
   @Get('me')
@@ -59,14 +68,42 @@ export class OrganizationsController {
     // contactEmail falls back to the organizer's account email when omitted —
     // step 2 of onboarding doesn't ask for it explicitly.
     const account = await this.users.getSafeById(user.sub);
-    return this.organizations.createForOrganiser(user.sub, {
+    const org = await this.organizations.createForOrganiser(user.sub, {
       name: dto.name,
       slug: dto.slug,
       contactEmail: dto.contactEmail ?? account.email,
       description: dto.description,
       contactPhone: dto.contactPhone,
+      city: dto.city,
+      state: dto.state,
       address: dto.address,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      googlePlaceId: dto.googlePlaceId,
+      logoUrl: dto.logoUrl,
+      galleryImageUrls: dto.galleryImageUrls,
+      instagramUrl: dto.instagramUrl,
+      facebookUrl: dto.facebookUrl,
+      twitterUrl: dto.twitterUrl,
+      websiteUrl: dto.websiteUrl,
       timezone: dto.timezone,
     });
+
+    const admins = await this.users.listActiveAdmins();
+    const reviewUrl = `${this.appBaseUrl}/admin/organizations?status=PENDING`;
+    await Promise.all(
+      admins.map((admin) =>
+        this.mailer.sendAdminOrganizationPending(
+          admin.email,
+          admin.fullName,
+          account.fullName,
+          account.email,
+          org.name,
+          reviewUrl,
+        ),
+      ),
+    );
+
+    return org;
   }
 }

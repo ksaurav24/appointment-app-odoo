@@ -106,10 +106,11 @@ export class AppointmentTypesService {
       maxReschedulesAllowed: input.maxReschedulesAllowed,
     });
 
+    const initialEntityIds = input.entityIds ?? [];
     await this.entities.verifyEntitiesForOrganization(
       org.id,
       input.entityType,
-      input.entityIds,
+      initialEntityIds,
     );
 
     const timezone = input.timezone ?? org.timezone;
@@ -145,7 +146,7 @@ export class AppointmentTypesService {
       await this.entities.replaceEntities(
         created.id,
         input.entityType,
-        input.entityIds,
+        initialEntityIds,
         tx,
       );
       await this.schedules.replaceSchedule(

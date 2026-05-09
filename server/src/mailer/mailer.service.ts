@@ -6,6 +6,7 @@ import { MailDispatcher } from './mail.dispatcher';
 import { MAIL_QUEUE_NAME } from './mail.constants';
 import { MAIL_JOB_SEND, MailJobPayload } from './mail.types';
 import {
+  adminOrganizationPendingEmail,
   RenderedEmail,
   loginOtp,
   organizerApprovedEmail,
@@ -60,6 +61,26 @@ export class MailerService {
     reason?: string,
   ): Promise<void> {
     await this.enqueue(email, organizerRejectedEmail(fullName, reason));
+  }
+
+  async sendAdminOrganizationPending(
+    email: string,
+    adminName: string,
+    organizerName: string,
+    organizerEmail: string,
+    organizationName: string,
+    reviewUrl: string,
+  ): Promise<void> {
+    await this.enqueue(
+      email,
+      adminOrganizationPendingEmail(
+        adminName,
+        organizerName,
+        organizerEmail,
+        organizationName,
+        reviewUrl,
+      ),
+    );
   }
 
   /**

@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OtpPurpose, Role, User } from '@prisma/client';
+import { Organization, OtpPurpose, Role, User } from '@prisma/client';
 import { EnvVars } from '../config/env.validation';
 import { MailerService } from '../mailer/mailer.service';
 import { OrganizationsService } from '../organizations/organizations.service';
@@ -131,6 +131,9 @@ export class AuthService {
 
     const { code } = await this.otp.issue(user.id, OtpPurpose.SIGNUP);
     await this.mailer.sendOtp(user.email, code, OtpPurpose.SIGNUP);
+    if (organization) {
+      await this.notifyAdminsOrganizationPending(user, organization);
+    }
 
     return organization
       ? { userId: user.id, organizationId: organization.id }
@@ -324,5 +327,27 @@ export class AuthService {
       ipAddress: meta.ipAddress,
     });
     return { accessToken, refresh };
+  }
+
+  private async notifyAdminsOrganizationPending(
+    organizer: Pick<User, 'fullName' | 'email'>,
+    organization: Organization,
+  ): Promise<void> {
+    const admins = await this.users.listActiveAdmins();
+    if (admins.length === 0) return;
+
+    const reviewUrl = `${this.appBaseUrl}/admin/organizations?status=PENDING`;
+    await Promise.all(
+      admins.map((admin) =>
+        this.mailer.sendAdminOrganizationPending(
+          admin.email,
+          admin.fullName,
+          organizer.fullName,
+          organizer.email,
+          organization.name,
+          reviewUrl,
+        ),
+      ),
+    );
   }
 }

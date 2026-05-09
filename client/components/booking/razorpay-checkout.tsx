@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -10,6 +10,7 @@ import type { CreatePaymentIntentResult, SafeUser } from "@/types";
 type RazorpayCheckoutProps = {
   intent: CreatePaymentIntentResult;
   user: SafeUser;
+  autoOpen?: boolean;
   onVerified: (handle: {
     razorpayOrderId: string;
     razorpayPaymentId: string;
@@ -22,7 +23,10 @@ const SCRIPT_URL = "https://checkout.razorpay.com/v1/checkout.js";
 
 declare global {
   interface Window {
-    Razorpay?: new (options: unknown) => { open: () => void };
+    Razorpay?: new (options: unknown) => {
+      open: () => void;
+      on: (event: string, callback: (response: unknown) => void) => void;
+    };
   }
 }
 
@@ -56,6 +60,7 @@ function loadRazorpayScript(): Promise<boolean> {
 export function RazorpayCheckout({
   intent,
   user,
+  autoOpen = true,
   onVerified,
   onDismissed,
 }: RazorpayCheckoutProps) {
@@ -75,7 +80,7 @@ export function RazorpayCheckout({
     };
   }, []);
 
-  const open = () => {
+  const open = useCallback(() => {
     if (openedRef.current) return;
     if (typeof window === "undefined" || !window.Razorpay) return;
     openedRef.current = true;
@@ -104,8 +109,18 @@ export function RazorpayCheckout({
         },
       },
     });
+    rzp.on("payment.failed", () => {
+      openedRef.current = false;
+      onDismissed();
+    });
     rzp.open();
-  };
+  }, [intent, onDismissed, onVerified, user.email, user.fullName]);
+
+  useEffect(() => {
+    if (!autoOpen) return;
+    if (scriptStatus !== "ready") return;
+    open();
+  }, [autoOpen, scriptStatus, open]);
 
   if (scriptStatus === "loading") {
     return (
@@ -130,7 +145,7 @@ export function RazorpayCheckout({
         Pay <strong>{formatMinorUnits(intent.amount, intent.currency)}</strong> to
         confirm your booking.
       </p>
-      <Button onClick={open}>Pay now</Button>
+      <Button onClick={open}>Open payment window</Button>
     </div>
   );
 }

@@ -13,7 +13,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { TimeRange } from './helpers/range';
 import { resolveScheduleWindowsForDate } from './helpers/schedule-windows';
-import { isIsoDate, wallTimeToUtc } from './helpers/time-zone';
+import { dayOfWeekInZone, isIsoDate, wallTimeToUtc } from './helpers/time-zone';
 import {
   BusyRange,
   computeFixedSlots,
@@ -34,6 +34,17 @@ const APPOINTMENT_TYPE_INCLUDE = {
 type LoadedAppointmentType = Prisma.AppointmentTypeGetPayload<{
   include: typeof APPOINTMENT_TYPE_INCLUDE;
 }>;
+
+type StaffAvailabilityOverride = {
+  appointmentTypeId: string;
+  timezone?: string;
+  weeklyRules: Array<{
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+  }>;
+  dateExceptions?: Array<{ date: string; reason?: string }>;
+};
 
 export interface AvailabilityRequest {
   appointmentTypeId: string;
@@ -108,13 +119,19 @@ export class AvailabilityService {
     }
     const at = await this.loadAppointmentType(req.appointmentTypeId);
     const tz = this.resolveTimezone(at, req.timezone);
-    const entityIds = this.resolveEntityScope(at, req.entityId);
+    const entityIds = await this.resolveEntityScope(at, req.entityId);
 
-    const windows = resolveScheduleWindowsForDate(
+    const orgWindows = resolveScheduleWindowsForDate(
       at.scheduleType,
       at.schedules.flatMap((s) => s.rules),
       req.date,
       tz,
+    );
+    const windows = await this.resolveWindowsForScope(
+      at,
+      req,
+      tz,
+      orgWindows,
     );
 
     const dayStartUtc = wallTimeToUtc(req.date, '00:00', tz);
@@ -333,10 +350,10 @@ export class AvailabilityService {
    * computation. MANUAL mode requires the caller to specify exactly one
    * entity. AUTO mode collapses across all linked entities.
    */
-  private resolveEntityScope(
+  private async resolveEntityScope(
     at: LoadedAppointmentType,
     requestedEntityId?: string,
-  ): string[] {
+  ): Promise<string[]> {
     const linked = at.entities
       .map((e) =>
         at.entityType === EntityType.PERSON
@@ -351,10 +368,31 @@ export class AvailabilityService {
       );
     }
 
+    const activeLinked =
+      at.entityType === EntityType.PERSON
+        ? (
+            await this.prisma.bookablePerson.findMany({
+              where: { id: { in: linked }, isActive: true },
+              select: { id: true },
+            })
+          ).map((p) => p.id)
+        : (
+            await this.prisma.bookableResource.findMany({
+              where: { id: { in: linked }, isActive: true },
+              select: { id: true },
+            })
+          ).map((r) => r.id);
+
+    if (activeLinked.length === 0) {
+      throw new BadRequestException(
+        'No active entities are linked to this appointment type',
+      );
+    }
+
     if (requestedEntityId) {
-      if (!linked.includes(requestedEntityId)) {
+      if (!activeLinked.includes(requestedEntityId)) {
         throw new BadRequestException(
-          'entityId is not linked to this appointment type',
+          'entityId is not linked to this appointment type or is inactive',
         );
       }
       return [requestedEntityId];
@@ -365,7 +403,131 @@ export class AvailabilityService {
         'entityId is required for MANUAL assignment',
       );
     }
-    return linked;
+    return activeLinked;
+  }
+
+  private async resolveWindowsForScope(
+    at: LoadedAppointmentType,
+    req: AvailabilityRequest,
+    tz: string,
+    orgWindows: TimeRange[],
+  ): Promise<TimeRange[]> {
+    if (at.entityType !== EntityType.PERSON || !req.entityId) {
+      return orgWindows;
+    }
+
+    const person = await this.prisma.bookablePerson.findFirst({
+      where: {
+        id: req.entityId,
+        isActive: true,
+      },
+      select: { availabilityOverrides: true },
+    });
+
+    if (!person) return orgWindows;
+
+    const overrides = this.parseStaffOverrides(person.availabilityOverrides);
+    const override = overrides.find((o) => o.appointmentTypeId === at.id);
+    if (!override) return orgWindows;
+
+    if (
+      override.dateExceptions?.some(
+        (exception) => exception.date.slice(0, 10) === req.date,
+      )
+    ) {
+      return [];
+    }
+
+    const overrideTz = override.timezone ?? tz;
+    const day = dayOfWeekInZone(req.date, overrideTz);
+    const windows = override.weeklyRules
+      .filter((rule) => rule.dayOfWeek === day)
+      .map((rule) => ({
+        start: wallTimeToUtc(req.date, rule.startTime, overrideTz),
+        end: wallTimeToUtc(req.date, rule.endTime, overrideTz),
+      }))
+      .filter((range) => range.end.getTime() > range.start.getTime())
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    return windows.length > 0 ? windows : orgWindows;
+  }
+
+  private parseStaffOverrides(
+    value: Prisma.JsonValue | null,
+  ): StaffAvailabilityOverride[] {
+    if (!Array.isArray(value)) return [];
+    const overrides: StaffAvailabilityOverride[] = [];
+
+    for (const item of value) {
+      if (item == null || typeof item !== 'object' || Array.isArray(item)) {
+        continue;
+      }
+      const entry = item as Record<string, Prisma.JsonValue>;
+      if (typeof entry.appointmentTypeId !== 'string') continue;
+      if (!Array.isArray(entry.weeklyRules)) continue;
+
+      const weeklyRules: Array<{
+        dayOfWeek: number;
+        startTime: string;
+        endTime: string;
+      }> = [];
+      for (const ruleItem of entry.weeklyRules) {
+        if (
+          ruleItem == null ||
+          typeof ruleItem !== 'object' ||
+          Array.isArray(ruleItem)
+        ) {
+          continue;
+        }
+        const weeklyRule = ruleItem as Record<string, Prisma.JsonValue>;
+        if (
+          typeof weeklyRule.dayOfWeek !== 'number' ||
+          typeof weeklyRule.startTime !== 'string' ||
+          typeof weeklyRule.endTime !== 'string'
+        ) {
+          continue;
+        }
+        weeklyRules.push({
+          dayOfWeek: weeklyRule.dayOfWeek,
+          startTime: weeklyRule.startTime,
+          endTime: weeklyRule.endTime,
+        });
+      }
+      if (weeklyRules.length === 0) continue;
+
+      const dateExceptionsRaw = Array.isArray(entry.dateExceptions)
+        ? entry.dateExceptions
+        : [];
+      const dateExceptions: Array<{ date: string; reason?: string }> = [];
+      for (const exItem of dateExceptionsRaw) {
+        if (exItem == null || typeof exItem !== 'object' || Array.isArray(exItem)) {
+          continue;
+        }
+        const exception = exItem as Record<string, Prisma.JsonValue>;
+        if (typeof exception.date !== 'string') continue;
+        const output: { date: string; reason?: string } = {
+          date: exception.date,
+        };
+        if (typeof exception.reason === 'string') {
+          output.reason = exception.reason;
+        }
+        dateExceptions.push(output);
+      }
+
+      const override: StaffAvailabilityOverride = {
+        appointmentTypeId: entry.appointmentTypeId,
+        weeklyRules,
+      };
+      if (typeof entry.timezone === 'string') {
+        override.timezone = entry.timezone;
+      }
+      if (dateExceptions.length > 0) {
+        override.dateExceptions = dateExceptions;
+      }
+      overrides.push(override);
+    }
+
+    return overrides;
   }
 
   private fetchOverlappingAppointments(

@@ -11,11 +11,14 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { BookablePerson, Role } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { JwtUserPayload } from '../auth/token.service';
-import { BookablePersonsService } from './bookable-persons.service';
+import {
+  BookablePersonWithAssignments,
+  BookablePersonsService,
+} from './bookable-persons.service';
 import { CreateBookablePersonDto } from './dto/create-bookable-person.dto';
 import { ListBookablePersonsQuery } from './dto/list-bookable-persons.query';
 import { UpdateBookablePersonDto } from './dto/update-bookable-person.dto';
@@ -34,7 +37,7 @@ export class BookablePersonsController {
   create(
     @CurrentUser() user: JwtUserPayload,
     @Body() body: CreateBookablePersonDto,
-  ): Promise<BookablePerson> {
+  ): Promise<BookablePersonWithAssignments> {
     return this.persons.create(user.sub, body);
   }
 
@@ -43,8 +46,8 @@ export class BookablePersonsController {
   list(
     @CurrentUser() user: JwtUserPayload,
     @Query() query: ListBookablePersonsQuery,
-  ): Promise<BookablePerson[]> {
-    return this.persons.list(user.sub, query.includeInactive ?? false);
+  ): Promise<BookablePersonWithAssignments[]> {
+    return this.persons.list(user.sub, query);
   }
 
   @Get(':id')
@@ -52,7 +55,7 @@ export class BookablePersonsController {
   findOne(
     @CurrentUser() user: JwtUserPayload,
     @Param('id') id: string,
-  ): Promise<BookablePerson> {
+  ): Promise<BookablePersonWithAssignments> {
     return this.persons.findOneForOrganiser(user.sub, id);
   }
 
@@ -62,7 +65,7 @@ export class BookablePersonsController {
     @CurrentUser() user: JwtUserPayload,
     @Param('id') id: string,
     @Body() body: UpdateBookablePersonDto,
-  ): Promise<BookablePerson> {
+  ): Promise<BookablePersonWithAssignments> {
     return this.persons.update(user.sub, id, body);
   }
 

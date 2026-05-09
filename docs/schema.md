@@ -47,9 +47,19 @@ organizations [icon: briefcase, color: teal] {
   slug string unique
   description text
   logoUrl string
+  galleryImageUrls json
   contactEmail string
   contactPhone string
+  city string
+  state string
   address string
+  latitude float
+  longitude float
+  googlePlaceId string
+  instagramUrl string
+  facebookUrl string
+  twitterUrl string
+  websiteUrl string
   timezone string
   isActive boolean
   createdAt timestamp

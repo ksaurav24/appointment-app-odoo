@@ -26,11 +26,16 @@ const NAV: NavItem[] = [
     icon: Calendar01Icon,
   },
   {
+    href: "/organization/gallery",
+    label: "Gallery",
+    icon: Briefcase01Icon,
+  },
+  {
     href: "/organization/appointment-types",
     label: "Appointment types",
     icon: Briefcase01Icon,
   },
-  { href: "/organization/inventory", label: "Inventory", icon: UserGroupIcon },
+  { href: "/organization/staff", label: "Staff", icon: UserGroupIcon },
   { href: "/organization/analytics", label: "Analytics", icon: Analytics01Icon },
   { href: "/organization/settings", label: "Settings", icon: Settings01Icon },
 ];

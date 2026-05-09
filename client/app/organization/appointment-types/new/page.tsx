@@ -187,9 +187,6 @@ export default function NewAppointmentTypePage() {
         error: "Slug must be lowercase letters, numbers, and dashes only.",
       };
     }
-    if (entityIds.length === 0) {
-      return { error: "Select at least one entity." };
-    }
     if (durationMode === "VARIABLE" && minDurationMins >= maxDurationMins) {
       return { error: "Min duration must be less than max duration." };
     }
@@ -367,7 +364,7 @@ export default function NewAppointmentTypePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Inventory</CardTitle>
+            <CardTitle>Staff / Resource assignment</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
@@ -407,6 +404,10 @@ export default function NewAppointmentTypePage() {
               <Label>
                 Available {entityType === "PERSON" ? "persons" : "resources"}
               </Label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Optional for now — you can create this as draft and assign staff
+                or resources later.
+              </p>
               <div className="mt-2">
                 <EntityPicker
                   entityType={entityType}

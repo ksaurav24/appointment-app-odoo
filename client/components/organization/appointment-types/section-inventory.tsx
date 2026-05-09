@@ -55,10 +55,6 @@ export function SectionInventory({ type }: Props) {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selected.length === 0) {
-      toast.error("Select at least one entity");
-      return;
-    }
     setEntitiesMutation.mutate(
       { id: type.id, body: { entityIds: selected } },
       {
@@ -79,7 +75,7 @@ export function SectionInventory({ type }: Props) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Inventory</CardTitle>
+          <CardTitle>Staff / Resource assignment</CardTitle>
           <CardAction>
             <Button variant="outline" size="sm" onClick={handleEdit}>
               Edit
@@ -114,7 +110,7 @@ export function SectionInventory({ type }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Inventory</CardTitle>
+        <CardTitle>Staff / Resource assignment</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSave} className="space-y-4">

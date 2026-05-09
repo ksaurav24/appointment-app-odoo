@@ -54,9 +54,19 @@ export type Organization = {
   slug: string;
   description: string | null;
   logoUrl: string | null;
+  galleryImageUrls: string[];
   contactEmail: string;
   contactPhone: string | null;
+  city: string | null;
+  state: string | null;
   address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  googlePlaceId: string | null;
+  instagramUrl: string | null;
+  facebookUrl: string | null;
+  twitterUrl: string | null;
+  websiteUrl: string | null;
   timezone: string;
   isActive: boolean;
   approvalStatus: OrganizationApprovalStatus;
@@ -71,10 +81,21 @@ export type Organization = {
 export type CreateOrganizationInput = {
   name: string;
   slug: string;
+  description: string;
+  contactPhone: string;
+  city: string;
+  state: string;
+  address: string;
+  latitude?: number;
+  longitude?: number;
+  logoUrl: string;
   contactEmail?: string;
-  description?: string;
-  contactPhone?: string;
-  address?: string;
+  googlePlaceId?: string;
+  galleryImageUrls?: string[];
+  instagramUrl?: string;
+  facebookUrl?: string;
+  twitterUrl?: string;
+  websiteUrl?: string;
   timezone?: string;
 };
 
@@ -345,9 +366,29 @@ export type BookablePerson = {
   contactEmail: string | null;
   phone: string | null;
   designation: string | null;
+  assignedAppointmentTypes: Array<{ id: string; name: string }>;
+  availabilityOverrides: StaffAvailabilityOverride[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+export type StaffWeeklyRule = {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+};
+
+export type StaffDateException = {
+  date: string;
+  reason?: string;
+};
+
+export type StaffAvailabilityOverride = {
+  appointmentTypeId: string;
+  timezone?: string;
+  weeklyRules: StaffWeeklyRule[];
+  dateExceptions?: StaffDateException[];
 };
 
 export type BookableResource = {
@@ -625,13 +666,22 @@ export type VerifyPaymentResult = {
 // ─── Bookable inventory (CRUD inputs) ──────────────────────────
 export type CreateBookablePersonInput = {
   name: string;
+  designation: string;
   contactEmail: string;
-  phone?: string;
-  designation?: string;
+  phone: string;
+  appointmentTypeIds?: string[];
+  availabilityOverrides?: StaffAvailabilityOverride[];
   isActive?: boolean;
 };
 
 export type UpdateBookablePersonInput = Partial<CreateBookablePersonInput>;
+
+export type ListBookablePersonsQuery = {
+  includeInactive?: boolean;
+  q?: string;
+  designation?: string;
+  appointmentTypeId?: string;
+};
 
 export type CreateBookableResourceInput = {
   name: string;
@@ -653,7 +703,7 @@ export type CreateAppointmentTypeInput = {
   description?: string;
   entityType: EntityType;
   assignmentMode: AssignmentMode;
-  entityIds: string[];
+  entityIds?: string[];
   durationMode: DurationMode;
   durationMinutes?: number;
   minDurationMins?: number;
