@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional } from 'class-validator';
+import { AppointmentTypeVisibility } from '@prisma/client';
 
 export class ListAppointmentTypesQuery {
   @IsOptional()
@@ -10,4 +11,8 @@ export class ListAppointmentTypesQuery {
   })
   @IsBoolean()
   published?: boolean;
+
+  @IsOptional()
+  @IsEnum(AppointmentTypeVisibility)
+  visibility?: AppointmentTypeVisibility;
 }

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   AppointmentType,
+  AppointmentTypeVisibility,
   AppointmentTypeEntity,
   BookablePerson,
   BookableResource,
@@ -85,6 +86,9 @@ export class AppointmentTypesService {
   ): Promise<AppointmentTypeWithRelations> {
     const org = await this.organizations.requireForOrganiser(organiserId);
     const slug = await this.resolveSlug(org.id, input.name, input.slug);
+    const category = this.normalizeCategory(
+      input.category ?? org.defaultAppointmentTypeCategory,
+    );
 
     const policy = validateAppointmentTypePolicy({
       entityType: input.entityType,
@@ -122,6 +126,7 @@ export class AppointmentTypesService {
           name: input.name.trim(),
           slug,
           description: input.description,
+          category,
           entityType: input.entityType,
           scheduleType: input.scheduleType,
           durationMode: input.durationMode,
@@ -134,12 +139,20 @@ export class AppointmentTypesService {
           manualConfirmation: policy.manualConfirmation,
           advancePaymentEnabled: policy.advancePaymentEnabled,
           advancePaymentAmount: policy.advancePaymentAmount,
+          price: input.price != null ? input.price : null,
+          advanceBookingWindowDays: input.advanceBookingWindowDays ?? 30,
+          minimumNoticePeriodHours: input.minimumNoticePeriodHours ?? 0,
+          reminderIntervals: input.reminderIntervals ?? [],
           assignmentMode: input.assignmentMode,
+          bufferMinutes: input.bufferMinutes ?? 0,
           cancellationAllowed: policy.cancellationAllowed,
           cancellationWindowHours: policy.cancellationWindowHours,
           rescheduleAllowed: policy.rescheduleAllowed,
           rescheduleWindowHours: policy.rescheduleWindowHours,
           maxReschedulesAllowed: policy.maxReschedulesAllowed,
+          visibility: AppointmentTypeVisibility.DRAFT,
+          isPublished: false,
+          shareToken: generateShareToken(),
         },
       });
 
@@ -172,12 +185,23 @@ export class AppointmentTypesService {
   async list(
     organiserId: string,
     published?: boolean,
+    visibility?: AppointmentTypeVisibility,
   ): Promise<AppointmentType[]> {
     const org = await this.organizations.requireForOrganiser(organiserId);
+    let visibilityWhere: Prisma.AppointmentTypeWhereInput = {};
+    if (visibility != null) {
+      visibilityWhere = { visibility };
+    } else if (published === true) {
+      visibilityWhere = { visibility: AppointmentTypeVisibility.PUBLISHED };
+    } else if (published === false) {
+      visibilityWhere = {
+        visibility: { not: AppointmentTypeVisibility.PUBLISHED },
+      };
+    }
     return this.prisma.appointmentType.findMany({
       where: {
         organizationId: org.id,
-        ...(published === undefined ? {} : { isPublished: published }),
+        ...visibilityWhere,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -250,6 +274,7 @@ export class AppointmentTypesService {
           ? Number(existing.advancePaymentAmount)
           : null),
       assignmentMode: input.assignmentMode ?? existing.assignmentMode,
+      bufferMinutes: input.bufferMinutes ?? existing.bufferMinutes,
       cancellationAllowed:
         input.cancellationAllowed ?? existing.cancellationAllowed,
       cancellationWindowHours:
@@ -261,6 +286,9 @@ export class AppointmentTypesService {
         input.maxReschedulesAllowed ?? existing.maxReschedulesAllowed,
     };
     const policy = validateAppointmentTypePolicy(merged);
+    const category = this.normalizeCategory(
+      input.category === undefined ? existing.category : input.category,
+    );
 
     await this.prisma.appointmentType.update({
       where: { id },
@@ -268,6 +296,7 @@ export class AppointmentTypesService {
         name: input.name?.trim(),
         slug,
         description: input.description,
+        category,
         entityType: merged.entityType,
         durationMode: merged.durationMode,
         durationMinutes: policy.durationMinutes,
@@ -279,7 +308,12 @@ export class AppointmentTypesService {
         manualConfirmation: policy.manualConfirmation,
         advancePaymentEnabled: policy.advancePaymentEnabled,
         advancePaymentAmount: policy.advancePaymentAmount,
+        price: input.price !== undefined ? (input.price ?? null) : existing.price ? Number(existing.price) : null,
+        advanceBookingWindowDays: input.advanceBookingWindowDays ?? existing.advanceBookingWindowDays,
+        minimumNoticePeriodHours: input.minimumNoticePeriodHours ?? existing.minimumNoticePeriodHours,
+        reminderIntervals: input.reminderIntervals ?? existing.reminderIntervals,
         assignmentMode: merged.assignmentMode,
+        bufferMinutes: merged.bufferMinutes,
         cancellationAllowed: policy.cancellationAllowed,
         cancellationWindowHours: policy.cancellationWindowHours,
         rescheduleAllowed: policy.rescheduleAllowed,
@@ -324,6 +358,7 @@ export class AppointmentTypesService {
       where: { id },
       data: {
         isPublished: true,
+        visibility: AppointmentTypeVisibility.PUBLISHED,
         shareToken: at.shareToken ?? generateShareToken(),
       },
     });
@@ -337,7 +372,40 @@ export class AppointmentTypesService {
     await this.findOneForOrganiser(organiserId, id);
     await this.prisma.appointmentType.update({
       where: { id },
-      data: { isPublished: false },
+      data: {
+        isPublished: false,
+        visibility: AppointmentTypeVisibility.DRAFT,
+      },
+    });
+    return this.findOneForOrganiser(organiserId, id);
+  }
+
+  async archive(
+    organiserId: string,
+    id: string,
+  ): Promise<AppointmentTypeWithRelations> {
+    await this.findOneForOrganiser(organiserId, id);
+    await this.prisma.appointmentType.update({
+      where: { id },
+      data: {
+        isPublished: false,
+        visibility: AppointmentTypeVisibility.ARCHIVED,
+      },
+    });
+    return this.findOneForOrganiser(organiserId, id);
+  }
+
+  async unarchive(
+    organiserId: string,
+    id: string,
+  ): Promise<AppointmentTypeWithRelations> {
+    await this.findOneForOrganiser(organiserId, id);
+    await this.prisma.appointmentType.update({
+      where: { id },
+      data: {
+        isPublished: false,
+        visibility: AppointmentTypeVisibility.DRAFT,
+      },
     });
     return this.findOneForOrganiser(organiserId, id);
   }
@@ -449,6 +517,7 @@ export class AppointmentTypesService {
     const found = await this.prisma.appointmentType.findFirst({
       where: {
         shareToken: token,
+        visibility: { not: AppointmentTypeVisibility.ARCHIVED },
         organization: { approvalStatus: 'APPROVED', isActive: true },
       },
       include: PUBLIC_FULL_INCLUDE,
@@ -459,9 +528,15 @@ export class AppointmentTypesService {
 
   private publicWhereClause(): Prisma.AppointmentTypeWhereInput {
     return {
-      isPublished: true,
+      visibility: AppointmentTypeVisibility.PUBLISHED,
       organization: { approvalStatus: 'APPROVED', isActive: true },
     };
+  }
+
+  private normalizeCategory(input?: string | null): string | null {
+    if (input == null) return null;
+    const trimmed = input.trim();
+    return trimmed.length > 0 ? trimmed : null;
   }
 
   // -------------------------------------------------------------------------

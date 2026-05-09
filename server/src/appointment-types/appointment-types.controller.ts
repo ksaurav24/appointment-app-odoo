@@ -55,7 +55,11 @@ export class AppointmentTypesController {
     @CurrentUser() user: JwtUserPayload,
     @Query() query: ListAppointmentTypesQuery,
   ): Promise<AppointmentType[]> {
-    return this.appointmentTypes.list(user.sub, query.published);
+    return this.appointmentTypes.list(
+      user.sub,
+      query.published,
+      query.visibility,
+    );
   }
 
   @Get(':id')
@@ -109,6 +113,26 @@ export class AppointmentTypesController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<AppointmentTypeWithRelations> {
     return this.appointmentTypes.unpublish(user.sub, id);
+  }
+
+  @Post(':id/archive')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Archive an appointment type' })
+  archive(
+    @CurrentUser() user: JwtUserPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<AppointmentTypeWithRelations> {
+    return this.appointmentTypes.archive(user.sub, id);
+  }
+
+  @Post(':id/unarchive')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Restore an archived appointment type as draft' })
+  unarchive(
+    @CurrentUser() user: JwtUserPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<AppointmentTypeWithRelations> {
+    return this.appointmentTypes.unarchive(user.sub, id);
   }
 
   @Post(':id/share-token')

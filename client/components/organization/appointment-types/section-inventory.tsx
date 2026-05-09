@@ -12,6 +12,12 @@ import {
   CardTitle,
   CardAction,
 } from "@/components/ui/card";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@/components/ui/radio-group";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
 import { useAppointmentTypeMutations } from "@/hooks/useAppointmentTypes";
 import { EntityPicker } from "@/components/organization/appointment-types/entity-picker";
@@ -36,39 +42,44 @@ const ASSIGNMENT_LABELS: Record<string, string> = {
 
 export function SectionInventory({ type }: Props) {
   const [editing, setEditing] = useState(false);
-  const { setEntitiesMutation } = useAppointmentTypeMutations();
+  const { setEntitiesMutation, updateMutation } = useAppointmentTypeMutations();
 
   const initialSelected = type.entities
     .map(getEntityId)
     .filter((x): x is string => !!x);
 
   const [selected, setSelected] = useState<string[]>(initialSelected);
+  const [assignmentMode, setAssignmentMode] = useState(type.assignmentMode);
+  const [bufferMinutes, setBufferMinutes] = useState(type.bufferMinutes);
 
   const handleEdit = () => {
     setSelected(
       type.entities.map(getEntityId).filter((x): x is string => !!x),
     );
+    setAssignmentMode(type.assignmentMode);
+    setBufferMinutes(type.bufferMinutes);
     setEditing(true);
   };
 
   const handleCancel = () => setEditing(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEntitiesMutation.mutate(
-      { id: type.id, body: { entityIds: selected } },
-      {
-        onSuccess: () => {
-          toast.success("Saved");
-          setEditing(false);
-        },
-        onError: (err) => {
-          const msg =
-            err instanceof ApiError ? err.messages[0] : "Failed to save";
-          toast.error(msg);
-        },
-      },
-    );
+    try {
+      await updateMutation.mutateAsync({
+        id: type.id,
+        body: { assignmentMode, bufferMinutes },
+      });
+      await setEntitiesMutation.mutateAsync({
+        id: type.id,
+        body: { entityIds: selected },
+      });
+      toast.success("Saved");
+      setEditing(false);
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.messages[0] : "Failed to save";
+      toast.error(msg);
+    }
   };
 
   if (!editing) {
@@ -90,6 +101,8 @@ export function SectionInventory({ type }: Props) {
             </dd>
             <dt className="text-muted-foreground">Assignment</dt>
             <dd>{ASSIGNMENT_LABELS[type.assignmentMode] ?? type.assignmentMode}</dd>
+            <dt className="text-muted-foreground">Buffer</dt>
+            <dd>{type.bufferMinutes} min</dd>
           </dl>
           {type.entities.length === 0 ? (
             <p className="text-sm text-muted-foreground">No entities assigned yet.</p>
@@ -119,8 +132,39 @@ export function SectionInventory({ type }: Props) {
             <dd>
               <Badge variant="outline">{type.entityType}</Badge>
             </dd>
-            <dt className="text-muted-foreground">Assignment</dt>
-            <dd>{ASSIGNMENT_LABELS[type.assignmentMode] ?? type.assignmentMode}</dd>
+            <dt className="text-muted-foreground">Assignment mode</dt>
+            <dd>
+              <RadioGroup
+                value={assignmentMode}
+                onValueChange={(v) => setAssignmentMode(v as typeof assignmentMode)}
+                className="flex flex-wrap gap-4"
+              >
+                <label className="flex items-center gap-2 text-sm">
+                  <RadioGroupItem value="AUTO" /> Auto-assign
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <RadioGroupItem value="MANUAL" /> Customer chooses
+                </label>
+              </RadioGroup>
+            </dd>
+            <dt className="text-muted-foreground">Buffer (minutes)</dt>
+            <dd>
+              <div className="max-w-28 space-y-1">
+                <Label htmlFor="inventory-buffer" className="sr-only">
+                  Buffer minutes
+                </Label>
+                <Input
+                  id="inventory-buffer"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={bufferMinutes}
+                  onChange={(e) =>
+                    setBufferMinutes(Math.max(0, Number(e.target.value) || 0))
+                  }
+                />
+              </div>
+            </dd>
           </dl>
 
           <EntityPicker
@@ -133,10 +177,12 @@ export function SectionInventory({ type }: Props) {
             <Button
               type="submit"
               size="sm"
-              disabled={setEntitiesMutation.isPending}
-            >
-              {setEntitiesMutation.isPending ? "Saving..." : "Save"}
-            </Button>
+               disabled={setEntitiesMutation.isPending || updateMutation.isPending}
+             >
+               {setEntitiesMutation.isPending || updateMutation.isPending
+                 ? "Saving..."
+                 : "Save"}
+             </Button>
             <Button
               type="button"
               variant="outline"

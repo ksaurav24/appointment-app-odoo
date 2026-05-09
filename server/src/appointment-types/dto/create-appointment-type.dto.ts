@@ -64,6 +64,17 @@ export class CreateAppointmentTypeDto {
   @MaxLength(4000)
   description?: string;
 
+  @ApiPropertyOptional({
+    example: 'Consultation',
+    description:
+      'Optional category for organizer-facing grouping. Defaults to organization category when omitted.',
+    maxLength: 120,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  category?: string;
+
   // Step 2: entity type (locked once bookings exist)
   @ApiProperty({ enum: EntityType, example: EntityType.PERSON })
   @IsEnum(EntityType)
@@ -124,6 +135,17 @@ export class CreateAppointmentTypeDto {
   })
   @IsEnum(AssignmentMode)
   assignmentMode!: AssignmentMode;
+
+  @ApiPropertyOptional({
+    example: 15,
+    description:
+      'Buffer in minutes between consecutive bookings for the same entity.',
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  bufferMinutes?: number;
 
   @ApiPropertyOptional({
     type: [String],
@@ -213,6 +235,36 @@ export class CreateAppointmentTypeDto {
   @Min(0)
   advancePaymentAmount?: number;
 
+  @ApiPropertyOptional({
+    example: 500.0,
+    description: 'Base price of the appointment in the organisation\'s currency (0 for free)',
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  price?: number;
+
+  @ApiPropertyOptional({
+    example: 30,
+    description: 'How many days in advance customers can book (omit or 0 = unlimited)',
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  advanceBookingWindowDays?: number;
+
+  @ApiPropertyOptional({
+    example: 2,
+    description: 'Minimum hours before the slot a booking can be made',
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minimumNoticePeriodHours?: number;
+
   // Step 7: cancellation/reschedule policy
   @ApiPropertyOptional({ example: true })
   @IsOptional()
@@ -254,25 +306,23 @@ export class CreateAppointmentTypeDto {
   @Min(0)
   maxReschedulesAllowed?: number;
 
-  // Step 8: booking questions (optional set)
+  // Step 9: reminder intervals
+  @ApiPropertyOptional({
+    example: [1440, 60],
+    description:
+      'List of reminder offsets in minutes before appointment (e.g. 1440 = 24h before, 60 = 1h before)',
+    type: [Number],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  reminderIntervals?: number[];
+
+  // Step 10: booking questions (optional set)
   @ApiPropertyOptional({
     type: () => BookingQuestionDto,
     isArray: true,
-    example: [
-      {
-        questionText: 'Briefly describe your symptoms',
-        questionType: 'TEXT',
-        isRequired: true,
-        displayOrder: 0,
-      },
-      {
-        questionText: 'Visit type',
-        questionType: 'SINGLE_CHOICE',
-        isRequired: true,
-        options: ['First visit', 'Follow-up', 'Emergency'],
-        displayOrder: 1,
-      },
-    ],
   })
   @IsOptional()
   @IsArray()

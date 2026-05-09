@@ -345,6 +345,22 @@ describe('AppointmentsService.submitRequest', () => {
     appointmentFindUnique: jest.Mock;
     txExecuteRaw: jest.Mock;
   }): PrismaService {
+    const activeResourcesFindMany = jest
+      .fn()
+      .mockImplementation(
+        (args: { where: { id: Record<string, string[]> } }) => {
+          const ids = args.where.id['in'] ?? [];
+          return Promise.resolve(ids.map((id) => ({ id })));
+        },
+      );
+    const activePersonsFindMany = jest
+      .fn()
+      .mockImplementation(
+        (args: { where: { id: Record<string, string[]> } }) => {
+          const ids = args.where.id['in'] ?? [];
+          return Promise.resolve(ids.map((id) => ({ id })));
+        },
+      );
     const tx = {
       appointment: {
         aggregate: handles.aggregate,
@@ -352,6 +368,8 @@ describe('AppointmentsService.submitRequest', () => {
         findUnique: handles.appointmentFindUnique,
       },
       appointmentAnswer: { createMany: handles.appointmentAnswerCreateMany },
+      bookablePerson: { findMany: activePersonsFindMany },
+      bookableResource: { findMany: activeResourcesFindMany },
       $executeRaw: handles.txExecuteRaw,
     };
     return {
@@ -359,6 +377,8 @@ describe('AppointmentsService.submitRequest', () => {
       appointment: {
         aggregate: handles.aggregate,
       },
+      bookablePerson: { findMany: activePersonsFindMany },
+      bookableResource: { findMany: activeResourcesFindMany },
       $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
     } as unknown as PrismaService;
   }

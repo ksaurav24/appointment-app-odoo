@@ -2,8 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { X, Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
+import { BookingQuestionRow } from "@/components/organization/appointment-types/booking-question-row";
 import { EntityPicker } from "@/components/organization/appointment-types/entity-picker";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,15 +26,18 @@ import {
   RadioGroup,
   RadioGroupItem,
 } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useAppointmentTypeMutations } from "@/hooks/useAppointmentTypes";
 import type {
   AssignmentMode,
+  BookingQuestionInput,
   CreateAppointmentTypeInput,
   DurationMode,
   EntityType,
+  QuestionType,
   ScheduleRuleInput,
   ScheduleType,
 } from "@/types";
@@ -95,6 +101,13 @@ function MinutesInput({
   );
 }
 
+function formatInterval(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = minutes / 60;
+  if (Number.isInteger(hours)) return `${hours}h`;
+  return `${hours.toFixed(1)}h`;
+}
+
 export default function NewAppointmentTypePage() {
   const router = useRouter();
   const { createMutation, publishMutation } = useAppointmentTypeMutations();
@@ -103,15 +116,44 @@ export default function NewAppointmentTypePage() {
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
   const [entityType, setEntityType] = useState<EntityType>("PERSON");
   const [assignmentMode, setAssignmentMode] =
     useState<AssignmentMode>("AUTO");
+  const [bufferMinutes, setBufferMinutes] = useState(0);
   const [entityIds, setEntityIds] = useState<string[]>([]);
   const [durationMode, setDurationMode] = useState<DurationMode>("FIXED");
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [minDurationMins, setMinDurationMins] = useState(15);
   const [maxDurationMins, setMaxDurationMins] = useState(60);
   const [durationStepMins, setDurationStepMins] = useState(15);
+  
+  // Payment
+  const [price, setPrice] = useState("");
+  const [advancePaymentEnabled, setAdvancePaymentEnabled] = useState(false);
+  const [advancePaymentAmount, setAdvancePaymentAmount] = useState("");
+
+  // Policy
+  const [manualConfirmation, setManualConfirmation] = useState(false);
+  const [cancellationAllowed, setCancellationAllowed] = useState(true);
+  const [cancellationWindowHours, setCancellationWindowHours] = useState("");
+  const [rescheduleAllowed, setRescheduleAllowed] = useState(true);
+  const [rescheduleWindowHours, setRescheduleWindowHours] = useState("");
+  const [maxReschedulesAllowed, setMaxReschedulesAllowed] = useState("");
+  const [maxBookingsPerSlot, setMaxBookingsPerSlot] = useState("1");
+  const [manageCapacity, setManageCapacity] = useState(false);
+
+  // Schedule extra
+  const [advanceBookingWindowDays, setAdvanceBookingWindowDays] = useState("30");
+  const [minimumNoticePeriodHours, setMinimumNoticePeriodHours] = useState("0");
+
+  // Notifications
+  const [reminderIntervals, setReminderIntervals] = useState<number[]>([]);
+  const [customReminder, setCustomReminder] = useState("");
+
+  // Questions
+  const [bookingQuestions, setBookingQuestions] = useState<BookingQuestionInput[]>([]);
+
   const [scheduleType, setScheduleType] = useState<ScheduleType>("WEEKLY");
 
   const [weekly, setWeekly] = useState<Record<number, DayHours>>({
@@ -181,6 +223,70 @@ export default function NewAppointmentTypePage() {
     }
   };
 
+  // --- Notifications Handlers ---
+  const addInterval = (minutes: number) => {
+    if (minutes < 1) {
+      toast.error("Interval must be at least 1 minute");
+      return;
+    }
+    if (reminderIntervals.includes(minutes)) {
+      toast.error("This interval is already added");
+      return;
+    }
+    setReminderIntervals((prev) => [...prev, minutes].sort((a, b) => b - a));
+  };
+
+  const removeInterval = (minutes: number) => {
+    setReminderIntervals((prev) => prev.filter((m) => m !== minutes));
+  };
+
+  const addCustomReminder = () => {
+    const val = parseInt(customReminder, 10);
+    if (isNaN(val) || val < 1) {
+      toast.error("Enter a positive number of minutes");
+      return;
+    }
+    addInterval(val);
+    setCustomReminder("");
+  };
+
+  // --- Questions Handlers ---
+  const addQuestion = () => {
+    setBookingQuestions((prev) => [
+      ...prev,
+      {
+        questionText: "",
+        questionType: "TEXT",
+        isRequired: false,
+        options: undefined,
+      },
+    ]);
+  };
+
+  const updateQuestion = (idx: number, updated: BookingQuestionInput) => {
+    setBookingQuestions((prev) => {
+      const copy = [...prev];
+      copy[idx] = updated;
+      return copy;
+    });
+  };
+
+  const deleteQuestion = (idx: number) => {
+    setBookingQuestions((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const moveQuestion = (idx: number, dir: "UP" | "DOWN") => {
+    setBookingQuestions((prev) => {
+      const copy = [...prev];
+      if (dir === "UP" && idx > 0) {
+        [copy[idx - 1], copy[idx]] = [copy[idx], copy[idx - 1]];
+      } else if (dir === "DOWN" && idx < copy.length - 1) {
+        [copy[idx + 1], copy[idx]] = [copy[idx], copy[idx + 1]];
+      }
+      return copy;
+    });
+  };
+
   const buildBody = (): CreateAppointmentTypeInput | { error: string } => {
     if (effectiveSlug && !SLUG_REGEX.test(effectiveSlug)) {
       return {
@@ -189,6 +295,25 @@ export default function NewAppointmentTypePage() {
     }
     if (durationMode === "VARIABLE" && minDurationMins >= maxDurationMins) {
       return { error: "Min duration must be less than max duration." };
+    }
+
+    const priceNum = price.trim() === "" ? undefined : Number(price);
+    if (priceNum !== undefined && (isNaN(priceNum) || priceNum < 0)) {
+      return { error: "Base price must be a non-negative number" };
+    }
+    if (advancePaymentEnabled) {
+      const amt = Number(advancePaymentAmount);
+      if (isNaN(amt) || amt <= 0) {
+        return { error: "Advance payment amount must be greater than 0" };
+      }
+    }
+
+    for (let i = 0; i < bookingQuestions.length; i++) {
+      const q = bookingQuestions[i];
+      if (!q.questionText.trim()) return { error: `Question ${i + 1}: text is required` };
+      if (q.questionType === "SINGLE_CHOICE" || q.questionType === "MULTIPLE_CHOICE") {
+        if (!q.options || q.options.length === 0) return { error: `Question ${i + 1}: at least one option required` };
+      }
     }
 
     let scheduleRules: ScheduleRuleInput[] = [];
@@ -241,8 +366,10 @@ export default function NewAppointmentTypePage() {
       name: name.trim(),
       slug: effectiveSlug || undefined,
       description: description.trim() || undefined,
+      category: category.trim() || undefined,
       entityType,
       assignmentMode,
+      bufferMinutes,
       entityIds,
       durationMode,
       ...(durationMode === "FIXED"
@@ -254,6 +381,21 @@ export default function NewAppointmentTypePage() {
           }),
       scheduleType,
       scheduleRules,
+      price: priceNum,
+      advancePaymentEnabled,
+      advancePaymentAmount: advancePaymentEnabled ? Number(advancePaymentAmount) : undefined,
+      manualConfirmation,
+      cancellationAllowed,
+      cancellationWindowHours: cancellationWindowHours ? Number(cancellationWindowHours) : undefined,
+      rescheduleAllowed,
+      rescheduleWindowHours: rescheduleWindowHours ? Number(rescheduleWindowHours) : undefined,
+      maxReschedulesAllowed: maxReschedulesAllowed ? Number(maxReschedulesAllowed) : undefined,
+      maxBookingsPerSlot: Number(maxBookingsPerSlot) || 1,
+      manageCapacity,
+      advanceBookingWindowDays: advanceBookingWindowDays ? Number(advanceBookingWindowDays) : undefined,
+      minimumNoticePeriodHours: minimumNoticePeriodHours ? Number(minimumNoticePeriodHours) : undefined,
+      reminderIntervals,
+      bookingQuestions: bookingQuestions.map((q, idx) => ({ ...q, displayOrder: idx })),
     };
   };
 
@@ -350,6 +492,16 @@ export default function NewAppointmentTypePage() {
               </p>
             </div>
             <div className="space-y-1">
+              <Label htmlFor="at-category">Category</Label>
+              <Input
+                id="at-category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="General"
+                maxLength={120}
+              />
+            </div>
+            <div className="space-y-1">
               <Label htmlFor="at-desc">Description</Label>
               <Textarea
                 id="at-desc"
@@ -358,6 +510,16 @@ export default function NewAppointmentTypePage() {
                 maxLength={4000}
                 rows={3}
               />
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <Switch
+                id="basics-manual-confirm"
+                checked={manualConfirmation}
+                onCheckedChange={setManualConfirmation}
+              />
+              <Label htmlFor="basics-manual-confirm">
+                Require manual confirmation
+              </Label>
             </div>
           </CardContent>
         </Card>
@@ -399,6 +561,22 @@ export default function NewAppointmentTypePage() {
                   <RadioGroupItem value="MANUAL" /> Customer chooses
                 </label>
               </RadioGroup>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="at-buffer">Buffer between bookings</Label>
+              <InputGroup>
+                <InputGroupInput
+                  id="at-buffer"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={bufferMinutes}
+                  onChange={(e) =>
+                    setBufferMinutes(Math.max(0, Number(e.target.value) || 0))
+                  }
+                />
+                <InputGroupAddon align="inline-end">min</InputGroupAddon>
+              </InputGroup>
             </div>
             <div>
               <Label>
@@ -659,6 +837,287 @@ export default function NewAppointmentTypePage() {
                 </div>
               </div>
             )}
+            <div className="pt-4 border-t mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="schedule-advance-window">
+                  Advance booking window (days)
+                </Label>
+                <Input
+                  id="schedule-advance-window"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={advanceBookingWindowDays}
+                  onChange={(e) => setAdvanceBookingWindowDays(e.target.value)}
+                  placeholder="30"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave 0 for unlimited.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="schedule-notice-period">
+                  Minimum notice period (hours)
+                </Label>
+                <Input
+                  id="schedule-notice-period"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={minimumNoticePeriodHours}
+                  onChange={(e) => setMinimumNoticePeriodHours(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="payment-price">Base price (₹)</Label>
+              <Input
+                id="payment-price"
+                type="number"
+                step="0.01"
+                min={0}
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="0.00 — leave blank to not display a price"
+              />
+              <p className="text-xs text-muted-foreground">
+                Set to 0 to show the service as free.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="payment-advance-enabled"
+                  checked={advancePaymentEnabled}
+                  onCheckedChange={setAdvancePaymentEnabled}
+                />
+                <Label htmlFor="payment-advance-enabled">
+                  Require advance payment at booking
+                </Label>
+              </div>
+              {advancePaymentEnabled && (
+                <div className="space-y-1.5 pl-9">
+                  <Label htmlFor="payment-advance-amount">Amount (₹)</Label>
+                  <Input
+                    id="payment-advance-amount"
+                    type="number"
+                    step="0.01"
+                    min={0.01}
+                    value={advancePaymentAmount}
+                    onChange={(e) => setAdvancePaymentAmount(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Policy</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="policy-cancel"
+                  checked={cancellationAllowed}
+                  onCheckedChange={setCancellationAllowed}
+                />
+                <Label htmlFor="policy-cancel">Cancellation allowed</Label>
+              </div>
+              {cancellationAllowed && (
+                <div className="space-y-1.5 pl-9">
+                  <Label htmlFor="policy-cancel-window">
+                    Cancellation window (hours)
+                  </Label>
+                  <Input
+                    id="policy-cancel-window"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={cancellationWindowHours}
+                    onChange={(e) => setCancellationWindowHours(e.target.value)}
+                    placeholder="e.g. 24"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="policy-reschedule"
+                  checked={rescheduleAllowed}
+                  onCheckedChange={setRescheduleAllowed}
+                />
+                <Label htmlFor="policy-reschedule">Rescheduling allowed</Label>
+              </div>
+              {rescheduleAllowed && (
+                <div className="grid grid-cols-2 gap-4 pl-9">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="policy-reschedule-window">
+                      Window (hours)
+                    </Label>
+                    <Input
+                      id="policy-reschedule-window"
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={rescheduleWindowHours}
+                      onChange={(e) => setRescheduleWindowHours(e.target.value)}
+                      placeholder="e.g. 24"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="policy-reschedule-max">Max limit</Label>
+                    <Input
+                      id="policy-reschedule-max"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={maxReschedulesAllowed}
+                      onChange={(e) => setMaxReschedulesAllowed(e.target.value)}
+                      placeholder="e.g. 3"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="space-y-3 border-t pt-3">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="policy-manage-capacity"
+                  checked={manageCapacity}
+                  onCheckedChange={setManageCapacity}
+                />
+                <Label htmlFor="policy-manage-capacity">
+                  Manage capacity
+                </Label>
+              </div>
+              {manageCapacity && (
+                <div className="space-y-1.5 pl-9">
+                  <Label htmlFor="policy-max-bookings">Max bookings per slot</Label>
+                  <Input
+                    id="policy-max-bookings"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={maxBookingsPerSlot}
+                    onChange={(e) => setMaxBookingsPerSlot(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Notifications</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label className="mb-2 block">
+                Reminder intervals (before appointment)
+              </Label>
+              {reminderIntervals.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No reminders configured.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {reminderIntervals.map((m) => (
+                    <Badge
+                      key={m}
+                      variant="secondary"
+                      className="flex items-center gap-1 pr-1"
+                    >
+                      {formatInterval(m)} before
+                      <button
+                        type="button"
+                        onClick={() => removeInterval(m)}
+                        className="ml-0.5 rounded hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="notif-custom-minutes" className="text-xs uppercase tracking-wide text-muted-foreground">
+                Custom (minutes)
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="notif-custom-minutes"
+                  type="number"
+                  min={1}
+                  step={1}
+                  className="w-36"
+                  value={customReminder}
+                  onChange={(e) => setCustomReminder(e.target.value)}
+                  placeholder="e.g. 1440"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addCustomReminder();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addCustomReminder}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Booking Questions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {bookingQuestions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No questions added yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {bookingQuestions.map((q, idx) => (
+                  <BookingQuestionRow
+                    key={idx}
+                    question={q}
+                    onChange={(next) => updateQuestion(idx, next)}
+                    onDelete={() => deleteQuestion(idx)}
+                    onMoveUp={() => moveQuestion(idx, "UP")}
+                    onMoveDown={() => moveQuestion(idx, "DOWN")}
+                    isFirst={idx === 0}
+                    isLast={idx === bookingQuestions.length - 1}
+                  />
+                ))}
+              </div>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={addQuestion}>
+              <Plus className="mr-1 h-4 w-4" />
+              Add question
+            </Button>
           </CardContent>
         </Card>
 

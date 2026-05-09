@@ -6,6 +6,8 @@ import { PublishBar } from "@/components/organization/appointment-types/publish-
 import { SectionBasics } from "@/components/organization/appointment-types/section-basics";
 import { SectionDanger } from "@/components/organization/appointment-types/section-danger";
 import { SectionInventory } from "@/components/organization/appointment-types/section-inventory";
+import { SectionNotifications } from "@/components/organization/appointment-types/section-notifications";
+import { SectionPayment } from "@/components/organization/appointment-types/section-payment";
 import { SectionPolicy } from "@/components/organization/appointment-types/section-policy";
 import { SectionQuestions } from "@/components/organization/appointment-types/section-questions";
 import { SectionSchedule } from "@/components/organization/appointment-types/section-schedule";
@@ -45,8 +47,10 @@ export default function AppointmentTypeDetailPage() {
       <SectionBasics type={type} />
       <SectionInventory type={type} />
       <SectionSchedule type={type} />
-      <SectionQuestions type={type} />
+      <SectionPayment type={type} />
       <SectionPolicy type={type} />
+      <SectionQuestions type={type} />
+      <SectionNotifications type={type} />
       <SectionDanger id={type.id} name={type.name} />
     </div>
   );

@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
@@ -53,6 +54,12 @@ export class UpdateAppointmentTypeDto {
   @MaxLength(4000)
   description?: string;
 
+  @ApiPropertyOptional({ example: 'Consultation', maxLength: 120 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  category?: string;
+
   @ApiPropertyOptional({ enum: EntityType, example: EntityType.PERSON })
   @IsOptional()
   @IsEnum(EntityType)
@@ -91,6 +98,12 @@ export class UpdateAppointmentTypeDto {
   @IsOptional()
   @IsEnum(AssignmentMode)
   assignmentMode?: AssignmentMode;
+
+  @ApiPropertyOptional({ example: 10, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  bufferMinutes?: number;
 
   @ApiPropertyOptional({ example: 1, minimum: 1 })
   @IsOptional()
@@ -146,4 +159,33 @@ export class UpdateAppointmentTypeDto {
   @IsInt()
   @Min(0)
   maxReschedulesAllowed?: number;
+
+  @ApiPropertyOptional({ example: 500.0, minimum: 0 })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  price?: number;
+
+  @ApiPropertyOptional({ example: 30, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  advanceBookingWindowDays?: number;
+
+  @ApiPropertyOptional({ example: 2, minimum: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  minimumNoticePeriodHours?: number;
+
+  @ApiPropertyOptional({
+    example: [1440, 60],
+    type: [Number],
+    description: 'Reminder offsets in minutes before appointment',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  reminderIntervals?: number[];
 }

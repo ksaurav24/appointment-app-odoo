@@ -33,16 +33,28 @@ function formatDuration(t: AppointmentType): string {
   return `${t.minDurationMins ?? "?"}–${t.maxDurationMins ?? "?"} min, step ${t.durationStepMins ?? "?"}`;
 }
 
-const FILTERS: { label: string; value: "all" | "published" | "drafts" }[] = [
+const FILTERS: {
+  label: string;
+  value: "all" | "published" | "drafts" | "archived";
+}[] = [
   { label: "All", value: "all" },
   { label: "Published", value: "published" },
   { label: "Drafts", value: "drafts" },
+  { label: "Archived", value: "archived" },
 ];
 
 export function TypesTable() {
-  const [filter, setFilter] = useState<"all" | "published" | "drafts">("all");
+  const [filter, setFilter] = useState<
+    "all" | "published" | "drafts" | "archived"
+  >("all");
   const query: ListAppointmentTypesQuery =
-    filter === "all" ? {} : { published: filter === "published" };
+    filter === "all"
+      ? {}
+      : filter === "published"
+        ? { visibility: "PUBLISHED" }
+        : filter === "drafts"
+          ? { visibility: "DRAFT" }
+          : { visibility: "ARCHIVED" };
 
   const list = useAppointmentTypes(query);
   const { deleteMutation } = useAppointmentTypeMutations();
@@ -124,8 +136,8 @@ export function TypesTable() {
                   <TableCell>{formatDuration(t)}</TableCell>
                   <TableCell>{t.scheduleType}</TableCell>
                   <TableCell>
-                    <Badge variant={t.isPublished ? "default" : "secondary"}>
-                      {t.isPublished ? "Published" : "Draft"}
+                    <Badge variant={t.visibility === "PUBLISHED" ? "default" : "secondary"}>
+                      {t.visibility.charAt(0) + t.visibility.slice(1).toLowerCase()}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">

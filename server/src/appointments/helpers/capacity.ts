@@ -34,12 +34,15 @@ export type CapacityMode = 'all_non_cancelled' | 'confirmed_only';
  */
 export async function countConsumedCapacity(
   client: Client,
-  at: { id: string; entityType: EntityType },
+  at: { id: string; entityType: EntityType; bufferMinutes?: number | null },
   entityId: string,
   range: CapacityRange,
   exclude: CapacityExclusions = {},
   mode: CapacityMode = 'all_non_cancelled',
 ): Promise<number> {
+  const bufferMinutes = Math.max(0, at.bufferMinutes ?? 0);
+  const rangeStart = new Date(range.start.getTime() - bufferMinutes * 60_000);
+  const rangeEnd = new Date(range.end.getTime() + bufferMinutes * 60_000);
   const entityFilter =
     at.entityType === EntityType.PERSON
       ? { bookablePersonId: entityId }
@@ -54,8 +57,8 @@ export async function countConsumedCapacity(
     appointmentTypeId: at.id,
     ...entityFilter,
     ...statusFilter,
-    startTime: { lt: range.end },
-    endTime: { gt: range.start },
+    startTime: { lt: rangeEnd },
+    endTime: { gt: rangeStart },
     ...(exclude.appointmentId != null
       ? { id: { not: exclude.appointmentId } }
       : {}),
@@ -74,8 +77,8 @@ export async function countConsumedCapacity(
     appointmentTypeId: at.id,
     ...entityFilter,
     expiresAt: { gt: new Date() },
-    slotStart: { lt: range.end },
-    slotEnd: { gt: range.start },
+    slotStart: { lt: rangeEnd },
+    slotEnd: { gt: rangeStart },
     ...(exclude.lockId != null ? { id: { not: exclude.lockId } } : {}),
   };
 

@@ -150,6 +150,20 @@ export function BookingQuestionRow({
           />
         </div>
       )}
+
+      {/* Help text */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">
+          Help text <span className="font-normal">(optional — shown below question)</span>
+        </Label>
+        <Input
+          value={question.helpText ?? ""}
+          onChange={(e) =>
+            onChange({ ...question, helpText: e.target.value || undefined })
+          }
+          placeholder="e.g. Please be concise — we'll discuss details in-person"
+        />
+      </div>
     </div>
   );
 }

@@ -36,6 +36,7 @@ function buildInitial(type: AppointmentTypeWithRelations): BookingQuestionInput[
     .sort((a, b) => a.displayOrder - b.displayOrder)
     .map((q) => ({
       questionText: q.questionText,
+      helpText: q.helpText ?? undefined,
       questionType: q.questionType,
       isRequired: q.isRequired,
       options: q.options ?? undefined,
@@ -176,6 +177,11 @@ export function SectionQuestions({ type }: Props) {
                     {q.questionText}
                     {q.isRequired && (
                       <span className="ml-1 text-destructive">*</span>
+                    )}
+                    {q.helpText && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {q.helpText}
+                      </p>
                     )}
                   </span>
                   <Badge variant="outline" className="shrink-0 text-xs">
