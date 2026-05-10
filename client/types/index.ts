@@ -516,6 +516,12 @@ export type BookingQuestion = {
   displayOrder: number;
 };
 
+export type PublicOrganizationSummary = Pick<Organization, "id" | "name" | "slug" | "logoUrl">;
+
+export type PublicAppointmentTypeListItem = AppointmentType & {
+  organization: PublicOrganizationSummary;
+};
+
 export type AppointmentTypeWithRelations = AppointmentType & {
   entities: AppointmentTypeEntity[];
   schedules: Schedule[];

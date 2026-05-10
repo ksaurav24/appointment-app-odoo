@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AppointmentActionsMenu } from "@/components/organization/appointments/appointment-actions-menu";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -23,25 +22,19 @@ import type {
   PaymentStatus,
 } from "@/types";
 
-const STATUS_VARIANT: Record<
-  AppointmentStatus,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  PENDING: "secondary",
-  CONFIRMED: "default",
-  COMPLETED: "outline",
-  CANCELLED: "destructive",
-  NO_SHOW: "destructive",
+const STATUS_COLORS: Record<AppointmentStatus, string> = {
+  PENDING: "bg-amber-50 text-amber-700 border border-amber-200",
+  CONFIRMED: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  COMPLETED: "bg-blue-50 text-blue-700 border border-blue-200",
+  CANCELLED: "bg-red-50 text-red-700 border border-red-200",
+  NO_SHOW: "bg-slate-100 text-slate-600 border border-slate-200",
 };
 
-const PAYMENT_VARIANT: Record<
-  PaymentStatus,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  PENDING: "secondary",
-  PAID: "default",
-  FAILED: "destructive",
-  REFUNDED: "outline",
+const PAYMENT_COLORS: Record<PaymentStatus, string> = {
+  PENDING: "bg-amber-50 text-amber-700 border border-amber-200",
+  PAID: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  FAILED: "bg-red-50 text-red-700 border border-red-200",
+  REFUNDED: "bg-blue-50 text-blue-700 border border-blue-200",
 };
 
 const TAKE = 20;
@@ -84,7 +77,7 @@ export function AppointmentsTable() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-md border">
+      <div className="overflow-hidden rounded-xl border border-border shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -125,12 +118,14 @@ export function AppointmentsTable() {
                     {a.bookablePerson?.name ?? a.bookableResource?.name ?? "—"}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={STATUS_VARIANT[a.status]}>{a.status}</Badge>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_COLORS[a.status]}`}>
+                      {a.status}
+                    </span>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={PAYMENT_VARIANT[a.paymentStatus]}>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${PAYMENT_COLORS[a.paymentStatus]}`}>
                       {a.paymentStatus}
-                    </Badge>
+                    </span>
                   </TableCell>
                   <TableCell>
                     <AppointmentActionsMenu

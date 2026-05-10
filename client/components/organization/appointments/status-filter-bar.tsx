@@ -43,7 +43,7 @@ export function StatusFilterBar() {
   };
 
   return (
-    <div className="space-y-3 rounded-md border bg-card p-3">
+    <div className="space-y-4 rounded-xl border border-border shadow-sm bg-card p-4">
       <div className="flex flex-wrap gap-2">
         {STATUSES.map((s) => (
           <Button
@@ -56,7 +56,7 @@ export function StatusFilterBar() {
           </Button>
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div className="space-y-1">
           <Label className="text-xs">Appointment type</Label>
           <select
@@ -64,7 +64,7 @@ export function StatusFilterBar() {
             onChange={(e) =>
               update({ appointmentTypeId: e.target.value || null })
             }
-            className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:border-ring focus:ring-1 focus:ring-ring outline-none transition-colors"
           >
             <option value="">All types</option>
             {(types.data ?? []).map((t) => (
@@ -90,7 +90,7 @@ export function StatusFilterBar() {
             onChange={(e) => update({ to: e.target.value || null })}
           />
         </div>
-        <div className="flex items-end justify-between rounded-md border px-3 py-2">
+        <div className="flex h-9 items-center justify-between rounded-md border border-input bg-background px-3 self-end">
           <Label className="text-sm font-normal">Upcoming only</Label>
           <Switch
             checked={upcomingOnly}

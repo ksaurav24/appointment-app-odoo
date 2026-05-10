@@ -23,15 +23,17 @@ export function KpiCard({
   className,
 }: KpiCardProps) {
   return (
-    <Card size="sm" className={cn("gap-3", className)}>
+    <Card size="sm" className={cn("overflow-hidden border-l-[3px] border-l-amber shadow-sm gap-3", className)}>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-slate-light">
+        <CardTitle className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           <span>{label}</span>
           {icon ? (
-            <HugeiconsIcon
-              icon={icon}
-              className="size-4 text-slate-light"
-            />
+            <div className="rounded-md bg-forest-pale p-1.5 text-forest">
+              <HugeiconsIcon
+                icon={icon}
+                className="size-4"
+              />
+            </div>
           ) : null}
         </CardTitle>
       </CardHeader>

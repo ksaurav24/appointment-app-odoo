@@ -52,7 +52,7 @@ export function CheckoutShell({
           href="/"
           className="font-heading text-lg tracking-tight text-foreground"
         >
-          BookEase
+          Appointly
         </Link>
 
         <div className="flex-1 px-6">

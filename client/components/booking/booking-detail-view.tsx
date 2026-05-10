@@ -4,9 +4,14 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { CancelDialog } from "@/components/booking/cancel-dialog";
+import { CheckInQrDialog } from "@/components/booking/check-in-qr-dialog";
+import { RateReviewDialog } from "@/components/booking/rate-review-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { buildGoogleCalendarUrl } from "@/lib/calendar-link";
+import { downloadIcs } from "@/lib/ics-generator";
+import { downloadReceipt } from "@/lib/pdf-receipt";
 import {
   formatDateTimeInZone,
   formatDuration,
@@ -63,6 +68,9 @@ function isReschedulable(a: AppointmentWithRelations, now = Date.now()): boolean
 
 export function BookingDetailView({ appointment }: Props) {
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [rateOpen, setRateOpen] = useState(false);
+  
   const tz = appointment.appointmentType.organization.timezone;
   const canCancel = isCancellable(appointment);
   const canReschedule = isReschedulable(appointment);
@@ -155,6 +163,40 @@ export function BookingDetailView({ appointment }: Props) {
               </Badge>
             </div>
           </div>
+          
+          <div className="flex flex-wrap gap-2 bg-slate-pale px-5 py-3.5 border-b border-cream2">
+            {(appointment.status === "CONFIRMED" || appointment.status === "PENDING") ? (
+              <>
+                <Button variant="outline" size="sm" onClick={() => downloadIcs(appointment)}>
+                  Add to Calendar
+                </Button>
+                {appointment.status === "CONFIRMED" ? (
+                  <Button variant="outline" size="sm" onClick={() => setQrOpen(true)}>
+                    Check-in QR
+                  </Button>
+                ) : null}
+              </>
+            ) : null}
+            
+            {appointment.paymentStatus === "PAID" ? (
+              <Button variant="outline" size="sm" onClick={() => downloadReceipt(appointment)}>
+                Download Receipt
+              </Button>
+            ) : null}
+
+            {appointment.status === "COMPLETED" ? (
+              <Button variant="outline" size="sm" onClick={() => setRateOpen(true)}>
+                Rate & Review
+              </Button>
+            ) : null}
+
+            {(appointment.status === "COMPLETED" || appointment.status === "CANCELLED" || appointment.status === "NO_SHOW") ? (
+              <Button variant="outline" size="sm" render={<Link href={`/book/${appointment.appointmentTypeId}`} />}>
+                Re-book
+              </Button>
+            ) : null}
+          </div>
+
           {(canCancel || canReschedule) ? (
             <div className="flex gap-2 bg-slate-pale px-5 py-3.5">
               {canReschedule ? (
@@ -212,6 +254,17 @@ export function BookingDetailView({ appointment }: Props) {
       <CancelDialog
         open={cancelOpen}
         onOpenChange={setCancelOpen}
+        publicId={appointment.publicId}
+      />
+      <CheckInQrDialog
+        open={qrOpen}
+        onOpenChange={setQrOpen}
+        confirmationCode={appointment.confirmationCode}
+        serviceName={appointment.appointmentType.name}
+      />
+      <RateReviewDialog
+        open={rateOpen}
+        onOpenChange={setRateOpen}
         publicId={appointment.publicId}
       />
     </div>

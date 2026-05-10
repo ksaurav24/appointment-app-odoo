@@ -10,7 +10,7 @@ import {
   listPublicAppointmentTypes,
 } from "@/lib/api";
 import type {
-  AppointmentType,
+  PublicAppointmentTypeListItem,
   AppointmentTypeWithRelations,
   AvailabilityQuery,
   AvailabilityResponse,
@@ -25,7 +25,7 @@ export function publicAppointmentTypeKey(id: string) {
 }
 
 export function usePublicAppointmentTypes() {
-  return useQuery<AppointmentType[]>({
+  return useQuery<PublicAppointmentTypeListItem[]>({
     queryKey: ROOT_KEY,
     queryFn: listPublicAppointmentTypes,
     staleTime: 60_000,

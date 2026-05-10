@@ -35,18 +35,18 @@ export function PublicShell({ children, showBrowseLink = true }: PublicShellProp
 
   return (
     <div className="flex min-h-svh flex-col">
-      <header className="flex items-center justify-between border-b border-cream2 px-6 py-5">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background/95 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <Link
           href="/"
-          className="font-heading text-lg tracking-tight text-foreground"
+          className="font-heading text-xl tracking-tight text-foreground"
         >
-          BookEase
+          Appointly
         </Link>
 
-        <nav className="flex items-center gap-3">
+        <nav className="flex items-center gap-2">
           {showBrowseLink ? (
             <Button variant="ghost" size="sm" render={<Link href="/browse" />}>
-              Browse services
+              Browse
             </Button>
           ) : null}
           <ThemeToggle />
@@ -91,16 +91,25 @@ export function PublicShell({ children, showBrowseLink = true }: PublicShellProp
 
       <main className="flex flex-1 flex-col">{children}</main>
 
-      <footer className="border-t border-cream2 px-6 py-6 text-xs text-muted-foreground">
-        <div className="flex items-center justify-between">
-          <span>© BookEase</span>
-          <div className="flex items-center gap-4">
+      <footer className="border-t border-border bg-slate-pale px-6 py-10">
+        <div className="mx-auto max-w-6xl flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-heading text-base text-foreground">Appointly</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Book smarter. Grow faster.
+            </p>
+          </div>
+          <div className="flex items-center gap-6 text-xs text-muted-foreground">
             <Link href="/" className="hover:text-foreground transition-colors">
               Home
             </Link>
             <Link href="/browse" className="hover:text-foreground transition-colors">
               Browse
             </Link>
+            <Link href="/login" className="hover:text-foreground transition-colors">
+              Sign in
+            </Link>
+            <span>© 2025 Appointly</span>
           </div>
         </div>
       </footer>

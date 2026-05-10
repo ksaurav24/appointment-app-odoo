@@ -32,7 +32,7 @@
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
 
-  /* BookEase extended palette */
+  /* Appointly extended palette */
   --color-forest: #1A3C34;
   --color-forest-mid: #2D5A4E;
   --color-forest-light: #4A8573;
@@ -59,7 +59,7 @@
 
 @layer base {
   :root {
-    /* BookEase Cream backgrounds */
+    /* Appointly Cream backgrounds */
     --background: 36 33% 96%;       /* #FAF7F2 cream */
     --foreground: 45 4% 16%;        /* #2C2C28 slate */
 
@@ -80,7 +80,7 @@
 
     /* Muted = Cream 2 / Slate pale */
     --muted: 35 20% 93%;            /* #F3EEE5 */
-    --muted-foreground: 45 5% 34%;  /* #5C5C54 */
+    --muted-foreground: 45 5% 40%;  /* more readable in light mode */
 
     /* Accent = Forest Pale */
     --accent: 156 28% 93%;          /* #E8F2EE */
@@ -90,14 +90,14 @@
     --destructive: 14 78% 57%;      /* #E85D3A */
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders = Cream2 */
-    --border: 35 20% 93%;           /* #F3EEE5 */
-    --input: 35 20% 93%;
+    /* Borders — stronger for card separation */
+    --border: 35 15% 82%;           /* #D6D0C4 — visibly distinct from white */
+    --input: 35 15% 82%;
     --ring: 162 38% 17%;            /* Forest green */
 
     --radius: 0.625rem;             /* 10px base — design system buttons */
 
-    /* Chart colors aligned to BookEase palette */
+    /* Chart colors aligned to Appointly palette */
     --chart-1: 162 38% 17%;         /* Forest */
     --chart-2: 38 80% 52%;          /* Amber */
     --chart-3: 14 78% 57%;          /* Coral */
@@ -198,4 +198,26 @@
 }
 .dark .fc {
   --fc-event-text-color: #ffffff;
+}
+
+/* ─── Data Table Enhancement ─── */
+@layer components {
+  .data-table {
+    @apply w-full border-collapse;
+  }
+  .data-table thead tr {
+    @apply border-b-2 border-[color:var(--color-cream2)] bg-[#F5F4F0];
+  }
+  .data-table thead th {
+    @apply px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-mid;
+  }
+  .data-table tbody tr {
+    @apply border-b border-[color:var(--color-cream2)] transition-colors;
+  }
+  .data-table tbody tr:hover {
+    @apply bg-[#FAF7F2];
+  }
+  .data-table tbody td {
+    @apply px-4 py-3 text-sm text-foreground;
+  }
 }

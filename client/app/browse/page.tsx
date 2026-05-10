@@ -18,7 +18,7 @@ export default function BrowsePage() {
     const q = query.trim().toLowerCase();
     if (!q) return data;
     return data.filter((t) => {
-      const haystack = `${t.name} ${t.description ?? ""} ${t.slug}`.toLowerCase();
+      const haystack = `${t.name} ${t.description ?? ""} ${t.slug} ${t.category ?? ""} ${t.organization?.name ?? ""}`.toLowerCase();
       return haystack.includes(q);
     });
   }, [data, query]);
