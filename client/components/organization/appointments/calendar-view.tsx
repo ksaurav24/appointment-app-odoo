@@ -129,7 +129,7 @@ export function CalendarView() {
         <select 
           value={filterType} 
           onChange={(e: any) => { setFilterType(e.target.value); setFilterEntityId("ALL"); }}
-          className="h-10 w-[180px] rounded-md border border-input bg-background px-3 text-sm"
+          className="h-9 w-[180px] rounded-md border border-input bg-background px-3 text-sm focus:border-ring focus:ring-1 focus:ring-ring outline-none transition-colors"
         >
           <option value="ALL">All Appointments</option>
           <option value="PERSON">By Staff (Person)</option>
@@ -140,7 +140,7 @@ export function CalendarView() {
           <select 
             value={filterEntityId} 
             onChange={(e) => setFilterEntityId(e.target.value)}
-            className="h-10 w-[200px] rounded-md border border-input bg-background px-3 text-sm"
+            className="h-9 w-[200px] rounded-md border border-input bg-background px-3 text-sm focus:border-ring focus:ring-1 focus:ring-ring outline-none transition-colors"
           >
             <option value="ALL">All Staff</option>
             {persons.map(p => (
@@ -153,7 +153,7 @@ export function CalendarView() {
           <select 
             value={filterEntityId} 
             onChange={(e) => setFilterEntityId(e.target.value)}
-            className="h-10 w-[200px] rounded-md border border-input bg-background px-3 text-sm"
+            className="h-9 w-[200px] rounded-md border border-input bg-background px-3 text-sm focus:border-ring focus:ring-1 focus:ring-ring outline-none transition-colors"
           >
             <option value="ALL">All Resources</option>
             {resources.map(r => (
@@ -163,7 +163,7 @@ export function CalendarView() {
         )}
       </div>
 
-      <div className="bg-background border rounded-md p-4">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-5 overflow-hidden">
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
@@ -197,7 +197,11 @@ export function CalendarView() {
               </div>
               <div>
                 <span className="font-medium text-muted-foreground">Status:</span> 
-                <div className="mt-1"><Badge>{selectedApp.status}</Badge></div>
+                <div className="mt-1">
+                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                    {selectedApp.status}
+                  </span>
+                </div>
               </div>
               <div>
                 <span className="font-medium text-muted-foreground">Start:</span> 

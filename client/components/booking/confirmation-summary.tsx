@@ -4,6 +4,8 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ShareDialog } from "@/components/booking/share-dialog";
+import { downloadReceipt } from "@/lib/pdf-receipt";
 import { buildGoogleCalendarUrl } from "@/lib/calendar-link";
 import { formatDateTimeInZone, formatDuration } from "@/lib/format";
 import type { AppointmentWithRelations } from "@/types";
@@ -48,6 +50,14 @@ export function ConfirmationSummary({ appointment }: ConfirmationSummaryProps) {
     endIso: appointment.endTime,
     description: `Confirmation code: ${appointment.confirmationCode}`,
   });
+
+  const isPaid =
+    appointment.appointmentType.advancePaymentEnabled &&
+    appointment.paymentStatus === "PAID";
+    
+  const shareUrl = typeof window !== "undefined" 
+    ? `${window.location.origin}/bookings/${appointment.publicId}`
+    : "";
 
   return (
     <div className="mx-auto w-full max-w-xl space-y-6 px-6 py-12">
@@ -109,6 +119,12 @@ export function ConfirmationSummary({ appointment }: ConfirmationSummaryProps) {
         <Button render={<a href={calendarUrl} target="_blank" rel="noreferrer" />}>
           Add to Google Calendar
         </Button>
+        {isPaid ? (
+          <Button variant="outline" onClick={() => downloadReceipt(appointment)}>
+            Download Receipt
+          </Button>
+        ) : null}
+        <ShareDialog shareUrl={shareUrl} />
         <Button
           variant="outline"
           render={<Link href={`/bookings/${appointment.publicId}`} />}

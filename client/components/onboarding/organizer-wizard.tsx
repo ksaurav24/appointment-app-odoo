@@ -228,7 +228,7 @@ export function OrganizerWizard() {
       const logoUrl = await uploadImageToCloudinary(draft.logoFile, {
         folder: "organizations/logos",
       })
-      localStorage.setItem("bookease:organizer-logo-url", logoUrl)
+      localStorage.setItem("appointly:organizer-logo-url", logoUrl)
       const galleryImageUrls: string[] = []
       for (const file of draft.galleryFiles.slice(0, 5)) {
         galleryImageUrls.push(
@@ -722,7 +722,7 @@ function OrgBasicsStep({
         className="w-full"
         disabled={!canContinue}
       >
-        Continue to contact & location
+        Continue to contact &amp; location
       </Button>
     </form>
   )
@@ -947,15 +947,7 @@ function OrgContactStep({
         ) : null}
       </div>
 
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={onBack}
-        >
-          Back
-        </Button>
+      <div className="space-y-2">
         <Button
           type="submit"
           size="lg"
@@ -963,6 +955,15 @@ function OrgContactStep({
           disabled={!canContinue}
         >
           Continue to branding
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full text-muted-foreground hover:text-foreground"
+          onClick={onBack}
+        >
+          ← Back
         </Button>
       </div>
     </form>
@@ -1131,15 +1132,7 @@ function OrgBrandingStep({
         </p>
       ) : null}
 
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={onBack}
-        >
-          Back
-        </Button>
+      <div className="space-y-2">
         <Button
           type="submit"
           size="lg"
@@ -1147,6 +1140,15 @@ function OrgBrandingStep({
           disabled={!canContinue}
         >
           Continue to review
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full text-muted-foreground hover:text-foreground"
+          onClick={onBack}
+        >
+          ← Back
         </Button>
       </div>
     </form>
@@ -1242,15 +1244,7 @@ function OrgReviewStep({
 
       <AuthError error={error} />
 
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={onBack}
-        >
-          Back
-        </Button>
+      <div className="space-y-2">
         <Button
           type="button"
           size="lg"
@@ -1259,7 +1253,17 @@ function OrgReviewStep({
           disabled={submitting}
         >
           {submitting ? <Spinner /> : null}
-          Review complete — submit for approval
+          Submit for approval
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full text-muted-foreground hover:text-foreground"
+          onClick={onBack}
+          disabled={submitting}
+        >
+          ← Back
         </Button>
       </div>
     </div>

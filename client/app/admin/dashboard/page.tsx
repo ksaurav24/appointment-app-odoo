@@ -375,16 +375,18 @@ function StatusTile({
   value: number;
   tone: "success" | "warning" | "danger" | "info";
 }) {
-  const variant: Record<typeof tone, "default" | "secondary" | "destructive" | "outline"> = {
-    success: "default",
-    warning: "secondary",
-    danger: "destructive",
-    info: "outline",
+  const bgColors = {
+    success: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    warning: "bg-amber-50 text-amber-700 border border-amber-200",
+    danger: "bg-red-50 text-red-700 border border-red-200",
+    info: "bg-blue-50 text-blue-700 border border-blue-200",
   };
   return (
-    <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <Badge variant={variant[tone]}>{formatNumber(value)}</Badge>
+    <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/30">
+      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      <span className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${bgColors[tone]}`}>
+        {formatNumber(value)}
+      </span>
     </div>
   );
 }

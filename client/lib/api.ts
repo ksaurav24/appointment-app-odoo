@@ -8,6 +8,7 @@ import type {
   AdminUserDetail,
   ApiErrorBody,
   AppointmentType,
+  PublicAppointmentTypeListItem,
   AppointmentTypeWithRelations,
   AppointmentWithRelations,
   AuditLog,
@@ -592,9 +593,9 @@ export async function listAuditLogs(
 
 // ─── Public discovery ────────────────────────────────────────────
 
-export async function listPublicAppointmentTypes(): Promise<AppointmentType[]> {
+export async function listPublicAppointmentTypes(): Promise<PublicAppointmentTypeListItem[]> {
   try {
-    const { data } = await api.get<AppointmentType[]>(
+    const { data } = await api.get<PublicAppointmentTypeListItem[]>(
       "/public/appointment-types",
     );
     return data;

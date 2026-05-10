@@ -4,8 +4,8 @@ import { Home, Calendar, Users, Settings, Briefcase } from 'lucide-react';
 export function AdminSidebar() {
   return (
     <aside className="hidden lg:flex w-64 flex-col bg-forest h-screen sticky top-0">
-      <div className="p-6 border-b border-white/15">
-        <h1 className="font-heading text-lg text-white">BookEase</h1>
+      <div className="flex h-[60px] items-center px-6">
+        <h1 className="font-heading text-lg text-white">Appointly</h1>
       </div>
       <nav className="flex-1 p-4 space-y-0.5">
         <Link href="/admin/dashboard" className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/12 text-white/65 hover:text-white transition-colors text-[13px]">

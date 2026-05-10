@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { PoliciesSummary } from "@/components/booking/policies-summary";
 import { ScheduleSummary } from "@/components/booking/schedule-summary";
+import { ShareDialog } from "@/components/booking/share-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -115,6 +116,15 @@ export function ServiceDetail({ type, shareToken }: ServiceDetailProps) {
             <Button size="lg" className="w-full" render={<Link href={bookHref} />}>
               Book this
             </Button>
+            <ShareDialog 
+              shareUrl={typeof window !== "undefined" ? `${window.location.origin}/services/${type.id}` : ""} 
+              title={type.name} 
+              trigger={
+                <Button variant="outline" size="lg" className="w-full mt-2">
+                  Share Service
+                </Button>
+              } 
+            />
           </CardContent>
         </Card>
       </aside>
