@@ -97,9 +97,9 @@ export const ArcHandle = forwardRef<SVGGElement, ArcHandleProps>(
           cx={pos.x}
           cy={pos.y}
           r={knobR}
-          fill="var(--background)"
+          fill={active ? "var(--primary)" : "var(--background)"}
           stroke="var(--primary)"
-          strokeWidth={2}
+          strokeWidth={4}
           style={transitionStyle}
         />
       </g>

@@ -494,13 +494,14 @@ The global `ValidationPipe` runs with `whitelist: true`, `forbidNonWhitelisted: 
 ### 7.7 Appointments Lifecycle
 
 - `POST /appointments` — confirm a booking by consuming a slot lock; validates booking-question answers; transactional capacity re-check; generates `confirmationCode` (`CC-XXXXXXX`, Crockford-ish base32).
-- Customer-side: list / fetch / (planned) cancel / reschedule.
-- Organiser-side: approve / reject / mark-completed / mark-no-show — each guarded by an expected source status.
+- Customer-side: list / fetch / cancel / reschedule (policy-gated by appointment-type rules).
+- Organiser-side: approve / reject / mark-completed / mark-no-show / cancel / reschedule — each guarded by an expected source status and audit metadata on override flows.
+- Public manual-approval request flow: `POST /public/appointment-types/:id/requests` for `manualConfirmation=true` types.
 - Status machine:
   ```
   PENDING ─approve→ CONFIRMED ─complete→ COMPLETED
                  ╲           ╲─no-show → NO_SHOW
-                  ╲reject→ CANCELLED
+                   ╲reject→ CANCELLED
   ```
 
 ### 7.8 Payments (Razorpay)
@@ -508,14 +509,15 @@ The global `ValidationPipe` runs with `whitelist: true`, `forbidNonWhitelisted: 
 - `POST /payments/intent` to create a Razorpay order.
 - `POST /payments/verify` to verify the client-side signature.
 - `POST /webhooks/razorpay` — HMAC-verified using the rawBody.
-- Per-appointment-type `advancePaymentEnabled` flag controls whether the booking starts as `PaymentStatus.PENDING` or `PAID`.
+- `advancePaymentEnabled` enforces a `PENDING` payment at booking time; appointment promotion happens only after successful payment verification/webhook.
+- Refund handling is wired through the same payment module for cancellation flows.
 
 ### 7.9 Notifications
 
 - Multi-channel persistence (`EMAIL` / `SMS` / `PUSH` / `IN_APP`) with status (`PENDING` / `QUEUED` / `SENT` / `FAILED` / `BOUNCED`) and priority.
 - Recipient types: `USER` / `GUEST` / `ORGANIZER` / `ADMIN`.
 - Triggers: `APPOINTMENT_*`, `PAYMENT_*`, `ORGANIZER_APPROVED`/`REJECTED`, `CUSTOM`.
-- BullMQ-backed mail dispatch with templated bodies (OTP, welcome, reset, organiser-approved/rejected).
+- BullMQ-backed mail dispatch with templated bodies for auth, organisation moderation, booking lifecycle, payment receipts, and refunds.
 
 ### 7.10 Admin Console
 
@@ -534,7 +536,7 @@ The global `ValidationPipe` runs with `whitelist: true`, `forbidNonWhitelisted: 
 ### 7.12 Customer Account
 
 - "My bookings" (upcoming + past).
-- View per-booking confirmation code, policies, and (planned) cancel / reschedule actions.
+- View per-booking confirmation code, policies, and cancel / reschedule actions.
 - Profile / password / 2FA management.
 
 ---
@@ -613,7 +615,7 @@ The architecture is a direct consequence of the PRD's business rules. This secti
 | **Customer can book across any Organisation with one account.** | Booking is keyed by `(customerId, appointmentTypeId)` — there is no per-org customer profile. |
 | **Bookable Persons / Resources never log in.** | They are pure data rows. Notifications fan out to their stored `contactEmail` via the BullMQ mail queue. |
 | **Manual confirmation when an organiser wants control.** | `manualConfirmation` flag → `Appointment.status` starts at `PENDING`; only the organiser's `/approve` (or `/reject`) endpoint can move it forward. |
-| **Advance-payment appointment types must collect money first.** | `advancePaymentEnabled` flag → `Appointment.paymentStatus = PENDING` at creation. UI gates the confirmation step on a successful Razorpay verify. |
+| **Advance-payment appointment types must collect money first.** | `advancePaymentEnabled` sets `Appointment.paymentStatus = PENDING` at creation; payment verification/webhook promotes payment and appointment state in the backend. |
 | **Booking under 60s.** | Stepper machine on the client (`booking-stepper-machine.ts`) keeps state local; React Query caches availability; the slot-lock gives a 5-min window so the customer never re-races. |
 | **Auditable platform.** | Every admin/organiser-significant action writes an `AuditLog` row (actor + action + entity + JSON metadata). |
 | **Multi-channel notifications.** | The `Notification` model carries `channel`, `status`, `priority`, recipient type — extensible to SMS / push without schema churn. |
@@ -640,6 +642,8 @@ docker compose up -d
 cd server
 npm install
 cp .env.example .env       # edit secrets — see "Environment Variables"
+# if using the root docker-compose defaults:
+# DATABASE_URL=postgresql://odoo:odoo@localhost:5432/odoo?schema=public
 npx prisma migrate dev --name init
 npm run db:seed            # creates the platform admin user
 npm run start:dev          # http://localhost:8000  (Swagger at /docs)
@@ -673,23 +677,30 @@ DATABASE_URL=postgresql://odoo:odoo@localhost:5432/appointments_test?schema=publ
 | `NODE_ENV` | `development` / `production` (production flips cookies to `secure: true`). |
 | `DATABASE_URL` | PostgreSQL connection string. |
 | `REDIS_URL` | Redis connection string (BullMQ + Socket.IO adapter). |
+| `MAIL_QUEUE_CONCURRENCY` | BullMQ worker concurrency for outbound mail jobs. |
 | `JWT_ACCESS_SECRET` | Signing key for access tokens. |
-| `JWT_REFRESH_SECRET` | Signing key for refresh tokens. |
 | `JWT_ACCESS_TTL` | e.g. `15m`. |
 | `JWT_REFRESH_TTL_DAYS` | e.g. `30`. |
 | `COOKIE_DOMAIN` | Domain attribute for auth cookies (begin with `.` for subdomains). |
+| `BCRYPT_COST` | Password hashing rounds. |
 | `CORS_ORIGINS` | Comma-separated allow-list (the frontend's origin must appear verbatim). |
 | `APP_BASE_URL` | Used in outbound emails (reset links, etc.). |
 | `MAIL_TRANSPORT` | `console` / `gmail` / `json`. |
+| `MAIL_FROM` | Display sender for all outbound emails. |
 | `SMTP_USER`, `SMTP_PASS` | Required when `MAIL_TRANSPORT=gmail` (use a Google App Password). |
+| `ADMIN_BOOTSTRAP_EMAIL`, `ADMIN_BOOTSTRAP_PASSWORD`, `ADMIN_BOOTSTRAP_NAME` | Seeded admin user credentials for `npm run db:seed`. |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` | Razorpay credentials. |
 | `RAZORPAY_WEBHOOK_SECRET` | HMAC verification for `/webhooks/razorpay`. |
+| `PAYMENT_CURRENCY` | Default payment currency (default `INR`). |
 
 ### 11.2 Client (`client/.env.local`)
 
 | Variable | Purpose |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Base URL for the API (default `http://localhost:8000`). |
+| `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | Cloudinary cloud for organisation media uploads. |
+| `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` | Unsigned upload preset for client-side media uploads. |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Maps API key for organisation location picker. |
 
 ---
 
@@ -746,7 +757,7 @@ npm run typecheck    # tsc --noEmit
 | [`docs/_prd_extracted.txt`](./docs/_prd_extracted.txt) | Plain-text PRD extract (search-friendly). |
 | [`docs/schema.md`](./docs/schema.md) | Canonical DBML-style schema — source of truth ahead of `schema.prisma` for the data model. |
 | [`docs/booking-flow.md`](./docs/booking-flow.md) | Deep-dive on `availability` + `slot-locks` + `appointments` and how they cooperate. |
-| [`docs/pending-modules.md`](./docs/pending-modules.md) | PRD-vs-implementation gap analysis with P0/P1/P2 priorities. |
+| [`docs/pending-modules.md`](./docs/pending-modules.md) | Historical gap analysis (some items are now implemented). |
 | [`docs/api/INDEX.md`](./docs/api/INDEX.md) | LLM-friendly entry point for the API. Per-module files under `docs/api/modules/`. |
 | `GET /docs` (dev only) | Live Swagger UI (runtime source of truth). |
 | [`server/README.md`](./server/README.md) | NestJS-specific setup, mailer transports, e2e DB bootstrap. |
@@ -756,7 +767,7 @@ npm run typecheck    # tsc --noEmit
 
 ## 15. Project Status
 
-**Implemented (as of submission):**
+**Implemented (current branch):**
 
 - Auth (signup, OTP, login, 2FA, refresh rotation, reset, change, logout/logout-all).
 - Organisations + admin approval workflow.
@@ -765,15 +776,14 @@ npm run typecheck    # tsc --noEmit
 - Public discovery for published types.
 - Real-time availability (FIXED + VARIABLE), AUTO/MANUAL assignment, timezone-aware.
 - Slot locks (acquire / extend / release / sweeper).
-- Appointment confirmation (create-from-lock with question validation).
-- Organiser-side approve / reject / mark-completed / mark-no-show.
-- BullMQ-backed mailer with templates.
+- Appointment confirmation (create-from-lock), manual-approval requests, and booking-question validation.
+- Customer cancellation + reschedule flows with policy enforcement.
+- Organiser-side approve / reject / mark-completed / mark-no-show + override cancel/reschedule.
+- BullMQ-backed mailer + notifications for booking and payment lifecycle events.
 - Socket.IO `slot:updated` fan-out via Redis adapter.
 - Admin moderation, audit logs, analytics dashboards (admin + organiser).
-- Razorpay payment intent + verify + webhook.
+- Razorpay payment intent + verify + webhook + refund handling.
 - Frontend: full booking stepper, organiser dashboard, admin console, account pages.
-
-**Tracked gaps:** see [`docs/pending-modules.md`](./docs/pending-modules.md) — primarily customer-initiated cancellation, reschedule, refund automation, and selected post-confirmation notifications.
 
 ---
 

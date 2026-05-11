@@ -539,13 +539,28 @@ export function BookingStepper({ type }: BookingStepperProps) {
   return (
     <CheckoutShell
       confirmExit={confirmExit}
-      stepIndicator={<StepIndicator current={stepNum.current} total={stepNum.total} />}
+      stepIndicator={
+        <StepIndicator
+          current={stepNum.current}
+          total={stepNum.total}
+          labels={steps.map((s) =>
+            s === "entity" ? (type.entityType === "PERSON" ? "Staff" : "Resource")
+            : s === "time" ? "Date & Time"
+            : s === "questions" ? "Details"
+            : s === "review" ? "Review"
+            : s === "payment" ? "Payment"
+            : s
+          )}
+        />
+      }
     >
-      <div className="mx-auto w-full max-w-2xl px-6 py-8">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
-          {type.name}
-        </h1>
-        <p className="text-sm text-muted-foreground">{type.organization.name}</p>
+      <div className="mx-auto w-full max-w-2xl bg-card rounded-2xl border border-border shadow-sm px-6 py-8 sm:px-10 sm:py-10 my-4 sm:my-8">
+        <div className="mb-8 border-b border-border pb-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-forest">{type.organization.name}</p>
+          <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight text-foreground">
+            {type.name}
+          </h1>
+        </div>
 
         {selectedSlotFilled &&
         state.step !== "entity" &&
@@ -570,10 +585,15 @@ export function BookingStepper({ type }: BookingStepperProps) {
 
         <div className="mt-8 space-y-6">
           {state.step === "entity" ? (
-            <section className="space-y-4">
-              <h2 className="font-heading text-base font-semibold">
-                Choose {type.entityType === "PERSON" ? "who" : "what"}
-              </h2>
+            <section className="space-y-5">
+              <div className="space-y-1">
+                <h2 className="font-heading text-lg font-semibold">
+                  Choose {type.entityType === "PERSON" ? "your staff member" : "a resource"}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Select who or what you&apos;d like to book.
+                </p>
+              </div>
               <EntityPicker
                 type={type}
                 value={state.entityId}
@@ -583,10 +603,13 @@ export function BookingStepper({ type }: BookingStepperProps) {
           ) : null}
 
           {state.step === "time" ? (
-            <section className="space-y-4">
-              <h2 className="font-heading text-base font-semibold">
-                Pick a date and time
-              </h2>
+            <section className="space-y-5">
+              <div className="space-y-1">
+                <h2 className="font-heading text-lg font-semibold">Pick a date &amp; time</h2>
+                <p className="text-sm text-muted-foreground">
+                  Select an available slot. Times are shown in <span className="font-medium text-foreground">{tz}</span>.
+                </p>
+              </div>
               <div className="grid gap-6 md:grid-cols-[auto_1fr]">
                 <div>
                   <AvailabilityCalendar
@@ -594,22 +617,22 @@ export function BookingStepper({ type }: BookingStepperProps) {
                     selected={state.date}
                     onSelect={(d) => dispatch({ type: "SET_DATE", date: d })}
                   />
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Times in {tz}.
-                  </p>
                 </div>
                 <div>
-                  <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                     Available times
                   </p>
                   {!state.date ? (
-                    <p className="rounded-md border border-dashed border-input bg-muted/30 px-3 py-6 text-center text-sm text-muted-foreground">
-                      Select a date to see available times.
-                    </p>
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 py-12 text-center">
+                      <span className="text-3xl">📅</span>
+                      <p className="mt-2 text-sm text-muted-foreground">Select a date to see available times.</p>
+                    </div>
                   ) : availabilityQuery.isPending ? (
-                    <Spinner className="size-4" />
+                    <div className="flex h-40 items-center justify-center">
+                      <Spinner className="size-5" />
+                    </div>
                   ) : availabilityQuery.isError || !availabilityQuery.data ? (
-                    <p className="text-sm text-destructive">
+                    <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
                       Couldn&apos;t load times. Try a different date.
                     </p>
                   ) : (
@@ -628,8 +651,11 @@ export function BookingStepper({ type }: BookingStepperProps) {
           ) : null}
 
           {state.step === "questions" ? (
-            <section className="space-y-4">
-              <h2 className="font-heading text-base font-semibold">A few questions</h2>
+            <section className="space-y-5">
+              <div className="space-y-1">
+                <h2 className="font-heading text-lg font-semibold">A few quick questions</h2>
+                <p className="text-sm text-muted-foreground">Your answers help the organizer prepare for your appointment.</p>
+              </div>
               <QuestionForm
                 questions={type.bookingQuestions}
                 values={state.answers}
@@ -641,17 +667,23 @@ export function BookingStepper({ type }: BookingStepperProps) {
           ) : null}
 
           {state.step === "review" ? (
-            <section className="space-y-4">
-              <h2 className="font-heading text-base font-semibold">
-                {isApprovalFlow ? "Review your request" : "Review"}
-              </h2>
+            <section className="space-y-5">
+              <div className="space-y-1">
+                <h2 className="font-heading text-lg font-semibold">
+                  {isApprovalFlow ? "Review your request" : "Confirm your booking"}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {isApprovalFlow ? "Your request will be reviewed by the organizer." : "Check the details below and confirm."}
+                </p>
+              </div>
 
               {isApprovalFlow ? (
-                <p className="rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                  This service requires organiser approval. Other customers
+                <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <span className="mt-0.5 text-lg">ℹ️</span>
+                  <p>This service requires organiser approval. Other customers
                   may also request the same time — the organiser will choose
-                  who to confirm.
-                </p>
+                  who to confirm.</p>
+                </div>
               ) : state.slotLockExpiresAt ? (
                 <SlotLockCountdown
                   expiresAt={state.slotLockExpiresAt}
@@ -659,40 +691,35 @@ export function BookingStepper({ type }: BookingStepperProps) {
                   onExpired={handleExpired}
                 />
               ) : acquire.isPending ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Spinner className="size-4" /> Holding your slot…
+                <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                  <Spinner className="size-4" /> Securing your slot…
                 </div>
               ) : null}
 
-              <Card>
-                <CardContent className="space-y-3 p-4 text-sm">
-                  <div>
-                    <p className="text-xs uppercase text-muted-foreground">
-                      Service
-                    </p>
-                    <p>{type.name}</p>
-                  </div>
+              <div className="overflow-hidden rounded-xl border border-border shadow-sm">
+                <div className="bg-forest px-5 py-4">
+                  <p className="font-heading text-base font-semibold text-white">{type.name}</p>
+                  <p className="text-xs text-white/70">{type.organization.name}</p>
+                </div>
+                <div className="divide-y divide-border bg-card px-5">
                   {state.startTime && state.endTime ? (
-                    <div>
-                      <p className="text-xs uppercase text-muted-foreground">
-                        When
-                      </p>
-                      <p>
-                        {formatDateInZone(state.startTime, tz)} ·{" "}
-                        {formatTimeInZone(state.startTime, tz)}–
-                        {formatTimeInZone(state.endTime, tz)} ({tz})
+                    <div className="flex items-center justify-between py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">When</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {formatDateInZone(state.startTime, tz)} · {formatTimeInZone(state.startTime, tz)}–{formatTimeInZone(state.endTime, tz)}
                       </p>
                     </div>
                   ) : null}
                   {type.maxBookingsPerSlot > 1 && type.manageCapacity ? (
-                    <div className="space-y-1">
-                      <Label htmlFor="capacity">Seats</Label>
+                    <div className="flex items-center justify-between gap-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seats</p>
                       <Input
                         id="capacity"
                         type="number"
                         min={1}
                         max={type.maxBookingsPerSlot}
                         value={state.capacityBooked}
+                        className="w-20 text-right"
                         onChange={(e) => {
                           const n = Math.max(
                             1,
@@ -707,15 +734,22 @@ export function BookingStepper({ type }: BookingStepperProps) {
                     </div>
                   ) : null}
                   {type.advancePaymentEnabled ? (
-                    <div>
-                      <p className="text-xs uppercase text-muted-foreground">Price</p>
-                      <p>{formatPrice(type.advancePaymentAmount)}</p>
+                    <div className="flex items-center justify-between py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Price</p>
+                      <p className="text-sm font-semibold text-forest">{formatPrice(type.advancePaymentAmount)}</p>
                     </div>
-                  ) : null}
-                </CardContent>
-              </Card>
+                  ) : (
+                    <div className="flex items-center justify-between py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Price</p>
+                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">Free</span>
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <Button
+                size="lg"
+                className="w-full"
                 onClick={handleConfirm}
                 disabled={
                   selectedSlotFilled
@@ -782,23 +816,28 @@ export function BookingStepper({ type }: BookingStepperProps) {
           ) : null}
         </div>
 
-        <div className="mt-10 flex items-center justify-between border-t pt-4">
-          <Button
-            variant="ghost"
-            disabled={state.step === steps[0] || state.step === "payment"}
-            onClick={state.step === "review" ? goBackFromReview : goPrev}
-          >
-            Back
-          </Button>
-
-          {state.step !== "review" && state.step !== "payment" ? (
+        <div className="sticky bottom-0 mt-10 border-t border-border bg-white/95 px-6 py-4 backdrop-blur-sm">
+          <div className="mx-auto flex w-full max-w-2xl items-center justify-between">
             <Button
-              disabled={continueDisabled}
-              onClick={onContinueFromQuestionsOrPrior}
+              variant="ghost"
+              className="text-muted-foreground"
+              disabled={state.step === steps[0] || state.step === "payment"}
+              onClick={state.step === "review" ? goBackFromReview : goPrev}
             >
-              Continue
+              ← Back
             </Button>
-          ) : null}
+
+            {state.step !== "review" && state.step !== "payment" ? (
+              <Button
+                size="lg"
+                className="min-w-[140px]"
+                disabled={continueDisabled}
+                onClick={onContinueFromQuestionsOrPrior}
+              >
+                Continue →
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
     </CheckoutShell>

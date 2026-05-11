@@ -57,8 +57,8 @@ export function AuthShell({ title, description, children, footer }: AuthShellPro
           </Link>
         </div>
 
-        <main className="flex flex-1 items-start justify-center overflow-y-auto px-6 pb-16 pt-10 sm:items-start sm:pt-8">
-          <div className="w-full max-w-md space-y-6">
+        <main className="flex flex-1 items-center justify-center overflow-y-auto px-6 pb-16 pt-10 sm:pt-8">
+          <div className="w-full max-w-md bg-card rounded-2xl border border-border shadow-sm px-6 py-8 sm:px-10 sm:py-10 space-y-6">
             <div className="space-y-1.5">
               <h1 className="font-heading text-2xl tracking-tight text-foreground">{title}</h1>
               {description ? (
