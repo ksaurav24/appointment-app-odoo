@@ -33,28 +33,29 @@
   --color-card-foreground: hsl(var(--card-foreground));
 
   /* Appointly extended palette */
-  --color-forest: #1A3C34;
-  --color-forest-mid: #2D5A4E;
+  --color-forest:       #1A3C34;
+  --color-forest-deep:  #1A3C34;
+  --color-forest-mid:   #2D5A4E;
   --color-forest-light: #4A8573;
-  --color-forest-pale: #E8F2EE;
-  --color-amber: #E8A020;
-  --color-amber-deep: #C4820A;
-  --color-amber-pale: #FEF3DC;
-  --color-coral: #E85D3A;
-  --color-coral-pale: #FDEEE9;
-  --color-cream: #FAF7F2;
-  --color-cream2: #F3EEE5;
-  --color-slate-dark: #2C2C28;
-  --color-slate-mid: #5C5C54;
-  --color-slate-light: #9C9C90;
-  --color-slate-pale: #F5F4F0;
+  --color-forest-pale:  #E8F2EE;
+  --color-amber:        #E8A020;
+  --color-amber-deep:   #C4820A;
+  --color-amber-pale:   #FEF3DC;
+  --color-coral:        #E85D3A;
+  --color-coral-pale:   #FDEEE9;
+  --color-cream:        #FAF7F2;
+  --color-cream-2:      #F3EEE5;
+  --color-slate-dark:   #2C2C28;
+  --color-slate-mid:    #5C5C54;
+  --color-slate-light:  #9C9C90;
+  --color-slate-pale:   #F5F4F0;
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
-  --font-sans: 'DM Sans', sans-serif;
   --font-heading: 'DM Serif Display', serif;
+  --font-body:    'DM Sans', sans-serif;
 }
 
 @layer base {

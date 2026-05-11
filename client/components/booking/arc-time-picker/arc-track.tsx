@@ -58,6 +58,15 @@ export function ArcTrack({
     ? describeArc(cx, cy, trackR, selectedStartAngle, selectedEndAngle)
     : "";
 
+  let selectedSector = "";
+  if (hasSelection) {
+    const s = polarToCartesian(cx, cy, trackR, selectedStartAngle!);
+    const e = polarToCartesian(cx, cy, trackR, selectedEndAngle!);
+    const sweep = (((selectedEndAngle! - selectedStartAngle!) % 360) + 360) % 360;
+    const large = sweep > 180 ? 1 : 0;
+    selectedSector = `M ${cx} ${cy} L ${s.x} ${s.y} A ${trackR} ${trackR} 0 ${large} 1 ${e.x} ${e.y} Z`;
+  }
+
   return (
     <g>
       {/* Background ring (full circle, dimmed). */}
@@ -129,14 +138,22 @@ export function ArcTrack({
       })}
 
       {/* Selected arc. */}
-      {selectedPath ? (
-        <path
-          d={selectedPath}
-          fill="none"
-          stroke="var(--primary)"
-          strokeWidth={SELECTED_WIDTH}
-          strokeLinecap="round"
-        />
+      {hasSelection ? (
+        <>
+          <path
+            d={selectedSector}
+            fill="var(--primary)"
+            opacity={0.15}
+            stroke="none"
+          />
+          <path
+            d={selectedPath}
+            fill="none"
+            stroke="var(--primary)"
+            strokeWidth={SELECTED_WIDTH}
+            strokeLinecap="round"
+          />
+        </>
       ) : null}
 
       {/* Hour ticks + numeric labels. */}

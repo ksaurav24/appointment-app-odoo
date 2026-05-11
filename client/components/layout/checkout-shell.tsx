@@ -46,37 +46,45 @@ export function CheckoutShell({
   };
 
   return (
-    <div className="flex min-h-svh flex-col">
-      <header className="flex items-center justify-between border-b border-cream2 px-6 py-4">
+    <div className="flex min-h-svh flex-col bg-cream text-slate-dark">
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-cream-2 bg-white/95 px-6 backdrop-blur-sm">
         <Link
           href="/"
-          className="font-heading text-lg tracking-tight text-foreground"
+          className="font-heading text-lg tracking-tight text-forest flex items-center gap-2"
         >
+          <svg className="w-5 h-5 text-forest" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
           Appointly
         </Link>
 
-        <div className="flex-1 px-6">
-          <div className="mx-auto max-w-md">{stepIndicator}</div>
+        <div className="flex flex-1 items-center justify-center px-4">
+          <div className="w-full max-w-sm">{stepIndicator}</div>
         </div>
 
-        <Button variant="ghost" size="sm" onClick={handleExitClick}>
-          Exit
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-slate-mid hover:text-slate-dark font-semibold"
+          onClick={handleExitClick}
+        >
+          ✕ Exit
         </Button>
       </header>
 
-      <main className="flex flex-1 flex-col">{children}</main>
+      <main className="flex flex-1 flex-col items-center py-10 px-4">
+        {children}
+      </main>
 
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-white border-cream-2 rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Leave booking?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="font-heading text-xl text-slate-dark">Leave booking?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-mid">
               Your selections will be discarded and any held slot will be released.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Stay</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmExit}>
+            <AlertDialogCancel className="rounded-xl font-semibold text-slate-dark hover:bg-slate-pale">Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmExit} className="bg-coral hover:bg-coral/90 text-white rounded-xl font-semibold">
               Leave
             </AlertDialogAction>
           </AlertDialogFooter>

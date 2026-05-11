@@ -5,15 +5,15 @@ type ScheduleSummaryProps = {
   schedules: Schedule[];
 };
 
-function summarizeRule(rule: ScheduleRule): string {
-  const range = `${formatHHMM(rule.startTime)}–${formatHHMM(rule.endTime)}`;
+function parseRule(rule: ScheduleRule): { label: string; time: string } {
+  const time = `${formatHHMM(rule.startTime)} – ${formatHHMM(rule.endTime)}`;
   if (rule.dayOfWeek != null) {
-    return `${dayOfWeekName(rule.dayOfWeek)} ${range}`;
+    return { label: dayOfWeekName(rule.dayOfWeek), time };
   }
   if (rule.specificDate) {
-    return `${rule.specificDate} ${range}`;
+    return { label: rule.specificDate, time };
   }
-  return range;
+  return { label: "Always", time };
 }
 
 export function ScheduleSummary({ schedules }: ScheduleSummaryProps) {
@@ -23,35 +23,53 @@ export function ScheduleSummary({ schedules }: ScheduleSummaryProps) {
 
   if (rules.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">No availability configured.</p>
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-sm text-muted-foreground text-center">No availability configured.</p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-3 text-sm text-muted-foreground">
+    <div className="space-y-6">
       {weekly.length > 0 ? (
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-foreground/70">
-            Weekly
-          </p>
-          <ul className="mt-1 space-y-0.5">
-            {weekly.map((r) => (
-              <li key={r.id}>{summarizeRule(r)}</li>
-            ))}
-          </ul>
+        <div className="overflow-hidden rounded-xl border border-cream2 bg-white">
+          <div className="bg-cream px-4 py-2 border-b border-cream2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-mid">
+              Weekly Schedule
+            </p>
+          </div>
+          <div className="divide-y divide-cream2">
+            {weekly.map((r) => {
+              const { label, time } = parseRule(r);
+              return (
+                <div key={r.id} className="flex justify-between items-center px-4 py-3 text-sm">
+                  <span className="font-medium text-foreground">{label}</span>
+                  <span className="text-slate-mid font-medium bg-cream2 px-2.5 py-1 rounded-md">{time}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : null}
 
       {overrides.length > 0 ? (
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-foreground/70">
-            Specific dates
-          </p>
-          <ul className="mt-1 space-y-0.5">
-            {overrides.map((r) => (
-              <li key={r.id}>{summarizeRule(r)}</li>
-            ))}
-          </ul>
+        <div className="overflow-hidden rounded-xl border border-cream2 bg-white">
+          <div className="bg-cream px-4 py-2 border-b border-cream2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-mid">
+              Specific dates
+            </p>
+          </div>
+          <div className="divide-y divide-cream2">
+            {overrides.map((r) => {
+              const { label, time } = parseRule(r);
+              return (
+                <div key={r.id} className="flex justify-between items-center px-4 py-3 text-sm">
+                  <span className="font-medium text-foreground">{label}</span>
+                  <span className="text-slate-mid font-medium bg-cream2 px-2.5 py-1 rounded-md">{time}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : null}
     </div>

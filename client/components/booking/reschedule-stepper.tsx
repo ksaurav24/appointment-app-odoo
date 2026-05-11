@@ -264,7 +264,7 @@ export function RescheduleStepper({ appointment }: Props) {
       confirmExit
       exitHref={`/bookings/${appointment.publicId}`}
     >
-      <div className="mx-auto w-full max-w-2xl px-6 py-8">
+      <div className="mx-auto w-full max-w-2xl bg-card rounded-2xl border border-border shadow-sm px-6 py-8 sm:px-10 sm:py-10 my-4 sm:my-8">
         <h1 className="font-heading text-2xl font-semibold tracking-tight">
           Reschedule
         </h1>
