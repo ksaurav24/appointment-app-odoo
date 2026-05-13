@@ -15,6 +15,7 @@ import { geocodeIndianAddress, type GeocodeSuggestion } from "@/lib/google-maps"
 import { AuthError } from "@/components/auth/auth-error"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { Stepper } from "@/components/onboarding/stepper"
+import { FileInput } from "@/components/onboarding/file-input"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -1024,19 +1025,18 @@ function OrgBrandingStep({
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="org-logo">Brand logo (required)</Label>
-        <Input
+        <FileInput
           id="org-logo"
-          type="file"
-          accept="image/*"
-          required
+          variant="logo"
           onChange={(e) => onLogoChange(e.target.files?.[0] ?? null)}
+          selectedFiles={draft.logoFile ? [draft.logoFile] : []}
         />
         {draft.logoPreviewUrl ? (
-          <div className="mt-2 overflow-hidden rounded-lg border border-border/60">
+          <div className="mt-3 overflow-hidden rounded-lg border border-border/60 bg-muted/30">
             <img
               src={draft.logoPreviewUrl}
               alt="Logo preview"
-              className="h-40 w-full bg-muted/30 object-contain"
+              className="h-40 w-full object-contain p-4"
             />
           </div>
         ) : null}
@@ -1044,14 +1044,14 @@ function OrgBrandingStep({
 
       <div className="space-y-1.5">
         <Label htmlFor="org-gallery">Gallery images (optional, max 5)</Label>
-        <Input
+        <FileInput
           id="org-gallery"
-          type="file"
-          accept="image/*"
+          variant="gallery"
           multiple
           onChange={(e) =>
             onGalleryChange(Array.from(e.target.files ?? []).slice(0, 5))
           }
+          selectedFiles={draft.galleryFiles}
         />
         <p className="text-xs text-muted-foreground">
           Add up to 5 photos (e.g. turf/hospital pictures).

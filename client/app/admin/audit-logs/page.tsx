@@ -1,51 +1,46 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"
 
-import { useAdminAuditLogs } from "@/hooks/useAdminAuditLogs";
-import type { AuditLog, ListAuditLogsQuery, Role } from "@/types";
+import { useAdminAuditLogs } from "@/hooks/useAdminAuditLogs"
+import type { AuditLog, ListAuditLogsQuery, Role } from "@/types"
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 
 const ACTOR_ROLES: Array<Role | "ANY"> = [
   "ANY",
   "ADMIN",
   "ORGANIZER",
   "CUSTOMER",
-];
+]
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 20
 
 export default function AdminAuditLogsPage() {
-  const [action, setAction] = useState("");
-  const [entityType, setEntityType] = useState("");
-  const [actorRole, setActorRole] = useState<Role | "ANY">("ANY");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [skip, setSkip] = useState(0);
+  const [action, setAction] = useState("")
+  const [entityType, setEntityType] = useState("")
+  const [actorRole, setActorRole] = useState<Role | "ANY">("ANY")
+  const [from, setFrom] = useState("")
+  const [to, setTo] = useState("")
+  const [skip, setSkip] = useState(0)
 
-  const [debouncedAction, setDebouncedAction] = useState("");
-  const [debouncedEntity, setDebouncedEntity] = useState("");
+  const [debouncedAction, setDebouncedAction] = useState("")
+  const [debouncedEntity, setDebouncedEntity] = useState("")
 
   useEffect(() => {
     const handle = setTimeout(() => {
-      setDebouncedAction(action.trim());
-      setDebouncedEntity(entityType.trim());
-      setSkip(0);
-    }, 300);
-    return () => clearTimeout(handle);
-  }, [action, entityType]);
+      setDebouncedAction(action.trim())
+      setDebouncedEntity(entityType.trim())
+      setSkip(0)
+    }, 300)
+    return () => clearTimeout(handle)
+  }, [action, entityType])
 
   const query: ListAuditLogsQuery = {
     take: PAGE_SIZE,
@@ -55,11 +50,11 @@ export default function AdminAuditLogsPage() {
     ...(actorRole !== "ANY" ? { actorRole } : {}),
     ...(from ? { from: new Date(from).toISOString() } : {}),
     ...(to ? { to: new Date(to).toISOString() } : {}),
-  };
+  }
 
-  const logsQuery = useAdminAuditLogs(query);
-  const items = logsQuery.data?.items ?? [];
-  const total = logsQuery.data?.total ?? 0;
+  const logsQuery = useAdminAuditLogs(query)
+  const items = logsQuery.data?.items ?? []
+  const total = logsQuery.data?.total ?? 0
 
   return (
     <div className="space-y-6">
@@ -110,8 +105,8 @@ export default function AdminAuditLogsPage() {
                     size="sm"
                     variant={actorRole === r ? "default" : "outline"}
                     onClick={() => {
-                      setActorRole(r);
-                      setSkip(0);
+                      setActorRole(r)
+                      setSkip(0)
                     }}
                   >
                     {r}
@@ -128,8 +123,8 @@ export default function AdminAuditLogsPage() {
                 type="date"
                 value={from}
                 onChange={(e) => {
-                  setFrom(e.target.value);
-                  setSkip(0);
+                  setFrom(e.target.value)
+                  setSkip(0)
                 }}
               />
             </div>
@@ -142,8 +137,8 @@ export default function AdminAuditLogsPage() {
                 type="date"
                 value={to}
                 onChange={(e) => {
-                  setTo(e.target.value);
-                  setSkip(0);
+                  setTo(e.target.value)
+                  setSkip(0)
                 }}
               />
             </div>
@@ -158,12 +153,12 @@ export default function AdminAuditLogsPage() {
               size="sm"
               variant="outline"
               onClick={() => {
-                setAction("");
-                setEntityType("");
-                setActorRole("ANY");
-                setFrom("");
-                setTo("");
-                setSkip(0);
+                setAction("")
+                setEntityType("")
+                setActorRole("ANY")
+                setFrom("")
+                setTo("")
+                setSkip(0)
               }}
             >
               Clear filters
@@ -195,13 +190,12 @@ export default function AdminAuditLogsPage() {
         onChange={setSkip}
       />
     </div>
-  );
+  )
 }
 
 function LogRow({ log }: { log: AuditLog }) {
-  const [expanded, setExpanded] = useState(false);
-  const hasMetadata =
-    log.metadata && Object.keys(log.metadata).length > 0;
+  const [expanded, setExpanded] = useState(false)
+  const hasMetadata = log.metadata && Object.keys(log.metadata).length > 0
 
   return (
     <Card>
@@ -261,7 +255,7 @@ function LogRow({ log }: { log: AuditLog }) {
         ) : null}
       </CardContent>
     </Card>
-  );
+  )
 }
 
 function Pagination({
@@ -270,14 +264,14 @@ function Pagination({
   total,
   onChange,
 }: {
-  skip: number;
-  take: number;
-  total: number;
-  onChange: (next: number) => void;
+  skip: number
+  take: number
+  total: number
+  onChange: (next: number) => void
 }) {
-  const page = Math.floor(skip / take) + 1;
-  const totalPages = Math.max(1, Math.ceil(total / take));
-  if (total <= take) return null;
+  const page = Math.floor(skip / take) + 1
+  const totalPages = Math.max(1, Math.ceil(total / take))
+  if (total <= take) return null
   return (
     <div className="flex items-center justify-between text-sm text-muted-foreground">
       <span>
@@ -302,5 +296,5 @@ function Pagination({
         </Button>
       </div>
     </div>
-  );
+  )
 }

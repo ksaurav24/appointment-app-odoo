@@ -1,7 +1,7 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { useState } from "react"
+import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Analytics01Icon,
   Building01Icon,
@@ -10,7 +10,7 @@ import {
   MoneyBag02Icon,
   Note01Icon,
   UserMultiple02Icon,
-} from "@hugeicons/core-free-icons";
+} from "@hugeicons/core-free-icons"
 import {
   Bar,
   BarChart,
@@ -18,41 +18,33 @@ import {
   ResponsiveContainer,
   XAxis,
   YAxis,
-} from "recharts";
+} from "recharts"
 
-import { KpiCard } from "@/components/dashboard/kpi-card";
-import { QuickLinks } from "@/components/dashboard/quick-links";
-import { TimeseriesChart } from "@/components/dashboard/timeseries-chart";
+import { KpiCard } from "@/components/dashboard/kpi-card"
+import { QuickLinks } from "@/components/dashboard/quick-links"
+import { TimeseriesChart } from "@/components/dashboard/timeseries-chart"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "@/components/ui/card"
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@/components/ui/chart";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+} from "@/components/ui/chart"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 import {
   useAdminDashboard,
   useAdminTimeseries,
   useTopOrganizations,
-} from "@/hooks/useAdminAnalytics";
-import type {
-  AdminTimeseriesMetric,
-  TimeseriesGranularity,
-} from "@/types";
+} from "@/hooks/useAdminAnalytics"
+import type { AdminTimeseriesMetric, TimeseriesGranularity } from "@/types"
 
 const QUICK_LINKS = [
   {
@@ -79,23 +71,23 @@ const QUICK_LINKS = [
     description: "Track admin and platform activity.",
     icon: Note01Icon,
   },
-];
+]
 
 const METRIC_LABEL: Record<AdminTimeseriesMetric, string> = {
   appointments: "Appointments",
   revenue: "Revenue",
   signups: "Signups",
-};
+}
 
 export default function AdminDashboardPage() {
-  const dashboard = useAdminDashboard();
-  const [metric, setMetric] = useState<AdminTimeseriesMetric>("appointments");
-  const [granularity] = useState<TimeseriesGranularity>("day");
-  const timeseries = useAdminTimeseries({ metric, granularity });
-  const topOrgs = useTopOrganizations({ metric: "bookings", limit: 5 });
+  const dashboard = useAdminDashboard()
+  const [metric, setMetric] = useState<AdminTimeseriesMetric>("appointments")
+  const [granularity] = useState<TimeseriesGranularity>("day")
+  const timeseries = useAdminTimeseries({ metric, granularity })
+  const topOrgs = useTopOrganizations({ metric: "bookings", limit: 5 })
 
-  const d = dashboard.data;
-  const currency = d?.revenue.currency ?? "INR";
+  const d = dashboard.data
+  const currency = d?.revenue.currency ?? "INR"
 
   return (
     <div className="space-y-8">
@@ -270,15 +262,15 @@ export default function AdminDashboardPage() {
         <QuickLinks links={QUICK_LINKS} />
       </section>
     </div>
-  );
+  )
 }
 
 function TopOrgsList({
   loading,
   data,
 }: {
-  loading: boolean;
-  data: { organizationId: string; name: string; slug: string; value: number }[];
+  loading: boolean
+  data: { organizationId: string; name: string; slug: string; value: number }[]
 }) {
   if (loading) {
     return (
@@ -287,16 +279,16 @@ function TopOrgsList({
           <Skeleton key={i} className="h-9 w-full" />
         ))}
       </div>
-    );
+    )
   }
   if (data.length === 0) {
     return (
       <p className="py-6 text-center text-sm text-muted-foreground">
         No organizations yet.
       </p>
-    );
+    )
   }
-  const max = Math.max(...data.map((o) => o.value), 1);
+  const max = Math.max(...data.map((o) => o.value), 1)
   return (
     <ol className="space-y-3">
       {data.map((org, i) => (
@@ -319,7 +311,7 @@ function TopOrgsList({
         </li>
       ))}
     </ol>
-  );
+  )
 }
 
 function UsersByRoleChart({
@@ -328,28 +320,33 @@ function UsersByRoleChart({
   organizer,
   customer,
 }: {
-  loading: boolean;
-  admin: number;
-  organizer: number;
-  customer: number;
+  loading: boolean
+  admin: number
+  organizer: number
+  customer: number
 }) {
   if (loading) {
-    return <Skeleton className="h-48 w-full" />;
+    return <Skeleton className="h-48 w-full" />
   }
   const data = [
     { role: "Customers", value: customer },
     { role: "Organizers", value: organizer },
     { role: "Admins", value: admin },
-  ];
+  ]
   const config: ChartConfig = {
     value: { label: "Users", color: "var(--chart-2)" },
-  };
+  }
   return (
     <ChartContainer config={config} className="h-48 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ left: 0 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-          <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
+          <XAxis
+            type="number"
+            tickLine={false}
+            axisLine={false}
+            fontSize={11}
+          />
           <YAxis
             type="category"
             dataKey="role"
@@ -363,7 +360,7 @@ function UsersByRoleChart({
         </BarChart>
       </ResponsiveContainer>
     </ChartContainer>
-  );
+  )
 }
 
 function StatusTile({
@@ -371,41 +368,43 @@ function StatusTile({
   value,
   tone,
 }: {
-  label: string;
-  value: number;
-  tone: "success" | "warning" | "danger" | "info";
+  label: string
+  value: number
+  tone: "success" | "warning" | "danger" | "info"
 }) {
   const bgColors = {
     success: "bg-emerald-50 text-emerald-700 border border-emerald-200",
     warning: "bg-amber-50 text-amber-700 border border-amber-200",
     danger: "bg-red-50 text-red-700 border border-red-200",
     info: "bg-blue-50 text-blue-700 border border-blue-200",
-  };
+  }
   return (
     <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/30">
       <span className="text-sm font-medium text-muted-foreground">{label}</span>
-      <span className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${bgColors[tone]}`}>
+      <span
+        className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${bgColors[tone]}`}
+      >
         {formatNumber(value)}
       </span>
     </div>
-  );
+  )
 }
 
 function formatNumber(n: number | undefined): string {
-  if (n === undefined) return "—";
-  return new Intl.NumberFormat().format(n);
+  if (n === undefined) return "—"
+  return new Intl.NumberFormat().format(n)
 }
 
 function formatCurrency(amount: string | number, currency: string): string {
-  const value = typeof amount === "string" ? Number(amount) : amount;
-  if (Number.isNaN(value)) return "—";
+  const value = typeof amount === "string" ? Number(amount) : amount
+  if (Number.isNaN(value)) return "—"
   try {
     return new Intl.NumberFormat(undefined, {
       style: "currency",
       currency,
       maximumFractionDigits: 2,
-    }).format(value);
+    }).format(value)
   } catch {
-    return `${currency} ${value.toFixed(2)}`;
+    return `${currency} ${value.toFixed(2)}`
   }
 }

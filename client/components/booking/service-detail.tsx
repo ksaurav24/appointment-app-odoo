@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCurrentUser } from "@/hooks/useAuth";
 
 import { PoliciesSummary } from "@/components/booking/policies-summary";
 import { ScheduleSummary } from "@/components/booking/schedule-summary";
@@ -36,9 +38,16 @@ function durationLabel(type: AppointmentTypeWithRelations): string {
 }
 
 export function ServiceDetail({ type, shareToken }: ServiceDetailProps) {
-  const bookHref = shareToken
+  const router = useRouter();
+  const { data: user, isPending: isUserPending } = useCurrentUser();
+
+  const baseBookHref = shareToken
     ? `/book/${type.id}?token=${encodeURIComponent(shareToken)}`
     : `/book/${type.id}`;
+
+  const finalBookHref = !isUserPending && !user 
+    ? `/login?next=${encodeURIComponent(baseBookHref)}` 
+    : baseBookHref;
 
   const entityCount = type.entities.length;
   const priceLabel = type.advancePaymentEnabled
@@ -128,7 +137,7 @@ export function ServiceDetail({ type, shareToken }: ServiceDetailProps) {
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Duration</p>
               <p className="mt-1 text-sm font-medium text-foreground">{durationLabel(type)}</p>
             </div>
-            <Button size="lg" className="w-full" render={<Link href={bookHref} />}>
+            <Button size="lg" className="w-full" render={<Link href={finalBookHref} />}>
               Book now
             </Button>
             <ShareDialog

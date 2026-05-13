@@ -634,7 +634,9 @@ export class AnalyticsService {
     );
   }
 
-  private async computeStaffPerformance(organizationId: string): Promise<unknown> {
+  private async computeStaffPerformance(
+    organizationId: string,
+  ): Promise<unknown> {
     const rows = await this.prisma.$queryRaw<
       {
         personId: string;

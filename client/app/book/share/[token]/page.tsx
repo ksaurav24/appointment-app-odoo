@@ -1,23 +1,23 @@
-"use client";
+"use client"
 
-import Link from "next/link";
-import { use } from "react";
+import Link from "next/link"
+import { use } from "react"
 
-import { BookingStepper } from "@/components/booking/booking-stepper";
-import { CheckoutShell } from "@/components/layout/checkout-shell";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { usePublicAppointmentTypeByToken } from "@/hooks/usePublicAppointments";
+import { BookingStepper } from "@/components/booking/booking-stepper"
+import { CheckoutShell } from "@/components/layout/checkout-shell"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { usePublicAppointmentTypeByToken } from "@/hooks/usePublicAppointments"
 
-type Params = { token: string };
+type Params = { token: string }
 
 export default function BookByTokenPage({
   params,
 }: {
-  params: Promise<Params>;
+  params: Promise<Params>
 }) {
-  const { token } = use(params);
-  const { data, isPending, isError } = usePublicAppointmentTypeByToken(token);
+  const { token } = use(params)
+  const { data, isPending, isError } = usePublicAppointmentTypeByToken(token)
 
   if (isPending) {
     return (
@@ -28,7 +28,7 @@ export default function BookByTokenPage({
           <Skeleton className="h-64 w-full" />
         </div>
       </CheckoutShell>
-    );
+    )
   }
 
   if (isError || !data) {
@@ -46,8 +46,8 @@ export default function BookByTokenPage({
           </Button>
         </div>
       </CheckoutShell>
-    );
+    )
   }
 
-  return <BookingStepper type={data} />;
+  return <BookingStepper type={data} />
 }

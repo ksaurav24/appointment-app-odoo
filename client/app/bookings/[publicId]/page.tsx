@@ -1,33 +1,33 @@
-"use client";
+"use client"
 
-import { useRouter } from "next/navigation";
-import { use, useEffect } from "react";
+import { useRouter } from "next/navigation"
+import { use, useEffect } from "react"
 
-import { BookingDetailView } from "@/components/booking/booking-detail-view";
-import { PublicShell } from "@/components/layout/public-shell";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useCurrentUser } from "@/hooks/useAuth";
-import { useAppointment } from "@/hooks/useBooking";
+import { BookingDetailView } from "@/components/booking/booking-detail-view"
+import { PublicShell } from "@/components/layout/public-shell"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useCurrentUser } from "@/hooks/useAuth"
+import { useAppointment } from "@/hooks/useBooking"
 
-type Params = { publicId: string };
+type Params = { publicId: string }
 
 export default function BookingDetailPage({
   params,
 }: {
-  params: Promise<Params>;
+  params: Promise<Params>
 }) {
-  const { publicId } = use(params);
-  const router = useRouter();
-  const { data: user, isPending: userPending } = useCurrentUser();
-  const { data, isPending, isError } = useAppointment(publicId);
+  const { publicId } = use(params)
+  const router = useRouter()
+  const { data: user, isPending: userPending } = useCurrentUser()
+  const { data, isPending, isError } = useAppointment(publicId)
 
   useEffect(() => {
     if (!userPending && !user) {
       router.replace(
-        `/login?next=${encodeURIComponent(`/bookings/${publicId}`)}`,
-      );
+        `/login?next=${encodeURIComponent(`/bookings/${publicId}`)}`
+      )
     }
-  }, [user, userPending, router, publicId]);
+  }, [user, userPending, router, publicId])
 
   return (
     <PublicShell>
@@ -50,5 +50,5 @@ export default function BookingDetailPage({
         <BookingDetailView appointment={data} />
       )}
     </PublicShell>
-  );
+  )
 }

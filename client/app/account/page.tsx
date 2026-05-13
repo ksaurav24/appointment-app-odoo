@@ -1,25 +1,25 @@
-"use client";
+"use client"
 
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
-import { ChangePasswordForm } from "@/components/account/change-password-form";
-import { ProfileCard } from "@/components/account/profile-card";
-import { SignOutEverywhere } from "@/components/account/sign-out-everywhere";
-import { TwoFactorToggle } from "@/components/account/two-factor-toggle";
-import { PublicShell } from "@/components/layout/public-shell";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useCurrentUser } from "@/hooks/useAuth";
+import { ChangePasswordForm } from "@/components/account/change-password-form"
+import { ProfileCard } from "@/components/account/profile-card"
+import { SignOutEverywhere } from "@/components/account/sign-out-everywhere"
+import { TwoFactorToggle } from "@/components/account/two-factor-toggle"
+import { PublicShell } from "@/components/layout/public-shell"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useCurrentUser } from "@/hooks/useAuth"
 
 export default function AccountPage() {
-  const router = useRouter();
-  const { data: user, isPending } = useCurrentUser();
+  const router = useRouter()
+  const { data: user, isPending } = useCurrentUser()
 
   useEffect(() => {
     if (!isPending && !user) {
-      router.replace("/login?next=/account");
+      router.replace("/login?next=/account")
     }
-  }, [user, isPending, router]);
+  }, [user, isPending, router])
 
   return (
     <PublicShell>
@@ -50,5 +50,5 @@ export default function AccountPage() {
         )}
       </div>
     </PublicShell>
-  );
+  )
 }

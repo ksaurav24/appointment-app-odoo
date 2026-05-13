@@ -1,28 +1,17 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  Search01Icon,
-  UserMultiple02Icon,
-} from "@hugeicons/core-free-icons";
+import { useEffect, useState } from "react"
+import { toast } from "sonner"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Search01Icon, UserMultiple02Icon } from "@hugeicons/core-free-icons"
 
-import { ApiError } from "@/lib/api";
-import {
-  useAdminUserMutations,
-  useAdminUsers,
-} from "@/hooks/useAdminUsers";
-import type { ListUsersQuery, Role, SafeUser } from "@/types";
+import { ApiError } from "@/lib/api"
+import { useAdminUserMutations, useAdminUsers } from "@/hooks/useAdminUsers"
+import type { ListUsersQuery, Role, SafeUser } from "@/types"
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -30,11 +19,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Table,
   TableBody,
@@ -42,68 +31,62 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/ui/table"
+import { Textarea } from "@/components/ui/textarea"
 
-const ROLES: Array<Role | "ALL"> = ["ALL", "ADMIN", "ORGANIZER", "CUSTOMER"];
+const ROLES: Array<Role | "ALL"> = ["ALL", "ADMIN", "ORGANIZER", "CUSTOMER"]
 
 const ACTIVE_OPTIONS = [
   { label: "Any", value: "ANY" },
   { label: "Active", value: "ACTIVE" },
   { label: "Inactive", value: "INACTIVE" },
-] as const;
+] as const
 
-type ActiveFilter = (typeof ACTIVE_OPTIONS)[number]["value"];
+type ActiveFilter = (typeof ACTIVE_OPTIONS)[number]["value"]
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 20
 
 export default function AdminUsersPage() {
-  const [search, setSearch] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [roleFilter, setRoleFilter] = useState<Role | "ALL">("ALL");
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("ANY");
-  const [skip, setSkip] = useState(0);
-  const [roleDialog, setRoleDialog] = useState<SafeUser | null>(null);
+  const [search, setSearch] = useState("")
+  const [debounced, setDebounced] = useState("")
+  const [roleFilter, setRoleFilter] = useState<Role | "ALL">("ALL")
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("ANY")
+  const [skip, setSkip] = useState(0)
+  const [roleDialog, setRoleDialog] = useState<SafeUser | null>(null)
 
   useEffect(() => {
     const handle = setTimeout(() => {
-      setDebounced(search.trim());
-      setSkip(0);
-    }, 300);
-    return () => clearTimeout(handle);
-  }, [search]);
+      setDebounced(search.trim())
+      setSkip(0)
+    }, 300)
+    return () => clearTimeout(handle)
+  }, [search])
 
   const query: ListUsersQuery = {
     take: PAGE_SIZE,
     skip,
     ...(debounced ? { q: debounced } : {}),
     ...(roleFilter !== "ALL" ? { role: roleFilter } : {}),
-    ...(activeFilter !== "ANY"
-      ? { isActive: activeFilter === "ACTIVE" }
-      : {}),
-  };
+    ...(activeFilter !== "ANY" ? { isActive: activeFilter === "ACTIVE" } : {}),
+  }
 
-  const usersQuery = useAdminUsers(query);
-  const { activateMutation, deactivateMutation } = useAdminUserMutations();
+  const usersQuery = useAdminUsers(query)
+  const { activateMutation, deactivateMutation } = useAdminUserMutations()
 
-  const total = usersQuery.data?.total ?? 0;
-  const items = usersQuery.data?.items ?? [];
+  const total = usersQuery.data?.total ?? 0
+  const items = usersQuery.data?.items ?? []
 
   const onToggleActive = (user: SafeUser) => {
-    const action = user.isActive ? deactivateMutation : activateMutation;
+    const action = user.isActive ? deactivateMutation : activateMutation
     action.mutate(user.id, {
       onSuccess: (updated) => {
-        toast.success(
-          updated.isActive ? "User activated" : "User deactivated",
-        );
+        toast.success(updated.isActive ? "User activated" : "User deactivated")
       },
       onError: (err) => {
-        toast.error(
-          err instanceof ApiError ? err.messages[0] : "Action failed",
-        );
+        toast.error(err instanceof ApiError ? err.messages[0] : "Action failed")
       },
-    });
-  };
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -132,7 +115,7 @@ export default function AdminUsersPage() {
               <div className="relative">
                 <HugeiconsIcon
                   icon={Search01Icon}
-                  className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
                 />
                 <Input
                   id="user-search"
@@ -154,8 +137,8 @@ export default function AdminUsersPage() {
                     size="sm"
                     variant={roleFilter === r ? "default" : "outline"}
                     onClick={() => {
-                      setRoleFilter(r);
-                      setSkip(0);
+                      setRoleFilter(r)
+                      setSkip(0)
                     }}
                   >
                     {r}
@@ -172,12 +155,10 @@ export default function AdminUsersPage() {
                     key={opt.value}
                     type="button"
                     size="sm"
-                    variant={
-                      activeFilter === opt.value ? "default" : "outline"
-                    }
+                    variant={activeFilter === opt.value ? "default" : "outline"}
                     onClick={() => {
-                      setActiveFilter(opt.value);
-                      setSkip(0);
+                      setActiveFilter(opt.value)
+                      setSkip(0)
                     }}
                   >
                     {opt.label}
@@ -241,10 +222,7 @@ export default function AdminUsersPage() {
                     <TableCell className="text-muted-foreground">
                       {user.email}
                       {!user.emailVerified ? (
-                        <Badge
-                          variant="outline"
-                          className="ml-2 text-[10px]"
-                        >
+                        <Badge variant="outline" className="ml-2 text-[10px]">
                           unverified
                         </Badge>
                       ) : null}
@@ -299,12 +277,9 @@ export default function AdminUsersPage() {
         onChange={setSkip}
       />
 
-      <ChangeRoleDialog
-        user={roleDialog}
-        onClose={() => setRoleDialog(null)}
-      />
+      <ChangeRoleDialog user={roleDialog} onClose={() => setRoleDialog(null)} />
     </div>
-  );
+  )
 }
 
 function Pagination({
@@ -313,14 +288,14 @@ function Pagination({
   total,
   onChange,
 }: {
-  skip: number;
-  take: number;
-  total: number;
-  onChange: (next: number) => void;
+  skip: number
+  take: number
+  total: number
+  onChange: (next: number) => void
 }) {
-  const page = Math.floor(skip / take) + 1;
-  const totalPages = Math.max(1, Math.ceil(total / take));
-  if (total <= take) return null;
+  const page = Math.floor(skip / take) + 1
+  const totalPages = Math.max(1, Math.ceil(total / take))
+  if (total <= take) return null
   return (
     <div className="flex items-center justify-between text-sm text-muted-foreground">
       <span>
@@ -345,48 +320,48 @@ function Pagination({
         </Button>
       </div>
     </div>
-  );
+  )
 }
 
 function ChangeRoleDialog({
   user,
   onClose,
 }: {
-  user: SafeUser | null;
-  onClose: () => void;
+  user: SafeUser | null
+  onClose: () => void
 }) {
-  const { changeRoleMutation } = useAdminUserMutations();
-  const [role, setRole] = useState<Role>("CUSTOMER");
-  const [reason, setReason] = useState("");
+  const { changeRoleMutation } = useAdminUserMutations()
+  const [role, setRole] = useState<Role>("CUSTOMER")
+  const [reason, setReason] = useState("")
 
   useEffect(() => {
     if (user) {
-      setRole(user.role);
-      setReason("");
+      setRole(user.role)
+      setReason("")
     }
-  }, [user]);
+  }, [user])
 
   const submit = () => {
-    if (!user) return;
+    if (!user) return
     if (role === user.role) {
-      toast.info("No role change.");
-      return;
+      toast.info("No role change.")
+      return
     }
     changeRoleMutation.mutate(
       { userId: user.id, body: { role, reason: reason.trim() } },
       {
         onSuccess: () => {
-          toast.success("Role updated. User has been signed out.");
-          onClose();
+          toast.success("Role updated. User has been signed out.")
+          onClose()
         },
         onError: (err) => {
           toast.error(
-            err instanceof ApiError ? err.messages[0] : "Action failed",
-          );
+            err instanceof ApiError ? err.messages[0] : "Action failed"
+          )
         },
-      },
-    );
-  };
+      }
+    )
+  }
 
   return (
     <Dialog open={!!user} onOpenChange={(open) => !open && onClose()}>
@@ -451,5 +426,5 @@ function ChangeRoleDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

@@ -1,26 +1,18 @@
-"use client";
+"use client"
 
-import { useState } from "react";
+import { useState } from "react"
 
-import { useAdminAppointments } from "@/hooks/useAdminAppointments";
-import type {
-  AppointmentStatus,
-  ListAdminAppointmentsQuery,
-} from "@/types";
+import { useAdminAppointments } from "@/hooks/useAdminAppointments"
+import type { AppointmentStatus, ListAdminAppointmentsQuery } from "@/types"
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
-import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -28,7 +20,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"
 
 const STATUSES: Array<AppointmentStatus | "ANY"> = [
   "ANY",
@@ -37,16 +29,16 @@ const STATUSES: Array<AppointmentStatus | "ANY"> = [
   "COMPLETED",
   "CANCELLED",
   "NO_SHOW",
-];
+]
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 20
 
 export default function AdminAppointmentsPage() {
-  const [status, setStatus] = useState<AppointmentStatus | "ANY">("ANY");
-  const [upcomingOnly, setUpcomingOnly] = useState(false);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [skip, setSkip] = useState(0);
+  const [status, setStatus] = useState<AppointmentStatus | "ANY">("ANY")
+  const [upcomingOnly, setUpcomingOnly] = useState(false)
+  const [from, setFrom] = useState("")
+  const [to, setTo] = useState("")
+  const [skip, setSkip] = useState(0)
 
   const query: ListAdminAppointmentsQuery = {
     take: PAGE_SIZE,
@@ -55,11 +47,11 @@ export default function AdminAppointmentsPage() {
     ...(upcomingOnly ? { upcomingOnly: true } : {}),
     ...(from ? { from: new Date(from).toISOString() } : {}),
     ...(to ? { to: new Date(to).toISOString() } : {}),
-  };
+  }
 
-  const appointmentsQuery = useAdminAppointments(query);
-  const items = appointmentsQuery.data?.items ?? [];
-  const total = appointmentsQuery.data?.total ?? 0;
+  const appointmentsQuery = useAdminAppointments(query)
+  const items = appointmentsQuery.data?.items ?? []
+  const total = appointmentsQuery.data?.total ?? 0
 
   return (
     <div className="space-y-6">
@@ -88,8 +80,8 @@ export default function AdminAppointmentsPage() {
                     size="sm"
                     variant={status === s ? "default" : "outline"}
                     onClick={() => {
-                      setStatus(s);
-                      setSkip(0);
+                      setStatus(s)
+                      setSkip(0)
                     }}
                   >
                     {s}
@@ -106,8 +98,8 @@ export default function AdminAppointmentsPage() {
                 type="date"
                 value={from}
                 onChange={(e) => {
-                  setFrom(e.target.value);
-                  setSkip(0);
+                  setFrom(e.target.value)
+                  setSkip(0)
                 }}
               />
             </div>
@@ -120,8 +112,8 @@ export default function AdminAppointmentsPage() {
                 type="date"
                 value={to}
                 onChange={(e) => {
-                  setTo(e.target.value);
-                  setSkip(0);
+                  setTo(e.target.value)
+                  setSkip(0)
                 }}
               />
             </div>
@@ -131,8 +123,8 @@ export default function AdminAppointmentsPage() {
               <Switch
                 checked={upcomingOnly}
                 onCheckedChange={(checked) => {
-                  setUpcomingOnly(checked);
-                  setSkip(0);
+                  setUpcomingOnly(checked)
+                  setSkip(0)
                 }}
               />
               Upcoming only
@@ -234,40 +226,46 @@ export default function AdminAppointmentsPage() {
         onChange={setSkip}
       />
     </div>
-  );
+  )
 }
 
 function StatusBadge({ status }: { status: AppointmentStatus }) {
   const map: Record<
     AppointmentStatus,
-    { variant: "default" | "secondary" | "destructive" | "outline"; label: string }
+    {
+      variant: "default" | "secondary" | "destructive" | "outline"
+      label: string
+    }
   > = {
     PENDING: { variant: "secondary", label: "Pending" },
     CONFIRMED: { variant: "default", label: "Confirmed" },
     COMPLETED: { variant: "outline", label: "Completed" },
     CANCELLED: { variant: "destructive", label: "Cancelled" },
     NO_SHOW: { variant: "destructive", label: "No-show" },
-  };
-  const { variant, label } = map[status];
-  return <Badge variant={variant}>{label}</Badge>;
+  }
+  const { variant, label } = map[status]
+  return <Badge variant={variant}>{label}</Badge>
 }
 
 function PaymentBadge({
   status,
 }: {
-  status: "PENDING" | "PAID" | "FAILED" | "REFUNDED";
+  status: "PENDING" | "PAID" | "FAILED" | "REFUNDED"
 }) {
   const map: Record<
     typeof status,
-    { variant: "default" | "secondary" | "destructive" | "outline"; label: string }
+    {
+      variant: "default" | "secondary" | "destructive" | "outline"
+      label: string
+    }
   > = {
     PAID: { variant: "default", label: "Paid" },
     PENDING: { variant: "secondary", label: "Pending" },
     FAILED: { variant: "destructive", label: "Failed" },
     REFUNDED: { variant: "outline", label: "Refunded" },
-  };
-  const { variant, label } = map[status];
-  return <Badge variant={variant}>{label}</Badge>;
+  }
+  const { variant, label } = map[status]
+  return <Badge variant={variant}>{label}</Badge>
 }
 
 function Pagination({
@@ -276,14 +274,14 @@ function Pagination({
   total,
   onChange,
 }: {
-  skip: number;
-  take: number;
-  total: number;
-  onChange: (next: number) => void;
+  skip: number
+  take: number
+  total: number
+  onChange: (next: number) => void
 }) {
-  const page = Math.floor(skip / take) + 1;
-  const totalPages = Math.max(1, Math.ceil(total / take));
-  if (total <= take) return null;
+  const page = Math.floor(skip / take) + 1
+  const totalPages = Math.max(1, Math.ceil(total / take))
+  if (total <= take) return null
   return (
     <div className="flex items-center justify-between text-sm text-muted-foreground">
       <span>
@@ -308,5 +306,5 @@ function Pagination({
         </Button>
       </div>
     </div>
-  );
+  )
 }

@@ -308,10 +308,18 @@ export class AppointmentTypesService {
         manualConfirmation: policy.manualConfirmation,
         advancePaymentEnabled: policy.advancePaymentEnabled,
         advancePaymentAmount: policy.advancePaymentAmount,
-        price: input.price !== undefined ? (input.price ?? null) : existing.price ? Number(existing.price) : null,
-        advanceBookingWindowDays: input.advanceBookingWindowDays ?? existing.advanceBookingWindowDays,
-        minimumNoticePeriodHours: input.minimumNoticePeriodHours ?? existing.minimumNoticePeriodHours,
-        reminderIntervals: input.reminderIntervals ?? existing.reminderIntervals,
+        price:
+          input.price !== undefined
+            ? (input.price ?? null)
+            : existing.price
+              ? Number(existing.price)
+              : null,
+        advanceBookingWindowDays:
+          input.advanceBookingWindowDays ?? existing.advanceBookingWindowDays,
+        minimumNoticePeriodHours:
+          input.minimumNoticePeriodHours ?? existing.minimumNoticePeriodHours,
+        reminderIntervals:
+          input.reminderIntervals ?? existing.reminderIntervals,
         assignmentMode: merged.assignmentMode,
         bufferMinutes: merged.bufferMinutes,
         cancellationAllowed: policy.cancellationAllowed,
