@@ -1,46 +1,49 @@
-"use client";
+"use client"
 
-import { useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react"
+import { useSearchParams } from "next/navigation"
+import { useQueryClient } from "@tanstack/react-query"
 
-import { ConfirmationSummary } from "@/components/booking/confirmation-summary";
-import { PublicShell } from "@/components/layout/public-shell";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useAppointment, appointmentKey } from "@/hooks/useBooking";
+import { ConfirmationSummary } from "@/components/booking/confirmation-summary"
+import { PublicShell } from "@/components/layout/public-shell"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useAppointment, appointmentKey } from "@/hooks/useBooking"
 
-const POLL_INTERVAL_MS = 3_000;
-const POLL_DURATION_MS = 30_000;
+const POLL_INTERVAL_MS = 3_000
+const POLL_DURATION_MS = 30_000
 
 export default function ConfirmedPage() {
-  const searchParams = useSearchParams();
-  const publicId = searchParams?.get("appointment") ?? undefined;
-  const { data, isPending, isError } = useAppointment(publicId);
-  const qc = useQueryClient();
+  const searchParams = useSearchParams()
+  const publicId = searchParams?.get("appointment") ?? undefined
+  const { data, isPending, isError } = useAppointment(publicId)
+  const qc = useQueryClient()
 
-  const pollRef = useRef<{ started: number; interval?: ReturnType<typeof setInterval> }>({
+  const pollRef = useRef<{
+    started: number
+    interval?: ReturnType<typeof setInterval>
+  }>({
     started: 0,
-  });
+  })
   useEffect(() => {
-    if (!data || !publicId) return;
-    if (!data.appointmentType.advancePaymentEnabled) return;
-    if (data.paymentStatus !== "PENDING") return;
-    if (pollRef.current.interval) return;
-    pollRef.current.started = Date.now();
+    if (!data || !publicId) return
+    if (!data.appointmentType.advancePaymentEnabled) return
+    if (data.paymentStatus !== "PENDING") return
+    if (pollRef.current.interval) return
+    pollRef.current.started = Date.now()
     pollRef.current.interval = setInterval(() => {
-      qc.invalidateQueries({ queryKey: appointmentKey(publicId) });
+      qc.invalidateQueries({ queryKey: appointmentKey(publicId) })
       if (Date.now() - pollRef.current.started > POLL_DURATION_MS) {
-        clearInterval(pollRef.current.interval!);
-        pollRef.current.interval = undefined;
+        clearInterval(pollRef.current.interval!)
+        pollRef.current.interval = undefined
       }
-    }, POLL_INTERVAL_MS);
+    }, POLL_INTERVAL_MS)
     return () => {
       if (pollRef.current.interval) {
-        clearInterval(pollRef.current.interval);
-        pollRef.current.interval = undefined;
+        clearInterval(pollRef.current.interval)
+        pollRef.current.interval = undefined
       }
-    };
-  }, [data, publicId, qc]);
+    }
+  }, [data, publicId, qc])
 
   return (
     <PublicShell showBrowseLink={false}>
@@ -62,5 +65,5 @@ export default function ConfirmedPage() {
         <ConfirmationSummary appointment={data} />
       )}
     </PublicShell>
-  );
+  )
 }

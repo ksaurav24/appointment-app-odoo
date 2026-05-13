@@ -1,6 +1,6 @@
-/* eslint-disable no-console */
 import {
   AppointmentStatus,
+  AppointmentTypeVisibility,
   AssignmentMode,
   DurationMode,
   EntityType,
@@ -31,6 +31,38 @@ type SeedUserInput = {
   fullName: string;
   role: Role;
 };
+
+async function upsertBootstrapAdmin(): Promise<{
+  email: string;
+  fullName: string;
+}> {
+  const email = (process.env.ADMIN_BOOTSTRAP_EMAIL ?? 'admin@example.com')
+    .trim()
+    .toLowerCase();
+  const password = process.env.ADMIN_BOOTSTRAP_PASSWORD ?? 'ChangeMe123!';
+  const fullName = (process.env.ADMIN_BOOTSTRAP_NAME ?? 'Administrator').trim();
+  const cost = Number(process.env.BCRYPT_COST ?? '12');
+  const passwordHash = await bcrypt.hash(password, cost);
+
+  await prisma.user.upsert({
+    where: { email },
+    update: {
+      fullName,
+      role: Role.ADMIN,
+      passwordHash,
+      emailVerified: true,
+    },
+    create: {
+      email,
+      passwordHash,
+      fullName,
+      role: Role.ADMIN,
+      emailVerified: true,
+    },
+  });
+
+  return { email, fullName };
+}
 
 async function upsertUser(
   input: SeedUserInput,
@@ -64,6 +96,9 @@ type OrgSeed = {
   address: string;
   timezone: string;
   organiser: SeedUserInput;
+  approvalStatus?: OrganizationApprovalStatus;
+  isActive?: boolean;
+  rejectedReason?: string;
 };
 
 async function upsertOrganization(
@@ -81,9 +116,23 @@ async function upsertOrganization(
       contactPhone: org.contactPhone,
       address: org.address,
       timezone: org.timezone,
-      approvalStatus: OrganizationApprovalStatus.APPROVED,
-      approvedAt: new Date(),
-      isActive: true,
+      approvalStatus: org.approvalStatus ?? OrganizationApprovalStatus.APPROVED,
+      approvedAt:
+        (org.approvalStatus ?? OrganizationApprovalStatus.APPROVED) ===
+        OrganizationApprovalStatus.APPROVED
+          ? new Date()
+          : null,
+      rejectedAt:
+        (org.approvalStatus ?? OrganizationApprovalStatus.APPROVED) ===
+        OrganizationApprovalStatus.REJECTED
+          ? new Date()
+          : null,
+      rejectedReason:
+        (org.approvalStatus ?? OrganizationApprovalStatus.APPROVED) ===
+        OrganizationApprovalStatus.REJECTED
+          ? (org.rejectedReason ?? 'Seeded as rejected')
+          : null,
+      isActive: org.isActive ?? true,
     },
     create: {
       slug: org.slug,
@@ -94,8 +143,23 @@ async function upsertOrganization(
       address: org.address,
       timezone: org.timezone,
       organiserId,
-      approvalStatus: OrganizationApprovalStatus.APPROVED,
-      approvedAt: new Date(),
+      approvalStatus: org.approvalStatus ?? OrganizationApprovalStatus.APPROVED,
+      approvedAt:
+        (org.approvalStatus ?? OrganizationApprovalStatus.APPROVED) ===
+        OrganizationApprovalStatus.APPROVED
+          ? new Date()
+          : null,
+      rejectedAt:
+        (org.approvalStatus ?? OrganizationApprovalStatus.APPROVED) ===
+        OrganizationApprovalStatus.REJECTED
+          ? new Date()
+          : null,
+      rejectedReason:
+        (org.approvalStatus ?? OrganizationApprovalStatus.APPROVED) ===
+        OrganizationApprovalStatus.REJECTED
+          ? (org.rejectedReason ?? 'Seeded as rejected')
+          : null,
+      isActive: org.isActive ?? true,
     },
     select: { id: true },
   });
@@ -168,6 +232,7 @@ type AppointmentTypeSeed = {
   rescheduleWindowHours?: number;
   maxReschedulesAllowed?: number;
   isPublished?: boolean;
+  visibility?: AppointmentTypeVisibility;
   personIds?: string[];
   resourceIds?: string[];
   schedule: {
@@ -220,6 +285,11 @@ async function upsertAppointmentType(
     rescheduleWindowHours: seed.rescheduleWindowHours,
     maxReschedulesAllowed: seed.maxReschedulesAllowed,
     isPublished: seed.isPublished ?? true,
+    visibility:
+      seed.visibility ??
+      ((seed.isPublished ?? true)
+        ? AppointmentTypeVisibility.PUBLISHED
+        : AppointmentTypeVisibility.DRAFT),
     shareToken: crypto.randomBytes(16).toString('hex'),
   };
 
@@ -318,31 +388,79 @@ async function createSampleAppointment(args: {
     },
     select: { id: true },
   });
-  if (existing) return;
+  const appointmentData = {
+    appointmentTypeId: args.appointmentTypeId,
+    organizationId: args.organizationId,
+    customerId: args.customerId,
+    bookablePersonId: args.bookablePersonId,
+    bookableResourceId: args.bookableResourceId,
+    startTime: args.start,
+    endTime: end,
+    durationMins: args.durationMins,
+    status: args.status,
+    paymentStatus: args.paymentStatus ?? PaymentStatus.PENDING,
+    totalAmount:
+      args.totalAmount !== undefined
+        ? new Prisma.Decimal(args.totalAmount)
+        : null,
+    capacityBooked: args.capacityBooked ?? 1,
+    cancellationReason: args.cancellationReason,
+    cancelledAt:
+      args.status === AppointmentStatus.CANCELLED ? new Date() : null,
+  };
 
-  await prisma.appointment.create({
-    data: {
-      appointmentTypeId: args.appointmentTypeId,
-      organizationId: args.organizationId,
-      customerId: args.customerId,
-      bookablePersonId: args.bookablePersonId,
-      bookableResourceId: args.bookableResourceId,
-      startTime: args.start,
-      endTime: end,
-      durationMins: args.durationMins,
-      status: args.status,
-      paymentStatus: args.paymentStatus ?? PaymentStatus.PENDING,
-      totalAmount:
-        args.totalAmount !== undefined
-          ? new Prisma.Decimal(args.totalAmount)
-          : null,
-      capacityBooked: args.capacityBooked ?? 1,
-      cancellationReason: args.cancellationReason,
-      cancelledAt:
-        args.status === AppointmentStatus.CANCELLED ? new Date() : null,
-      confirmationCode: makeConfirmationCode(),
-    },
+  const appointment = existing
+    ? await prisma.appointment.update({
+        where: { id: existing.id },
+        data: appointmentData,
+        select: { id: true },
+      })
+    : await prisma.appointment.create({
+        data: {
+          ...appointmentData,
+          confirmationCode: makeConfirmationCode(),
+        },
+        select: { id: true },
+      });
+
+  const paymentStatus = args.paymentStatus ?? PaymentStatus.PENDING;
+  const needsPayment =
+    args.totalAmount !== undefined &&
+    (paymentStatus === PaymentStatus.PAID ||
+      paymentStatus === PaymentStatus.REFUNDED);
+
+  if (!needsPayment) {
+    await prisma.payment.deleteMany({
+      where: { appointmentId: appointment.id },
+    });
+    return;
+  }
+
+  const existingPayment = await prisma.payment.findFirst({
+    where: { appointmentId: appointment.id },
+    select: { id: true },
   });
+
+  const paymentData = {
+    appointmentId: appointment.id,
+    customerId: args.customerId,
+    amount: new Prisma.Decimal(args.totalAmount!),
+    currency: 'INR',
+    paymentGateway: 'DEMO',
+    gatewayTransactionId: `SEED-${appointment.id.toString()}`,
+    status: paymentStatus,
+    paidAt: new Date(),
+    refundedAt: paymentStatus === PaymentStatus.REFUNDED ? new Date() : null,
+  };
+
+  if (existingPayment) {
+    await prisma.payment.update({
+      where: { id: existingPayment.id },
+      data: paymentData,
+    });
+  } else {
+    await prisma.payment.create({ data: paymentData });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -351,9 +469,19 @@ async function createSampleAppointment(args: {
 
 async function seedDemoData(): Promise<void> {
   console.log(`Seeding demo data (default password: ${DEMO_PASSWORD})`);
+  const bootstrapAdmin = await upsertBootstrapAdmin();
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_COST);
 
   // ----------------- Customers (shared across orgs) -----------------
+  await upsertUser(
+    {
+      email: 'admin@appointly.example.com',
+      fullName: 'Platform Admin',
+      role: Role.ADMIN,
+    },
+    passwordHash,
+  );
+
   const customers = await Promise.all(
     [
       { email: 'aarav.sharma@example.com', fullName: 'Aarav Sharma' },
@@ -364,6 +492,60 @@ async function seedDemoData(): Promise<void> {
     ].map((c) => upsertUser({ ...c, role: Role.CUSTOMER }, passwordHash)),
   );
   const [aarav, priya, rohit, maya, ishaan] = customers;
+
+  // Extra legacy-style users for demo continuity.
+  const legacyCustomers = await Promise.all(
+    [
+      { email: 'ananya.desai@example.com', fullName: 'Ananya Desai' },
+      { email: 'dev.patil@example.com', fullName: 'Dev Patil' },
+      { email: 'kavya.nair@example.com', fullName: 'Kavya Nair' },
+      { email: 'manav.joshi@example.com', fullName: 'Manav Joshi' },
+      { email: 'sana.mirza@example.com', fullName: 'Sana Mirza' },
+    ].map((c) => upsertUser({ ...c, role: Role.CUSTOMER }, passwordHash)),
+  );
+  const [ananya, dev, kavya] = legacyCustomers;
+
+  // Extra orgs for admin approval workflow demo.
+  await upsertOrganization(
+    {
+      slug: 'pending-demo-org',
+      name: 'Pending Demo Organization',
+      description: 'Used to showcase admin approval flow.',
+      contactEmail: 'contact@pendingdemo.example.com',
+      contactPhone: '+91-9000-400-400',
+      address: '22 Awaiting Approval Street, Hyderabad, TS 500001',
+      timezone: 'Asia/Kolkata',
+      organiser: {
+        email: 'organiser@pendingdemo.example.com',
+        fullName: 'Pending Organizer',
+        role: Role.ORGANIZER,
+      },
+      approvalStatus: OrganizationApprovalStatus.PENDING,
+      isActive: true,
+    },
+    passwordHash,
+  );
+
+  await upsertOrganization(
+    {
+      slug: 'rejected-demo-org',
+      name: 'Rejected Demo Organization',
+      description: 'Used to showcase admin rejection state.',
+      contactEmail: 'contact@rejecteddemo.example.com',
+      contactPhone: '+91-9000-500-500',
+      address: '9 Rejected Lane, Chennai, TN 600001',
+      timezone: 'Asia/Kolkata',
+      organiser: {
+        email: 'organiser@rejecteddemo.example.com',
+        fullName: 'Rejected Organizer',
+        role: Role.ORGANIZER,
+      },
+      approvalStatus: OrganizationApprovalStatus.REJECTED,
+      rejectedReason: 'Insufficient business verification documents',
+      isActive: false,
+    },
+    passwordHash,
+  );
 
   // ====================================================================
   // 1. Glow Aesthetic — clinical management for skin & hair
@@ -942,6 +1124,136 @@ async function seedDemoData(): Promise<void> {
     },
   });
 
+  // ====================================================================
+  // 4. Legacy demo orgs (restored-style accounts)
+  // ====================================================================
+  const dentalOrgId = await upsertOrganization(
+    {
+      slug: 'careplus-dental',
+      name: 'CarePlus Dental Studio',
+      description:
+        'Family dental clinic for consultation, cleaning, and oral care procedures.',
+      contactEmail: 'hello@careplusdental.example.com',
+      contactPhone: '+91-9000-610-610',
+      address: '44 Smile Park, Pune, MH 411001',
+      timezone: 'Asia/Kolkata',
+      organiser: {
+        email: 'organiser@careplusdental.example.com',
+        fullName: 'Dr. Rhea Kulkarni',
+        role: Role.ORGANIZER,
+      },
+    },
+    passwordHash,
+  );
+  const dentalDoctor = await upsertBookablePerson(dentalOrgId, {
+    name: 'Dr. Rhea Kulkarni',
+    designation: 'Dentist',
+  });
+  const dentalConsultAppt = await upsertAppointmentType(dentalOrgId, {
+    slug: 'dental-consult',
+    name: 'Dental Consultation',
+    description: 'Routine oral check-up with treatment recommendations.',
+    entityType: EntityType.PERSON,
+    scheduleType: ScheduleType.WEEKLY,
+    durationMode: DurationMode.FIXED,
+    durationMinutes: 30,
+    personIds: [dentalDoctor],
+    schedule: {
+      timezone: 'Asia/Kolkata',
+      rules: [1, 2, 3, 4, 5].map((d) => ({
+        dayOfWeek: d,
+        startTime: '10:00',
+        endTime: '18:00',
+      })),
+    },
+  });
+
+  const fitnessOrgId = await upsertOrganization(
+    {
+      slug: 'fitpulse-gym',
+      name: 'FitPulse Gym & Training',
+      description:
+        'Strength training, cardio coaching and personal fitness programs.',
+      contactEmail: 'hello@fitpulse.example.com',
+      contactPhone: '+91-9000-620-620',
+      address: '7 Momentum Street, Mumbai, MH 400001',
+      timezone: 'Asia/Kolkata',
+      organiser: {
+        email: 'organiser@fitpulse.example.com',
+        fullName: 'Raghav Menon',
+        role: Role.ORGANIZER,
+      },
+    },
+    passwordHash,
+  );
+  const studioFloor = await upsertBookableResource(fitnessOrgId, {
+    name: 'Training Floor A',
+    resourceType: 'Studio',
+    capacity: 15,
+    location: 'Ground floor',
+  });
+  const sessionAppt = await upsertAppointmentType(fitnessOrgId, {
+    slug: 'personal-training-session',
+    name: 'Personal Training Session',
+    description: 'One-on-one personal training program.',
+    entityType: EntityType.RESOURCE,
+    scheduleType: ScheduleType.WEEKLY,
+    durationMode: DurationMode.FIXED,
+    durationMinutes: 60,
+    advancePaymentEnabled: true,
+    advancePaymentAmount: 700,
+    resourceIds: [studioFloor],
+    schedule: {
+      timezone: 'Asia/Kolkata',
+      rules: [1, 2, 3, 4, 5, 6].map((d) => ({
+        dayOfWeek: d,
+        startTime: '06:00',
+        endTime: '21:00',
+      })),
+    },
+  });
+
+  const visaOrgId = await upsertOrganization(
+    {
+      slug: 'visabridge-consulting',
+      name: 'VisaBridge Consulting',
+      description:
+        'Student and work visa consultation with end-to-end documentation support.',
+      contactEmail: 'hello@visabridge.example.com',
+      contactPhone: '+91-9000-630-630',
+      address: '11 Embassy Road, New Delhi, DL 110001',
+      timezone: 'Asia/Kolkata',
+      organiser: {
+        email: 'organiser@visabridge.example.com',
+        fullName: 'Farah Siddiqui',
+        role: Role.ORGANIZER,
+      },
+    },
+    passwordHash,
+  );
+  const visaAdvisor = await upsertBookablePerson(visaOrgId, {
+    name: 'Farah Siddiqui',
+    designation: 'Senior Visa Advisor',
+  });
+  const visaConsultAppt = await upsertAppointmentType(visaOrgId, {
+    slug: 'visa-document-review',
+    name: 'Visa Document Review',
+    description: 'Checklist and document gap review before submission.',
+    entityType: EntityType.PERSON,
+    scheduleType: ScheduleType.WEEKLY,
+    durationMode: DurationMode.FIXED,
+    durationMinutes: 45,
+    personIds: [visaAdvisor],
+    schedule: {
+      timezone: 'Asia/Kolkata',
+      rules: [1, 2, 3, 4, 5].map((d) => ({
+        dayOfWeek: d,
+        startTime: '09:30',
+        endTime: '17:30',
+      })),
+    },
+  });
+
   // (e) PERSON / WEEKLY / FIXED — full-day photographer booking
   await upsertAppointmentType(modelOrgId, {
     slug: 'photographer-full-day',
@@ -1086,14 +1398,56 @@ async function seedDemoData(): Promise<void> {
     cancellationReason: 'Shoot moved to next month',
   });
 
+  await createSampleAppointment({
+    organizationId: dentalOrgId,
+    appointmentTypeId: dentalConsultAppt,
+    customerId: ananya,
+    bookablePersonId: dentalDoctor,
+    start: atTime(2, 11, 0),
+    durationMins: 30,
+    status: AppointmentStatus.CONFIRMED,
+  });
+
+  await createSampleAppointment({
+    organizationId: fitnessOrgId,
+    appointmentTypeId: sessionAppt,
+    customerId: dev,
+    bookableResourceId: studioFloor,
+    start: atTime(1, 7, 0),
+    durationMins: 60,
+    status: AppointmentStatus.CONFIRMED,
+    paymentStatus: PaymentStatus.PAID,
+    totalAmount: 700,
+  });
+
+  await createSampleAppointment({
+    organizationId: visaOrgId,
+    appointmentTypeId: visaConsultAppt,
+    customerId: kavya,
+    bookablePersonId: visaAdvisor,
+    start: atTime(3, 16, 0),
+    durationMins: 45,
+    status: AppointmentStatus.PENDING,
+  });
+
   console.log('---------------------------------------------------------');
   console.log(
     `Demo seed complete. All accounts share password: ${DEMO_PASSWORD}`,
   );
+  console.log('  Admin:');
+  console.log(
+    `    ${bootstrapAdmin.email.padEnd(37)} (${bootstrapAdmin.fullName})`,
+  );
+  console.log('    admin@appointly.example.com             (Platform Admin)');
   console.log('  Organisers:');
   console.log('    organiser@glowaesthetic.example.com   (Glow Aesthetic)');
   console.log('    organiser@turfpro.example.com         (TurfPro Sports)');
   console.log('    organiser@lumieremodels.example.com   (Lumiere Models)');
+  console.log('    organiser@pendingdemo.example.com     (Pending demo org)');
+  console.log('    organiser@rejecteddemo.example.com    (Rejected demo org)');
+  console.log('    organiser@careplusdental.example.com  (CarePlus Dental)');
+  console.log('    organiser@fitpulse.example.com        (FitPulse Gym)');
+  console.log('    organiser@visabridge.example.com      (VisaBridge)');
   console.log('  Customers:');
   console.log('    aarav.sharma@example.com');
   console.log('    priya.iyer@example.com');

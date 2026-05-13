@@ -1,12 +1,25 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LockPasswordIcon, StarIcon } from "@hugeicons/core-free-icons";
+import { LockPasswordIcon, StarIcon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
 export function HeroSection() {
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/browse?q=${encodeURIComponent(searchQuery.trim())}`);
+    } else {
+      router.push('/browse');
+    }
+  };
+
   return (
     <section className="relative overflow-hidden bg-cream px-6 py-20 lg:py-28 min-h-[90vh] flex items-center">
       {/* Background Blob */}
@@ -20,7 +33,7 @@ export function HeroSection() {
         {/* Left Column (55%) */}
         <div className="lg:col-span-7 space-y-8 max-w-2xl">
           <Badge className="bg-forest-pale text-forest-light border-0 font-semibold text-xs tracking-widest uppercase px-4 py-1.5 rounded-full">
-            ✦ Trusted by 2,400+ businesses
+            ✦ Hassle-free booking starts here
           </Badge>
           
           <h1 className="font-heading text-[52px] lg:text-[64px] leading-[1.1] text-slate-dark">
@@ -38,12 +51,32 @@ export function HeroSection() {
             The all-in-one scheduling platform for clinics, salons, tutors, and venues. Real-time slots. Zero double-bookings. Payments built in.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
-            <Button render={<Link href="/signup" />} className="w-full sm:w-auto bg-amber hover:bg-amber-deep text-white rounded-full px-8 py-6 text-base font-semibold shadow-lg shadow-amber/20">
-              Start Booking Free →
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-center gap-2 pt-2 max-w-lg w-full">
+            <div className="relative w-full">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <HugeiconsIcon icon={Search01Icon} className="w-5 h-5 text-slate-light" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search by service, provider, or category..."
+                className="w-full pl-11 pr-4 py-4 rounded-full border border-slate-dark/10 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-forest-light focus:border-transparent text-slate-dark transition-all placeholder:text-slate-light"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <Button type="submit" className="w-full sm:w-auto bg-amber hover:bg-amber-deep text-white rounded-full px-8 py-6 text-base font-semibold shadow-lg shadow-amber/20 shrink-0">
+              Search
             </Button>
-            <Button render={<Link href="/browse" />} variant="outline" className="w-full sm:w-auto rounded-full px-8 py-6 border-slate-dark/20 text-slate-dark hover:bg-slate-pale">
-              Watch demo
+          </form>
+          
+          <div className="flex gap-4">
+            <Button 
+              type="button"
+              variant="outline"
+              onClick={() => router.push('/browse')} 
+              className="rounded-full px-8 py-6 text-base font-semibold border-forest-deep text-forest-deep hover:bg-forest-pale"
+            >
+              Browse All Services
             </Button>
           </div>
 

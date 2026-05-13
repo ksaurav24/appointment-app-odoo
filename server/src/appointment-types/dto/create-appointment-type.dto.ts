@@ -237,7 +237,8 @@ export class CreateAppointmentTypeDto {
 
   @ApiPropertyOptional({
     example: 500.0,
-    description: 'Base price of the appointment in the organisation\'s currency (0 for free)',
+    description:
+      "Base price of the appointment in the organisation's currency (0 for free)",
     minimum: 0,
   })
   @IsOptional()
@@ -247,7 +248,8 @@ export class CreateAppointmentTypeDto {
 
   @ApiPropertyOptional({
     example: 30,
-    description: 'How many days in advance customers can book (omit or 0 = unlimited)',
+    description:
+      'How many days in advance customers can book (omit or 0 = unlimited)',
     minimum: 0,
   })
   @IsOptional()

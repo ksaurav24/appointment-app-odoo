@@ -1,33 +1,33 @@
-"use client";
+"use client"
 
-import { useRouter } from "next/navigation";
-import { use, useEffect } from "react";
+import { useRouter } from "next/navigation"
+import { use, useEffect } from "react"
 
-import { RescheduleStepper } from "@/components/booking/reschedule-stepper";
-import { CheckoutShell } from "@/components/layout/checkout-shell";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useCurrentUser } from "@/hooks/useAuth";
-import { useAppointment } from "@/hooks/useBooking";
+import { RescheduleStepper } from "@/components/booking/reschedule-stepper"
+import { CheckoutShell } from "@/components/layout/checkout-shell"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useCurrentUser } from "@/hooks/useAuth"
+import { useAppointment } from "@/hooks/useBooking"
 
-type Params = { publicId: string };
+type Params = { publicId: string }
 
 export default function ReschedulePage({
   params,
 }: {
-  params: Promise<Params>;
+  params: Promise<Params>
 }) {
-  const { publicId } = use(params);
-  const router = useRouter();
-  const { data: user, isPending: userPending } = useCurrentUser();
-  const { data, isPending, isError } = useAppointment(publicId);
+  const { publicId } = use(params)
+  const router = useRouter()
+  const { data: user, isPending: userPending } = useCurrentUser()
+  const { data, isPending, isError } = useAppointment(publicId)
 
   useEffect(() => {
     if (!userPending && !user) {
       router.replace(
-        `/login?next=${encodeURIComponent(`/bookings/${publicId}/reschedule`)}`,
-      );
+        `/login?next=${encodeURIComponent(`/bookings/${publicId}/reschedule`)}`
+      )
     }
-  }, [user, userPending, router, publicId]);
+  }, [user, userPending, router, publicId])
 
   if (userPending || isPending) {
     return (
@@ -38,7 +38,7 @@ export default function ReschedulePage({
           <Skeleton className="h-64 w-full" />
         </div>
       </CheckoutShell>
-    );
+    )
   }
 
   if (isError || !data) {
@@ -53,7 +53,7 @@ export default function ReschedulePage({
           </p>
         </div>
       </CheckoutShell>
-    );
+    )
   }
 
   if (!data.appointmentType.rescheduleAllowed) {
@@ -68,8 +68,8 @@ export default function ReschedulePage({
           </p>
         </div>
       </CheckoutShell>
-    );
+    )
   }
 
-  return <RescheduleStepper appointment={data} />;
+  return <RescheduleStepper appointment={data} />
 }

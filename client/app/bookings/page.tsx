@@ -1,52 +1,52 @@
-"use client";
+"use client"
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useEffect, useMemo } from "react"
 
-import { BookingCard } from "@/components/booking/booking-card";
-import { PublicShell } from "@/components/layout/public-shell";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useCurrentUser } from "@/hooks/useAuth";
-import { useMyAppointments } from "@/hooks/useBooking";
-import type { AppointmentWithRelations } from "@/types";
+import { BookingCard } from "@/components/booking/booking-card"
+import { PublicShell } from "@/components/layout/public-shell"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useCurrentUser } from "@/hooks/useAuth"
+import { useMyAppointments } from "@/hooks/useBooking"
+import type { AppointmentWithRelations } from "@/types"
 
 function partition(list: AppointmentWithRelations[]) {
-  const now = Date.now();
-  const upcoming: AppointmentWithRelations[] = [];
-  const past: AppointmentWithRelations[] = [];
-  const cancelled: AppointmentWithRelations[] = [];
+  const now = Date.now()
+  const upcoming: AppointmentWithRelations[] = []
+  const past: AppointmentWithRelations[] = []
+  const cancelled: AppointmentWithRelations[] = []
   for (const a of list) {
     if (a.status === "CANCELLED") {
-      cancelled.push(a);
-      continue;
+      cancelled.push(a)
+      continue
     }
-    const startMs = new Date(a.startTime).getTime();
+    const startMs = new Date(a.startTime).getTime()
     if (a.status === "COMPLETED" || a.status === "NO_SHOW" || startMs < now) {
-      past.push(a);
+      past.push(a)
     } else {
-      upcoming.push(a);
+      upcoming.push(a)
     }
   }
-  return { upcoming, past, cancelled };
+  return { upcoming, past, cancelled }
 }
 
 export default function BookingsListPage() {
-  const router = useRouter();
-  const { data: user, isPending: userPending } = useCurrentUser();
-  const { data, isPending, isError, refetch } = useMyAppointments();
+  const router = useRouter()
+  const { data: user, isPending: userPending } = useCurrentUser()
+  const { data, isPending, isError, refetch } = useMyAppointments()
 
   useEffect(() => {
     if (!userPending && !user) {
-      router.replace("/login?next=/bookings");
+      router.replace("/login?next=/bookings")
     }
-  }, [user, userPending, router]);
+  }, [user, userPending, router])
 
   const { upcoming, past, cancelled } = useMemo(() => {
-    return partition(data ?? []);
-  }, [data]);
+    return partition(data ?? [])
+  }, [data])
 
   return (
     <PublicShell>
@@ -107,7 +107,9 @@ export default function BookingsListPage() {
                   No upcoming bookings.
                 </p>
               ) : (
-                upcoming.map((a) => <BookingCard key={a.publicId} appointment={a} />)
+                upcoming.map((a) => (
+                  <BookingCard key={a.publicId} appointment={a} />
+                ))
               )}
             </TabsContent>
 
@@ -117,7 +119,9 @@ export default function BookingsListPage() {
                   No past bookings.
                 </p>
               ) : (
-                past.map((a) => <BookingCard key={a.publicId} appointment={a} />)
+                past.map((a) => (
+                  <BookingCard key={a.publicId} appointment={a} />
+                ))
               )}
             </TabsContent>
 
@@ -127,12 +131,14 @@ export default function BookingsListPage() {
                   No cancelled bookings.
                 </p>
               ) : (
-                cancelled.map((a) => <BookingCard key={a.publicId} appointment={a} />)
+                cancelled.map((a) => (
+                  <BookingCard key={a.publicId} appointment={a} />
+                ))
               )}
             </TabsContent>
           </Tabs>
         )}
       </div>
     </PublicShell>
-  );
+  )
 }
